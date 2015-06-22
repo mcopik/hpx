@@ -14,8 +14,5 @@ void call_amp(std::vector<int> & v, size_t count, const function< int(double) > 
 	parallel_for_each(av.get_extent(), [=](index<1> idx) restrict(amp) {
     		av[idx] += lambda(0); //Lambda::get_lambda()(0);
  	});
-
-	for(unsigned int i = 0; i < av.get_extent().size(); i++)
-	    std::cout << static_cast<char>(av(i));
 }
 

@@ -60,6 +60,7 @@ int hpx_main(boost::program_options::variables_map& vm)
     run_amp(v, v.size(), Lambda::get_lambda());
     for(unsigned int i = 0; i < v.size(); i++)
     	std::cout << static_cast<char>(v.at(i));
+	std::cout << std::endl;
 
     return hpx::finalize();
 }

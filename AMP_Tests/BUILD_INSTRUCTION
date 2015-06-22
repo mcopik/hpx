@@ -1,0 +1,26 @@
+1. Get Clang & libcxx
+https://bitbucket.org/multicoreware/cppamp-driver-ng/overview
+'make world' creates libcxx and clang; then make
+
+2. Get Boost and compile against the libcxx:
+Download source, unpacke to BOOST_DIR and follow these steps:
+http://www.boost.org/doc/libs/1_58_0/more/getting_started/unix-variants.html
+for custom binaries.
+When you have b2, then build with tools:
+toolset=clang 
+cxxflags="-stdlib=libc++ -I YOUR_AMP_SOURCE/libc++/libcxx/include/ -I YOUR_AMP_SOURCE/libc++/libcxxrt/src/" 
+linkflags="-stdlib=libc++ -L YOUR_AMP_BUILD/libc++/libcxx/lib/ -L YOUR_AMP_BUILD/libc++/libcxxrt/lib/ -Wl,--rpath=YOUR_AMP_BUILD/libc++/libcxxrt/lib/:YOUR_AMP_BUILD/libc++/libcxx/lib/ -lc++ -lcxxrt"
+When it's done, then (depending on where did you decided to put builded libraries, e.g. in stage directory) create a symbolic link from BOOST_DIR/lib/ to the place where boost libs are located
+BOOST_DIR will be BOOST_ROOT for HPX build
+
+3. HPX
+HPX requires several options for building:
+1) disabled native TLS
+2) HPX_MALLOC needs to be: "custom"
+3) BOOST_ROOT must be set to the directory from previous section - cmake should find all shared libraries and inject them directly to build command, so default system boost is bypassed
+4) CMAKE_CXX_COMPILER will be YOUR_AMP_BUILD/compiler/bin/clang++
+5) CMAKE_CXX_FLAGS : "stdlib=libc++ -I YOUR_AMP_SOURCE/libc++/libcxx/include/ -I YOUR_AMP_SOURCE/libc++/libcxxrt/src/"
+5) CMAKE_EXE_LINKER_FLAGS, CMAKE_EXE_LINKER_FLAGS and CMAKE_SHARED_LINKER_FLAGS (but NOT static!) will be:
+"-stdlib=libc++ -L YOUR_AMP_BUILD/libc++/libcxx/lib/ -L YOUR_AMP_BUILD/libc++/libcxxrt/lib/ -Wl,--rpath=YOUR_AMP_BUILD/libc++/libcxxrt/lib/:YOUR_AMP_BUILD/libc++/libcxx/lib/ -lc++ -lcxxrt"
+
+That's all!

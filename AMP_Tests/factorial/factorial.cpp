@@ -62,6 +62,13 @@ int hpx_main(boost::program_options::variables_map& vm)
     	std::cout << static_cast<char>(v.at(i));
 	std::cout << std::endl;
 
+	std::list<int> l = { 'G', 'd', 'k', 'k', 'n', 31, 'v', 'n', 'q', 'k', 'c'};
+    run_amp(l, l.size(), Lambda::get_lambda());
+    for(auto it = l.begin(); it != l.end(); ++it)
+        std::cout << static_cast<char>(*it);
+        std::cout << std::endl;
+
+
     return hpx::finalize();
 }
 

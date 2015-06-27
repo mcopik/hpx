@@ -711,7 +711,7 @@ if(NOT MSVC)
       endif()
     endif()
   endif()
-
+  set(CXX_FLAG -std=c++amp)
   hpx_add_compile_flag(${CXX_FLAG})
 endif()
 

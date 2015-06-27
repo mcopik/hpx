@@ -6,11 +6,11 @@
 
 set(tests
     command_line_arguments_706
-    function_argument
-    function_serialization_728
-    iarchive_1237
+    #function_argument
+    #function_serialization_728
+    #iarchive_1237
     protect_with_nullary_pfo
-    serialize_buffer_1069
+    #serialize_buffer_1069
     tuple_serialization_803
     unwrapped_1528
     zero_copy_parcels_1001

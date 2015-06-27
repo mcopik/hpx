@@ -6,8 +6,8 @@
 set(subdirs "")
 
 if(HPX_WITH_TESTS_BENCHMARKS)
-  set(subdirs
-    ${subdirs} performance)
+  #set(subdirs
+  #  ${subdirs} performance)
 endif()
 
 if(HPX_WITH_TESTS_REGRESSIONS)

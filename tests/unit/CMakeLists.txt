@@ -6,8 +6,8 @@
 
 set(subdirs
     actions
-    agas
-    build
+    #agas
+    #build
     components
     diagnostics
     lcos
@@ -24,7 +24,7 @@ if(HPX_WITH_SECURITY)
 endif()
 
 if(HPX_WITH_CXX11_LAMBDAS)
-  set(subdirs ${subdirs} parallel)
+  #set(subdirs ${subdirs} parallel)
 endif()
 
 foreach(subdir ${subdirs})

@@ -31,13 +31,13 @@ set(dataflow_future_swap_FLAGS DEPENDENCIES iostreams_component)
 set(dataflow_future_swap2_FLAGS DEPENDENCIES iostreams_component)
 set(dataflow_future_swap_PARAMETERS THREADS_PER_LOCALITY 4)
 set(tests ${tests}
-    dataflow_future_swap
+    #dataflow_future_swap
     dataflow_791
    )
 if(HPX_WITH_CXX11_LAMBDAS)
   set(tests ${tests}
       dataflow_const_functor_773
-      dataflow_future_swap2
+      #dataflow_future_swap2
       dataflow_using_774
      )
 endif()

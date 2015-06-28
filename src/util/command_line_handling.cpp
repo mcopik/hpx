@@ -496,6 +496,10 @@ namespace hpx { namespace util
                     mode_ = hpx::runtime_mode_console;
                 }
                 else {
+                    // don't use port zero for non-console localities
+                    if (hpx_port == 0 && node != 0)
+                        hpx_port = HPX_INITIAL_IP_PORT;
+
                     // each node gets an unique port
                     hpx_port = static_cast<boost::uint16_t>(hpx_port + node);
                     mode_ = hpx::runtime_mode_worker;
@@ -639,6 +643,17 @@ namespace hpx { namespace util
                     vm["hpx:debug-agas-log"].as<std::string>());
             ini_config += "hpx.logging.console.agas.level=5";
             ini_config += "hpx.logging.agas.level=5";
+        }
+
+        if (vm.count("hpx:debug-parcel-log")) {
+            ini_config += "hpx.logging.console.parcel.destination=" +
+                detail::convert_to_log_file(
+                    vm["hpx:debug-parcel-log"].as<std::string>());
+            ini_config += "hpx.logging.parcel.destination=" +
+                detail::convert_to_log_file(
+                    vm["hpx:debug-parcel-log"].as<std::string>());
+            ini_config += "hpx.logging.console.parcel.level=5";
+            ini_config += "hpx.logging.parcel.level=5";
         }
 
         // Set number of cores and OS threads in configuration.

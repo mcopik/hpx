@@ -66,7 +66,7 @@ namespace hpx { namespace parallel { namespace util { namespace detail
     template <typename ExPolicy, typename Future, typename F1,
         typename FwdIter>
         // requires traits::is_future<Future>
-    std::size_t get_static_chunk_size(ExPolicy const& policy,
+    std::size_t get_static_chunk_size(ExPolicy policy,
         std::vector<Future>& workitems,
         F1 && f1, FwdIter& first, std::size_t& count,
         std::size_t chunk_size)
@@ -88,6 +88,33 @@ namespace hpx { namespace parallel { namespace util { namespace detail
             }
         }
         return chunk_size;
+    }
+
+    template <typename ExPolicy, typename Future, typename F1,
+        typename FwdIter>
+        // requires traits::is_future<Future>
+    std::vector<std::pair<FwdIter, std::size_t > > get_static_shape(
+        ExPolicy policy, std::vector<Future>& workitems,
+        F1 && f1, FwdIter& first, std::size_t& count,
+        std::size_t chunk_size)
+    {
+        chunk_size = get_static_chunk_size(policy, workitems,
+            std::forward<F1>(f1), first, count, chunk_size);
+
+        std::vector<std::pair<FwdIter, std::size_t> > shape;
+        shape.reserve(count);
+
+        while (count != 0)
+        {
+            std::size_t chunk = (std::min)(chunk_size, count);
+
+            shape.push_back(std::make_pair(first, chunk));
+
+            count -= chunk;
+            std::advance(first, chunk);
+        }
+
+        return shape;
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -143,7 +170,7 @@ namespace hpx { namespace parallel { namespace util { namespace detail
     template <typename ExPolicy, typename Future, typename F1,
         typename FwdIter>
         // requires traits::is_future<Future>
-    std::size_t get_static_chunk_size_idx(ExPolicy const& policy,
+    std::size_t get_static_chunk_size_idx(ExPolicy policy,
         std::vector<Future>& workitems,
         F1 && f1, std::size_t& base_idx, FwdIter& first,
         std::size_t& count, std::size_t chunk_size)

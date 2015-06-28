@@ -253,9 +253,7 @@ namespace hpx
         class HPX_EXPORT thread_data_base;
         class HPX_EXPORT thread_data;
 
-        template <
-            typename SchedulingPolicy,
-            typename NotificationPolicy = threads::policies::callback_notifier>
+        template <typename SchedulingPolicy>
         class HPX_EXPORT threadmanager_impl;
 
         ///////////////////////////////////////////////////////////////////////
@@ -504,9 +502,7 @@ namespace hpx
         std::size_t dflt);
 
     ///////////////////////////////////////////////////////////////////////////
-    template <
-        typename SchedulingPolicy,
-        typename NotificationPolicy = threads::policies::callback_notifier>
+    template <typename SchedulingPolicy>
     class HPX_API_EXPORT runtime_impl;
 
     /// The function \a get_runtime returns a reference to the (thread
@@ -534,8 +530,9 @@ namespace hpx
         destination_hpx = 0,
         destination_timing = 1,
         destination_agas = 2,
-        destination_app = 3,
-        destination_debuglog = 4
+        destination_parcel = 3,
+        destination_app = 4,
+        destination_debuglog = 5
     };
 
     /// \namespace components
@@ -770,6 +767,13 @@ namespace hpx
     operator&(BOOST_SCOPED_ENUM(launch) lhs, BOOST_SCOPED_ENUM(launch) rhs)
     {
         return (static_cast<int>(lhs) & static_cast<int>(rhs)) != 0;
+    }
+
+    inline BOOST_SCOPED_ENUM(launch)
+    operator|(BOOST_SCOPED_ENUM(launch) lhs, BOOST_SCOPED_ENUM(launch) rhs)
+    {
+        return static_cast<BOOST_SCOPED_ENUM(launch)>(
+            static_cast<int>(lhs) | static_cast<int>(rhs));
     }
 
     ///////////////////////////////////////////////////////////////////////////

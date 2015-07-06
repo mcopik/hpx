@@ -60,6 +60,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             parallel(ExPolicy policy, Iter first, std::size_t count,
                 F && f)
             {
+
+                std::cout << "call 3 for_each_parallel_n " << std::endl;
+
                 if (count != 0)
                 {
                     return util::foreach_n_partitioner<ExPolicy>::call(
@@ -77,6 +80,35 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 return util::detail::algorithm_result<ExPolicy, Iter>::get(
                     std::move(first));
             }
+
+            template <typename F>
+			static typename util::detail::algorithm_result<gpu_execution_policy, Iter>::type
+			parallel(gpu_execution_policy policy, Iter first, std::size_t count,
+				F && f)
+			{
+
+				std::cout << "call 3 for_each_parallel_n_gpu " << std::endl;
+
+				for(std::size_t i = 0;i < count;++i) {
+					f(*first++);
+				}
+				/*if (count != 0)
+				{
+					return util::foreach_n_partitioner<ExPolicy>::call(
+						policy, first, count,
+						[f](Iter part_begin, std::size_t part_size)
+						{
+							util::loop_n(part_begin, part_size,
+								[&f](Iter const& curr)
+								{
+									f(*curr);
+								});
+						});
+				}*/
+
+				return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
+					std::move(first));
+			}
         };
         /// \endcond
     }
@@ -209,6 +241,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                     typename util::detail::algorithm_result<ExPolicy>::type
                 result_type;
 
+                std::cout << "call 3 for_each_parallel " << std::endl;
                 return hpx::util::void_guard<result_type>(),
                     detail::for_each_n<FwdIter>().call(
                         policy, boost::mpl::false_(),
@@ -233,7 +266,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
             if (first == last)
                 return util::detail::algorithm_result<ExPolicy>::get();
-
+            std::cout << "call 2 " << is_seq() << std::endl;
             return for_each().call(
                 std::forward<ExPolicy>(policy), is_seq(),
                 first, last, std::forward<F>(f));
@@ -328,7 +361,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
         typedef hpx::traits::segmented_iterator_traits<InIter> iterator_traits;
         typedef typename iterator_traits::is_segmented_iterator is_segmented;
-
+        std::cout << "is_segm 1 " << is_segmented() << std::endl;
         return detail::for_each_(
             std::forward<ExPolicy>(policy), first, last,
             std::forward<F>(f), is_segmented());

@@ -787,6 +787,49 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     /// Default vector execution policy object.
     static parallel_vector_execution_policy const par_vec;
 
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// The class gpu_execution_policy is an execution policy type used
+    /// as a unique type to disambiguate parallel algorithm overloading and
+    /// indicate that a parallel algorithm's execution may be parallelized.
+    struct gpu_execution_policy
+	{
+		/// The type of the executor associated with this execution policy
+		typedef parallel::parallel_executor executor_type;
+
+		/// The category of the execution agents created by this execution
+		/// policy.
+		typedef parallel::parallel_execution_tag execution_category;
+
+		/// \cond NOINTERNAL
+		gpu_execution_policy() {}
+
+		static std::size_t get_chunk_size() { return 0; }
+		/// \endcond
+
+		/// Create a new gpu_execution_policy from itself
+		///
+		/// \param tag [in] Specify that the corresponding asynchronous
+		///            execution policy should be used
+		///
+		/// \returns The new gpu_execution_policy
+		///
+		gpu_execution_policy operator()(
+			task_execution_policy_tag tag) const
+		{
+			return *this;
+		}
+
+		/// Return the associated executor object.
+		static executor_type& executor()
+		{
+			static parallel::parallel_executor exec;
+			return exec;
+		}
+	};
+
+    static gpu_execution_policy const gpu;
+
     ///////////////////////////////////////////////////////////////////////////
     class execution_policy;
 
@@ -840,6 +883,10 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             ExPolicy policy_;
         };
         /// \endcond
+
+        /// Default parallel execution policy object.
+        static parallel_execution_policy const par;
+
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -863,6 +910,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
         template <>
         struct is_execution_policy<parallel_vector_execution_policy>
+          : boost::mpl::true_
+        {};
+
+        template <>
+        struct is_execution_policy<gpu_execution_policy>
           : boost::mpl::true_
         {};
 
@@ -938,6 +990,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
         template <>
         struct is_parallel_execution_policy<parallel_vector_execution_policy>
+          : boost::mpl::true_
+        {};
+
+        template <>
+        struct is_parallel_execution_policy<gpu_execution_policy>
           : boost::mpl::true_
         {};
 

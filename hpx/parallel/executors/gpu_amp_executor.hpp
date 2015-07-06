@@ -78,7 +78,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 result_type;
             std::vector<hpx::future<result_type> > results;
 
-            try {
+            /*try {
                 for (auto const& elem: shape)
                     results.push_back(hpx::async(launch::deferred, f, elem));
             }
@@ -89,7 +89,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 boost::throw_exception(
                     exception_list(boost::current_exception())
                 );
-            }
+            }*/
 
             return std::move(results);
         }
@@ -100,7 +100,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         {
             //return hpx::util::unwrapped(
             //    bulk_async_execute(std::forward<F>(f), shape));
+        	typedef typename Shape::value_type::first_type Iter;
+        	Iter first = shape[0].first;
+        	typedef typename Shape::value_type::second_type size_type;
+        	size_type count = shape[0].second;
 
+        	for(std::size_t i = 0;i < count;++i) {
+				f(*first++);
+			}
 			std::cout << "gpu_amp_exec 5" << std::endl;
         }
 

@@ -168,7 +168,7 @@ namespace hpx { namespace parallel { namespace util
 					std::cout << "partitioner for gpu 4" << std::endl;
 
 
-                    auto new_f = [f1](FwdIter part_begin, std::size_t part_size)
+                    /*auto new_f = [f1](FwdIter part_begin, std::size_t part_size)
                                 {
                                     util::loop_n(part_begin, part_size,
                                         [&f1](FwdIter const& curr)
@@ -180,10 +180,12 @@ namespace hpx { namespace parallel { namespace util
 					auto f = [new_f](std::pair<FwdIter, std::size_t> const& elem)
                     {
                         return new_f(elem.first, elem.second);
-                    };
+                    };*/
 					workitems.reserve(shape.size());
-					workitems = executor_traits::async_execute(
-						policy.executor(), f, shape);
+					//workitems = executor_traits::async_execute(
+					//	policy.executor(), f1, shape);
+					executor_traits::execute(
+						policy.executor(), f1, shape);
 				}
                 catch (...) {
                     detail::handle_local_exceptions<ExPolicy>::call(
@@ -191,8 +193,8 @@ namespace hpx { namespace parallel { namespace util
                 }
 
                 // wait for all tasks to finish
-                hpx::wait_all(inititems);
-                hpx::wait_all(workitems);
+                //hpx::wait_all(inititems);
+                //hpx::wait_all(workitems);
 
                 // handle exceptions
                 detail::handle_local_exceptions<ExPolicy>::call(

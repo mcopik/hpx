@@ -200,11 +200,10 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             typedef typename
                     std::iterator_traits<iterator_type>::value_type
                 value_type;
-            typedef typename hpx::util::result_of<
-                    typename hpx::util::decay<F>::type(value_type)
-                >::type type;
-            //typedef typename hpx::util::result_of<value_type
-			//>::type type;
+            //typedef typename hpx::util::result_of<
+            //       typename hpx::util::decay<F>::type(value_type)
+            //    >::type type;
+            typedef void type;
         };
 
         struct bulk_async_execute_helper
@@ -487,6 +486,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             return detail::call_bulk_async_execute(
                 exec, std::forward<F>(f), shape);
         }
+
+        /*template <typename F, typename Shape>
+		static std::vector<future<void>>
+		async_execute(executor_type& exec, F && f, Shape const& shape)
+		{
+			return detail::call_bulk_async_execute(
+				exec, std::forward<F>(f), shape);
+		}*/
 
         /// \brief Bulk form of synchronous execution agent creation
         ///

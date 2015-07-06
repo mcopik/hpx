@@ -52,7 +52,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 		/**
 		 * First, size
 		 */
-		std::iota(boost::begin(c), boost::end(c), std::rand());
+		/*std::iota(boost::begin(c), boost::end(c), std::rand());
 		hpx::parallel::for_each_n(hpx::parallel::gpu,
 			boost::begin(c), n,
 			[](std::size_t& v) {

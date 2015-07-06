@@ -25,6 +25,8 @@
 #include <boost/range/const_iterator.hpp>
 #include <boost/type_traits/is_void.hpp>
 
+#include <amp.h>
+
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 {
     ///////////////////////////////////////////////////////////////////////////
@@ -105,9 +107,22 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         	typedef typename Shape::value_type::second_type size_type;
         	size_type count = shape[0].second;
 
-        	for(std::size_t i = 0;i < count;++i) {
-				f(*first++);
-			}
+//        	for(std::size_t i = 0;i < count;++i) {
+//				f(*first++);
+//			}
+        	Iter end = first;
+        	std::advance(end, count);
+        	Concurrency::extent<1> e(count);
+
+        	Concurrency::array< typename std::iterator_traits<Iter>::value_type > arr(e, first, end);
+        	Concurrency::array_view< typename std::iterator_traits<Iter>::value_type > av(arr);
+
+        	Concurrency::parallel_for_each(av.get_extent(), [=](Concurrency::index<1> idx) restrict(amp) {
+        	                f( av[idx] );
+			});
+        	Concurrency::copy(arr, first);
+
+
 			std::cout << "gpu_amp_exec 5" << std::endl;
         }
 

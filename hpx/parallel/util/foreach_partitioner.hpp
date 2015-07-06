@@ -23,6 +23,9 @@
 
 #include <algorithm>
 
+
+#include <hpx/parallel/util/loop.hpp>
+
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace parallel { namespace util
 {
@@ -107,9 +110,10 @@ namespace hpx { namespace parallel { namespace util
                     std::vector<std::pair<FwdIter, std::size_t> > shape =
                         get_static_shape(policy, inititems, f1,
                             first, count, chunk_size);
+
                     auto f = [f1](std::pair<FwdIter, std::size_t> const& elem)
                     {
-                        return f1(elem.first, elem.second);
+                        return  f1(elem.first, elem.second);
                     };
 
                     workitems.reserve(shape.size());
@@ -162,9 +166,24 @@ namespace hpx { namespace parallel { namespace util
 					// TODO: extend for more GPUs
 					std::vector<std::pair<FwdIter, std::size_t> > shape{ {first, count} };
 					std::cout << "partitioner for gpu 4" << std::endl;
+
+
+                    auto new_f = [f1](FwdIter part_begin, std::size_t part_size)
+                                {
+                                    util::loop_n(part_begin, part_size,
+                                        [&f1](FwdIter const& curr)
+                                        {
+                                            f1(*curr);
+                                        });
+                                };
+
+					auto f = [new_f](std::pair<FwdIter, std::size_t> const& elem)
+                    {
+                        return new_f(elem.first, elem.second);
+                    };
 					workitems.reserve(shape.size());
-					//workitems = executor_traits::async_execute(
-					//	policy.executor(), f, shape);
+					workitems = executor_traits::async_execute(
+						policy.executor(), f, shape);
 				}
                 catch (...) {
                     detail::handle_local_exceptions<ExPolicy>::call(

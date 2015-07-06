@@ -73,7 +73,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         > >
         bulk_async_execute(F && f, Shape const& shape)
         {
-            /*typedef typename
+            typedef typename
                     detail::bulk_async_execute_result<F, Shape>::type
                 result_type;
             std::vector<hpx::future<result_type> > results;
@@ -91,7 +91,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 );
             }
 
-            return std::move(results);*/
+            return std::move(results);
         }
 
         template <typename F, typename Shape>
@@ -100,6 +100,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         {
             //return hpx::util::unwrapped(
             //    bulk_async_execute(std::forward<F>(f), shape));
+
+			std::cout << "gpu_amp_exec 5" << std::endl;
         }
 
         std::size_t os_thread_count()

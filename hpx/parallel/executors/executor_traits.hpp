@@ -52,6 +52,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     ///       \a parallel_execution_tag.
     struct vector_execution_tag {};
 
+    /// TODO!
+    struct gpu_execution_tag {};
+
     namespace detail
     {
         /// \cond NOINTERNAL
@@ -77,6 +80,16 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
         template <>
         struct is_not_weaker<sequential_execution_tag, parallel_execution_tag>
+          : std::true_type
+        {};
+
+        template <>
+        struct is_not_weaker<sequential_execution_tag, gpu_execution_tag>
+          : std::true_type
+        {};
+
+        template <>
+        struct is_not_weaker<parallel_execution_tag, gpu_execution_tag>
           : std::true_type
         {};
         /// \endcond
@@ -190,6 +203,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             typedef typename hpx::util::result_of<
                     typename hpx::util::decay<F>::type(value_type)
                 >::type type;
+            //typedef typename hpx::util::result_of<value_type
+			//>::type type;
         };
 
         struct bulk_async_execute_helper

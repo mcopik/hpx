@@ -799,7 +799,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
 		/// The category of the execution agents created by this execution
 		/// policy.
-		typedef parallel::parallel_execution_tag execution_category;
+		typedef parallel::gpu_execution_tag execution_category;
 
 		/// \cond NOINTERNAL
 		gpu_execution_policy() {}

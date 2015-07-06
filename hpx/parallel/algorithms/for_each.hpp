@@ -89,9 +89,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
 				std::cout << "call 3 for_each_parallel_n_gpu " << std::endl;
 
-				for(std::size_t i = 0;i < count;++i) {
-					f(*first++);
-				}
+				//for(std::size_t i = 0;i < count;++i) {
+				//	f(*first++);
+				//}
 				if (count != 0)
 				{
 					// do NOT modify the called function for this partitioner

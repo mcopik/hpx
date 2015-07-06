@@ -5,10 +5,11 @@
 
 void run_amp(std::vector<int> & v)
 {
+	auto f = [&](int & v) -> void { v += 1; };
 	Concurrency::array_view<int> av(v.size(), v);
 	Concurrency::parallel_for_each(av.get_extent(), [=](Concurrency::index<1> idx) restrict(amp) {
-		av[idx] += [=](int v) -> int { return 1; };
-	}
+		f(av[idx]);
+	});
 }
 
 int main(int argc, char ** argv)

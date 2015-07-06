@@ -92,19 +92,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 				for(std::size_t i = 0;i < count;++i) {
 					f(*first++);
 				}
-				/*if (count != 0)
+				if (count != 0)
 				{
-					return util::foreach_n_partitioner<ExPolicy>::call(
-						policy, first, count,
-						[f](Iter part_begin, std::size_t part_size)
-						{
-							util::loop_n(part_begin, part_size,
-								[&f](Iter const& curr)
-								{
-									f(*curr);
-								});
-						});
-				}*/
+					// do NOT modify the called function for this partitioner
+					// (comparing to usual parallel executor)
+					return util::foreach_n_partitioner<gpu_execution_policy>::call(
+						policy, first, count, f);
+				}
 
 				return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
 					std::move(first));

@@ -139,11 +139,11 @@ namespace hpx { namespace parallel { namespace util
         };
 
         ///////////////////////////////////////////////////////////////////////
-	/*	template <typename Result>
+		template <typename Result>
 		struct foreach_n_static_partitioner<gpu_execution_policy, Result>
 		{
 			template <typename ExPolicy, typename FwdIter, typename F1>
-			static hpx::future<FwdIter> call(ExPolicy policy,
+			static FwdIter call(ExPolicy policy,
 				FwdIter first, std::size_t count, F1 && f1,
 				std::size_t chunk_size)
 			{
@@ -158,40 +158,32 @@ namespace hpx { namespace parallel { namespace util
 				std::list<boost::exception_ptr> errors;
 
 				try {
-					// estimates a chunk size based on number of cores used
-					std::vector<std::pair<FwdIter, std::size_t> > shape =
-						get_static_shape(policy, inititems, f1,
-							first, count, chunk_size);
-					//auto f = [f1](std::pair<FwdIter, std::size_t> const& elem)
-					//{
-					//	return f1(elem.first, elem.second);
-					//};
 
+					// TODO: extend for more GPUs
+					std::vector<std::pair<FwdIter, std::size_t> > shape{ {first, count} };
+					std::cout << "partitioner for gpu 4" << std::endl;
 					workitems.reserve(shape.size());
 					//workitems = executor_traits::async_execute(
 					//	policy.executor(), f, shape);
 				}
-				catch (std::bad_alloc const&) {
-					return hpx::make_exceptional_future<FwdIter>(
-						boost::current_exception());
-				}
-				catch (...) {
-					errors.push_back(boost::current_exception());
-				}
+                catch (...) {
+                    detail::handle_local_exceptions<ExPolicy>::call(
+                        boost::current_exception(), errors);
+                }
 
-				// wait for all tasks to finish
-				return hpx::lcos::local::dataflow(
-					[last, errors](std::vector<hpx::future<Result> > && r1,
-							std::vector<hpx::future<Result> > && r2)
-						mutable -> FwdIter
-					{
-						detail::handle_local_exceptions<ExPolicy>::call(r1, errors);
-						detail::handle_local_exceptions<ExPolicy>::call(r2, errors);
-						return last;
-					},
-					std::move(inititems), std::move(workitems));
+                // wait for all tasks to finish
+                hpx::wait_all(inititems);
+                hpx::wait_all(workitems);
+
+                // handle exceptions
+                detail::handle_local_exceptions<ExPolicy>::call(
+                    inititems, errors);
+                detail::handle_local_exceptions<ExPolicy>::call(
+                    workitems, errors);
+
+                return last;
 			}
-		};*/
+		};
 
         template <typename Executor, typename Result>
         struct foreach_n_static_partitioner<
@@ -233,6 +225,23 @@ namespace hpx { namespace parallel { namespace util
                     policy, first, count, std::forward<F1>(f1), chunk_size);
             }
         };
+
+        /**
+         * TODO: extend for async
+         */
+        template <typename Result>
+		struct foreach_n_partitioner<gpu_execution_policy, Result,
+				parallel::traits::static_partitioner_tag>
+		{
+			template <typename ExPolicy, typename FwdIter, typename F1>
+			static FwdIter call(ExPolicy policy,
+				FwdIter first, std::size_t count, F1 && f1,
+				std::size_t chunk_size = 0)
+			{
+				return foreach_n_static_partitioner<gpu_execution_policy, Result>::call(
+					policy, first, count, std::forward<F1>(f1), chunk_size);
+			}
+		};
 
         template <typename Executor, typename Result>
         struct foreach_n_partitioner<

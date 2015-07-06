@@ -794,8 +794,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     /// indicate that a parallel algorithm's execution may be parallelized.
     struct gpu_execution_policy
 	{
-		/// The type of the executor associated with this execution policy
-		typedef parallel::parallel_executor executor_type;
+		/// The type of the default executor associated with this execution policy
+		typedef parallel::gpu_amp_executor executor_type;
 
 		/// The category of the execution agents created by this execution
 		/// policy.
@@ -823,7 +823,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 		/// Return the associated executor object.
 		static executor_type& executor()
 		{
-			static parallel::parallel_executor exec;
+			static executor_type exec;
 			return exec;
 		}
 	};

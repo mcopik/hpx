@@ -9,7 +9,6 @@
 #include <hpx/hpx_init.hpp>
 #include <hpx/include/parallel_for_each.hpp>
 #include <hpx/parallel/executors/parallel_executor.hpp>
-#include <hpx/parallel/executors/parallel_gpu_executor.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
 
@@ -17,6 +16,7 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/format.hpp>
+
 
 
 int hpx_main(boost::program_options::variables_map& vm)
@@ -29,18 +29,38 @@ int hpx_main(boost::program_options::variables_map& vm)
 		hpx::util::high_resolution_timer t;
 
 		std::vector<std::size_t> c(n);
-		std::iota(boost::begin(c), boost::end(c), std::rand());
 
-		std::cout << c[0] << " " << c[99001] << std::endl;
+		/**
+		 * First, last
+		 */
+		std::iota(boost::begin(c), boost::end(c), std::rand());
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(c), boost::end(c),
 			[](std::size_t& v) {
 				v = 42;
 			});
-		std::cout << c[0] << " " << c[99001] << std::endl;
 
 		// verify values
 		std::size_t count = 0;
+		std::for_each(boost::begin(c), boost::end(c),
+			[&count](std::size_t v) -> void {
+				HPX_TEST_EQ(v, std::size_t(42));
+				++count;
+			});
+		HPX_TEST_EQ(count, c.size());
+
+		/**
+		 * First, size
+		 */
+		std::iota(boost::begin(c), boost::end(c), std::rand());
+		hpx::parallel::for_each_n(hpx::parallel::gpu,
+			boost::begin(c), n,
+			[](std::size_t& v) {
+				v = 42;
+			});
+
+		// verify values
+		count = 0;
 		std::for_each(boost::begin(c), boost::end(c),
 			[&count](std::size_t v) -> void {
 				HPX_TEST_EQ(v, std::size_t(42));

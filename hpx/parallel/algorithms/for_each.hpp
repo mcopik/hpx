@@ -106,6 +106,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 	        	Concurrency::array< typename std::iterator_traits<Iter>::value_type > arr(e, first, end);
 	        	Concurrency::array_view< typename std::iterator_traits<Iter>::value_type > av(arr);
 
+	        	auto buffer = policy.executor().create_buffers(first, count);
+
 				if (count != 0)
 				{
 					//dont'return right now
@@ -113,8 +115,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 						policy, first, count,
                         [f, &av](std::size_t part_begin, std::size_t part_size)
 						{
-							for(std::size_t i = 0;i < part_size;++i)
-								f(av[part_begin + i]);
+							for(std::size_t i = 0; i < part_size; ++i)
+								f( av[part_begin + i] );
 						});
 
 					Concurrency::copy(arr, first);

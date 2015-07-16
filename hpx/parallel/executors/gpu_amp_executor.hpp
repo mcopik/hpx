@@ -29,17 +29,60 @@
 
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 {
-    ///////////////////////////////////////////////////////////////////////////
+
+
+	///////////////////////////////////////////////////////////////////////////
     /// A \a sequential_executor creates groups of sequential execution agents
     /// which execute in the calling thread. The sequential order is given by
     /// the lexicographical order of indices in the index space.
     ///
     struct gpu_amp_executor
     {
-#if defined(DOXYGEN)
-        /// Create a new sequential executor
-    	gpu_amp_executor() {}
-#endif
+		#if defined(DOXYGEN)
+				/// Create a new sequential executor
+				gpu_amp_executor() {}
+		#endif
+
+		template<typename Iter>
+    	struct gpu_amp_buffer : detail::gpu_executor_buffer<Iter,
+			Concurrency::array_view< typename std::iterator_traits<Iter>::value_type > >
+		{
+    		typedef typename std::iterator_traits<Iter>::value_type value_type;
+    		typedef typename Concurrency::array<value_type> buffer_type;
+    		typedef typename Concurrency::array_view<value_type> buffer_view_type;
+
+    		Iter cpu_buffer;
+    		Concurrency::extent<1> extent;
+    		std::shared_ptr<buffer_type> buffer;
+    		std::shared_ptr<buffer_view_type> _buffer_view;
+
+    		gpu_amp_buffer(Iter first, std::size_t count) :
+    			cpu_buffer( first ),
+    			extent( count )
+    		{
+    			Iter last = first;
+    			std::advance(last, count);
+
+    			buffer.reset( new buffer_type(extent, first, last) );
+    			_buffer_view.reset( new buffer_view_type( *buffer.get() ) );
+    		}
+
+    		buffer_view_type & buffer_view()
+    		{
+    			return *_buffer_view.get();
+    		}
+
+    		void sync()
+    		{
+				Concurrency::copy(*buffer.get(), cpu_buffer);
+    		}
+		};
+
+    	template<typename Iter>
+    	static gpu_amp_buffer<Iter> create_buffers(Iter first, std::size_t count)
+		{
+    		return gpu_amp_buffer<Iter>(first, count);
+		}
 
         template <typename F>
         static typename hpx::util::result_of<

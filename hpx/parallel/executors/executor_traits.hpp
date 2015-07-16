@@ -200,20 +200,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             typedef typename
                     std::iterator_traits<iterator_type>::value_type
                 value_type;
-         //   typedef typename value_type::first_type pair_type;
-          //  typedef typename std::iterator_traits<pair_type>::value_type iter_type;
-
-//            typedef typename
-  //                  std::iterator_traits<value_type>::value_type
-    //            value_type;
             typedef typename hpx::util::result_of<
                    typename hpx::util::decay<F>::type(value_type)
                 >::type type;
-            //typedef typename hpx::util::result_of<
-             //       typename hpx::util::decay<F>::type(iter_type&)
-              //  >::type type;
-            //typedef void type;
-            //typedef decltype(F) type;
         };
 
         struct bulk_async_execute_helper
@@ -497,14 +486,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 exec, std::forward<F>(f), shape);
         }
 
-        /*template <typename F, typename Shape>
-		static std::vector<future<void>>
-		async_execute(executor_type& exec, F && f, Shape const& shape)
-		{
-			return detail::call_bulk_async_execute(
-				exec, std::forward<F>(f), shape);
-		}*/
-
         /// \brief Bulk form of synchronous execution agent creation
         ///
         /// This synchronously creates a group of function invocations f(i)
@@ -567,6 +548,18 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     ///
     template <typename T>
     struct is_executor;         // defined in hpx/traits/is_executor.hpp
+
+    ///////////////////////////////////////////////////////////////////////////
+    namespace detail
+	{
+    	template <typename Iter, typename BufferType>
+    	struct gpu_executor_buffer
+		{
+    		virtual ~gpu_executor_buffer() {}
+    		virtual BufferType & buffer_view() = 0;
+    		virtual void sync() = 0;
+		};
+	}
 }}}
 
 #endif

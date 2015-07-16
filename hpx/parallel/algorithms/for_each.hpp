@@ -92,14 +92,40 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 				//for(std::size_t i = 0;i < count;++i) {
 				//	f(*first++);
 				//}
-				if (count != 0)
-				{
+				//if (count != 0)
+				//{
 					// do NOT modify the called function for this partitioner
 					// (comparing to usual parallel executor)
-					return util::foreach_n_partitioner<gpu_execution_policy>::call(
-						policy, first, count, f);
-				}
+				//	return util::foreach_n_partitioner<gpu_execution_policy>::call(
+				//		policy, first, count, f);
+				//}
 
+	        	Iter end = first;
+	        	std::advance(end, count);
+	        	Concurrency::extent<1> e(count);
+	        	Concurrency::array< typename std::iterator_traits<Iter>::value_type > arr(e, first, end);
+	        	Concurrency::array_view< typename std::iterator_traits<Iter>::value_type > av(arr);
+
+				if (count != 0)
+				{
+					//dont'return right now
+					util::foreach_n_partitioner<gpu_execution_policy>::call(
+						policy, first, count,
+						[f,&av](std::size_t part_begin, std::size_t part_size)
+                        //[f](Iter part_begin, std::size_t part_size)
+						{
+							//util::loop_n(part_begin, part_size,
+							//	[&f](Iter const& curr)
+							//	{
+							//		f(*curr);
+							//	});
+							f(av[part_begin]);
+						});
+
+					Concurrency::copy(arr, first);
+					return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
+						std::move(first));
+				}
 				return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
 					std::move(first));
 			}

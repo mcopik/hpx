@@ -1,7 +1,7 @@
 # one needs to update this variables before compiling!
 BOOST_ROOT=/home/mcopik/Projekty/steiar/boost_1_58_0/
-AMP_SOURCE=/home/mcopik/Projekty/hpx/cppamp-driver-ng-35
-AMP_BUILD=/home/mcopik/Projekty/hpx/build
+AMP_SOURCE=/home/mcopik/Projekty/steiar/cppamp-driver-ng-35
+AMP_BUILD=/home/mcopik/Projekty/steiar/cppamp-driver-ng-35_build_new
 HPX_SOURCE=/home/mcopik/Projekty/steiar/hpx/
 HPX_BUILD=/home/mcopik/Projekty/steiar/hpx_build_libcc_35
 

@@ -200,10 +200,20 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             typedef typename
                     std::iterator_traits<iterator_type>::value_type
                 value_type;
+         //   typedef typename value_type::first_type pair_type;
+          //  typedef typename std::iterator_traits<pair_type>::value_type iter_type;
+
+//            typedef typename
+  //                  std::iterator_traits<value_type>::value_type
+    //            value_type;
+            typedef typename hpx::util::result_of<
+                   typename hpx::util::decay<F>::type(value_type)
+                >::type type;
             //typedef typename hpx::util::result_of<
-            //       typename hpx::util::decay<F>::type(value_type)
-            //    >::type type;
-            typedef void type;
+             //       typename hpx::util::decay<F>::type(iter_type&)
+              //  >::type type;
+            //typedef void type;
+            //typedef decltype(F) type;
         };
 
         struct bulk_async_execute_helper

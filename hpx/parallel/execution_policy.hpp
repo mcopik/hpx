@@ -804,7 +804,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 		/// \cond NOINTERNAL
 		gpu_execution_policy() {}
 
-		static std::size_t get_chunk_size() { return 0; }
+		static std::size_t get_chunk_size() { return 1; }
 		/// \endcond
 
 		/// Create a new gpu_execution_policy from itself

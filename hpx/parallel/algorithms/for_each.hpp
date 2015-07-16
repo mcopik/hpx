@@ -102,26 +102,29 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
 	        	Iter end = first;
 	        	std::advance(end, count);
-	        	Concurrency::extent<1> e(count);
+	        	/*Concurrency::extent<1> e(count);
 	        	Concurrency::array< typename std::iterator_traits<Iter>::value_type > arr(e, first, end);
-	        	Concurrency::array_view< typename std::iterator_traits<Iter>::value_type > av(arr);
+	        	Concurrency::array_view< typename std::iterator_traits<Iter>::value_type > av(arr);*/
 
 	        	auto buffer = policy.executor().create_buffers(first, count);
+	        	auto gpu_buffer = buffer.buffer_view();
 
 				if (count != 0)
 				{
 					//dont'return right now
 					util::foreach_n_partitioner<gpu_execution_policy>::call(
 						policy, first, count,
-                        [f, &av](std::size_t part_begin, std::size_t part_size)
+                        [f, &gpu_buffer](std::size_t part_begin, std::size_t part_size)
 						{
 							for(std::size_t i = 0; i < part_size; ++i)
-								f( av[part_begin + i] );
+								f( gpu_buffer[part_begin + i] );
 						});
 
-					Concurrency::copy(arr, first);
+					// the data needs to be transferred from gpu back to original buffer
+					buffer.sync();
+
 					return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
-						std::move(first));
+						std::move(end));
 				}
 				return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
 					std::move(first));

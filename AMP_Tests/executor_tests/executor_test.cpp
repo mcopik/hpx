@@ -33,7 +33,6 @@ int hpx_main(boost::program_options::variables_map& vm)
 		/**
 		 * First, last
 		 */
-		c[0] = 40;
 		std::iota(boost::begin(c), boost::end(c), std::rand());
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(c), boost::end(c),
@@ -42,7 +41,6 @@ int hpx_main(boost::program_options::variables_map& vm)
 			});
 
 		// verify values
-		std::cout << c[0] << std::endl;
 		std::size_t count = 0;
 		std::for_each(boost::begin(c), boost::end(c),
 			[&count](std::size_t v) -> void {

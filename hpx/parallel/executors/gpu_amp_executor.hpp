@@ -127,7 +127,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 								//f(  )
 								//f( shape[0] );
 								//f(elem);
-        			auto _x = std::make_pair(x,y);
+        			auto _x = std::make_pair(x + idx[0], y);
 	        		f(_x);
         			//std::cout << x << std::endl;
 				});

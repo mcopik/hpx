@@ -111,15 +111,10 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					//dont'return right now
 					util::foreach_n_partitioner<gpu_execution_policy>::call(
 						policy, first, count,
-						[f,&av](std::size_t part_begin, std::size_t part_size)
-                        //[f](Iter part_begin, std::size_t part_size)
+                        [f, &av](std::size_t part_begin, std::size_t part_size)
 						{
-							//util::loop_n(part_begin, part_size,
-							//	[&f](Iter const& curr)
-							//	{
-							//		f(*curr);
-							//	});
-							f(av[part_begin]);
+							for(std::size_t i = 0;i < part_size;++i)
+								f(av[part_begin + i]);
 						});
 
 					Concurrency::copy(arr, first);

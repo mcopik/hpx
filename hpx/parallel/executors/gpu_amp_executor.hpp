@@ -143,42 +143,20 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         static typename detail::bulk_execute_result<F, Shape>::type
         bulk_execute(F && f, Shape const& shape)
         {
-            //return hpx::util::unwrapped(
-            //    bulk_async_execute(std::forward<F>(f), shape));
-        //	typedef typename Shape::value_type::first_type Iter;
-        	//Iter first = shape[0].first;
-        //	typedef typename Shape::value_type::second_type size_type;
-        	std::size_t count = shape[0].second;
 
-//        	for(std::size_t i = 0;i < count;++i) {
-//				f(*first++);
-//			}
-        	//Iter end = first;
-        	//std::advance(end, count);
-        	Concurrency::extent<1> e(count);
-
-        	//Concurrency::array< typename std::iterator_traits<Iter>::value_type > arr(e, first, end);
-        	//Concurrency::array_view< typename std::iterator_traits<Iter>::value_type > av(arr);
-
+        	/**
+        	 * The elements of pair are:
+        	 * begin at array, # of elements to process
+        	 */
         	for(auto const & elem : shape) {
-        		//std::cout << *(elem.first) << std::endl;
-        		//instead of av.get_extent();
 				std::size_t x = elem.first;
 				std::size_t y = elem.second;
+	        	Concurrency::extent<1> e(y);
         		Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
-								//f( av[idx] );
-								//f(  )
-								//f( shape[0] );
-								//f(elem);
         			auto _x = std::make_pair(x + idx[0], y);
 	        		f(_x);
-        			//std::cout << x << std::endl;
 				});
         	}
-        	//Concurrency::copy(arr, first);
-
-
-			std::cout << "gpu_amp_exec 5" << std::endl;
         }
 
         std::size_t os_thread_count()

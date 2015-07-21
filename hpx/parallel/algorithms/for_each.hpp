@@ -60,9 +60,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             parallel(ExPolicy policy, Iter first, std::size_t count,
                 F && f)
             {
-
-                std::cout << "call 3 for_each_parallel_n " << std::endl;
-
                 if (count != 0)
                 {
                     return util::foreach_n_partitioner<ExPolicy>::call(
@@ -87,31 +84,15 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 				F && f)
 			{
 
-				std::cout << "call 3 for_each_parallel_n_gpu " << std::endl;
-
-				//for(std::size_t i = 0;i < count;++i) {
-				//	f(*first++);
-				//}
-				//if (count != 0)
-				//{
-					// do NOT modify the called function for this partitioner
-					// (comparing to usual parallel executor)
-				//	return util::foreach_n_partitioner<gpu_execution_policy>::call(
-				//		policy, first, count, f);
-				//}
-
 	        	Iter end = first;
 	        	std::advance(end, count);
-	        	/*Concurrency::extent<1> e(count);
-	        	Concurrency::array< typename std::iterator_traits<Iter>::value_type > arr(e, first, end);
-	        	Concurrency::array_view< typename std::iterator_traits<Iter>::value_type > av(arr);*/
 
 	        	auto buffer = policy.executor().create_buffers(first, count);
 	        	auto gpu_buffer = buffer.buffer_view();
 
 				if (count != 0)
 				{
-					//dont'return right now
+					//dont'return right now - we have to sync buffers after the call
 					util::foreach_n_partitioner<gpu_execution_policy>::call(
 						policy, first, count,
                         [f, &gpu_buffer](std::size_t part_begin, std::size_t part_size)
@@ -261,7 +242,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                     typename util::detail::algorithm_result<ExPolicy>::type
                 result_type;
 
-                std::cout << "call 3 for_each_parallel " << std::endl;
                 return hpx::util::void_guard<result_type>(),
                     detail::for_each_n<FwdIter>().call(
                         policy, boost::mpl::false_(),
@@ -286,7 +266,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
             if (first == last)
                 return util::detail::algorithm_result<ExPolicy>::get();
-            std::cout << "call 2 " << is_seq() << std::endl;
             return for_each().call(
                 std::forward<ExPolicy>(policy), is_seq(),
                 first, last, std::forward<F>(f));
@@ -381,7 +360,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
         typedef hpx::traits::segmented_iterator_traits<InIter> iterator_traits;
         typedef typename iterator_traits::is_segmented_iterator is_segmented;
-        std::cout << "is_segm 1 " << is_segmented() << std::endl;
+
         return detail::for_each_(
             std::forward<ExPolicy>(policy), first, last,
             std::forward<F>(f), is_segmented());

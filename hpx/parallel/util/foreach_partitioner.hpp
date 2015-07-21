@@ -163,24 +163,12 @@ namespace hpx { namespace parallel { namespace util
 				try {
 
 					// TODO: extend for more GPUs
+					// right now it sends whole computation on one device
 					std::vector<int> positions = {0};
-					//std::vector<std::pair<std::vector<int>::iterator, std::size_t> > shape{ {positions.begin(), count} };
 					std::vector< std::pair<std::size_t, std::size_t> > shape{ {0, count} };
 
-
-                  //  auto new_f = [f1](FwdIter part_begin, std::size_t part_size)
-					//	{
-							//	util::loop_n(part_begin, part_size,
-							//	[&f1](FwdIter const& curr)
-								//{
-								//	f1(*curr);
-								//});
-					//	};
-
 					auto f = [f1](std::pair<std::size_t, std::size_t> const& elem)
-					//auto f = [f1](const std::size_t &x, const std::size_t & y)
 					{
-                        //return f1(*(elem.first), elem.second);
 						return f1(elem.first, elem.second);
 					};
 					workitems.reserve(shape.size());

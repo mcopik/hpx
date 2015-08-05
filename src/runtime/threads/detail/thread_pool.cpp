@@ -15,7 +15,7 @@
 #include <hpx/util/logging.hpp>
 #include <hpx/util/bind.hpp>
 #include <hpx/lcos/local/no_mutex.hpp>
-#include <hpx/util/scoped_unlock.hpp>
+#include <hpx/util/unlock_guard.hpp>
 
 #if defined(HPX_HAVE_THREAD_CUMULATIVE_COUNTS) && \
     defined(HPX_HAVE_THREAD_IDLE_RATES)
@@ -33,24 +33,15 @@ namespace hpx { namespace threads { namespace detail
 {
     ///////////////////////////////////////////////////////////////////////////
     template <typename Scheduler>
-    hpx::util::thread_specific_ptr<
-            std::size_t, typename thread_pool<Scheduler>::tls_tag
-        > thread_pool<Scheduler>::thread_num_;
-
-    template <typename Scheduler>
     void thread_pool<Scheduler>::init_tss(std::size_t num)
     {
-        // shouldn't be initialized yet
-        HPX_ASSERT(NULL == thread_pool::thread_num_.get());
-
-        thread_pool::thread_num_.reset(new std::size_t);
-        *thread_pool::thread_num_.get() = num;
+        thread_num_tss_.init_tss(num);
     }
 
     template <typename Scheduler>
     void thread_pool<Scheduler>::deinit_tss()
     {
-        thread_pool::thread_num_.reset();
+        thread_num_tss_.deinit_tss();
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -78,7 +69,7 @@ namespace hpx { namespace threads { namespace detail
             if (state_.load() == state_running)
             {
                 lcos::local::no_mutex mtx;
-                lcos::local::no_mutex::scoped_lock l(mtx);
+                boost::unique_lock<lcos::local::no_mutex> l(mtx);
                 stop_locked(l);
             }
             threads_.clear();
@@ -198,11 +189,7 @@ namespace hpx { namespace threads { namespace detail
     template <typename Scheduler>
     std::size_t thread_pool<Scheduler>::get_worker_thread_num() const
     {
-        if (NULL != thread_pool::thread_num_.get())
-            return *thread_pool::thread_num_;
-
-        // some OS threads are not managed by the thread-manager
-        return std::size_t(-1);
+        return thread_num_tss_.get_worker_thread_num();
     }
 
     template <typename Scheduler>
@@ -226,11 +213,13 @@ namespace hpx { namespace threads { namespace detail
     bool thread_pool<Scheduler>::run(boost::unique_lock<boost::mutex>& l,
         std::size_t num_threads)
     {
-        LTM_(info)
+        HPX_ASSERT(l.owns_lock());
+
+        LTM_(info) //-V128
             << "thread_pool::run: " << pool_name_
             << " number of processing units available: " //-V128
             << threads::hardware_concurrency();
-        LTM_(info)
+        LTM_(info) //-V128
             << "thread_pool::run: " << pool_name_
             << " creating " << num_threads << " OS thread(s)"; //-V128
 
@@ -288,7 +277,7 @@ namespace hpx { namespace threads { namespace detail
                 threads::mask_cref_type mask =
                     sched_.Scheduler::get_pu_mask(topology_, thread_num);
 
-                LTM_(info)
+                LTM_(info) //-V128
                     << "thread_pool::run: " << pool_name_
                     << " create OS thread " << thread_num //-V128
                     << ": will run on processing units within this mask: "
@@ -312,7 +301,7 @@ namespace hpx { namespace threads { namespace detail
                     topology_.set_thread_affinity_mask(threads_.back(), mask, ec);
                     if (ec)
                     {
-                        LTM_(warning)
+                        LTM_(warning) //-V128
                             << "thread_pool::run: " << pool_name_
                             << " setting thread affinity on OS thread " //-V128
                             << thread_num << " failed with: "
@@ -321,7 +310,7 @@ namespace hpx { namespace threads { namespace detail
                 }
                 else
                 {
-                    LTM_(debug)
+                    LTM_(debug) //-V128
                         << "thread_pool::run: " << pool_name_
                         << " setting thread affinity on OS thread " //-V128
                         << thread_num << " was explicitly disabled.";
@@ -359,6 +348,8 @@ namespace hpx { namespace threads { namespace detail
     void thread_pool<Scheduler>::stop (
         boost::unique_lock<boost::mutex>& l, bool blocking)
     {
+        HPX_ASSERT(l.owns_lock());
+
         return stop_locked(l, blocking);
     }
 
@@ -389,12 +380,12 @@ namespace hpx { namespace threads { namespace detail
 
                     sched_.Scheduler::do_some_work(std::size_t(-1));
 
-                    LTM_(info)
+                    LTM_(info) //-V128
                         << "thread_pool::stop: " << pool_name_
                         << " join:" << i; //-V128
 
                     // unlock the lock while joining
-                    util::scoped_unlock<Lock> ul(l);
+                    util::unlock_guard<Lock> ul(l);
                     threads_[i].join();
                 }
                 threads_.clear();
@@ -456,7 +447,7 @@ namespace hpx { namespace threads { namespace detail
             topology.set_thread_affinity_mask(mask, ec);
             if (ec)
             {
-                LTM_(warning)
+                LTM_(warning) //-V128
                     << "thread_pool::thread_func: " << pool_name_
                     << " setting thread affinity on OS thread " //-V128
                     << num_thread << " failed with: " << ec.get_message();
@@ -464,7 +455,7 @@ namespace hpx { namespace threads { namespace detail
         }
         else
         {
-            LTM_(debug)
+            LTM_(debug) //-V128
                 << "thread_pool::thread_func: " << pool_name_
                 << " setting thread affinity on OS thread " //-V128
                 << num_thread << " was explicitly disabled.";
@@ -477,7 +468,7 @@ namespace hpx { namespace threads { namespace detail
             topology.reduce_thread_priority(ec);
             if (ec)
             {
-                LTM_(warning)
+                LTM_(warning) //-V128
                     << "thread_pool::thread_func: " << pool_name_
                     << " reducing thread priority on OS thread " //-V128
                     << num_thread << " failed with: " << ec.get_message();
@@ -491,7 +482,7 @@ namespace hpx { namespace threads { namespace detail
         startup.wait();
 
         {
-            LTM_(info)
+            LTM_(info) //-V128
                 << "thread_pool::thread_func: " << pool_name_
                 << " starting OS thread: " << num_thread; //-V128
 
@@ -503,10 +494,13 @@ namespace hpx { namespace threads { namespace detail
                     hpx::util::coroutines::prepare_main_thread main_thread;
 
                     // run main Scheduler loop until terminated
-                    detail::scheduling_loop(num_thread, sched_, state_,
+                    detail::scheduling_counters counters(
                         executed_threads_[num_thread],
                         executed_thread_phases_[num_thread],
-                        tfunc_times_[num_thread], exec_times_[num_thread],
+                        tfunc_times_[num_thread], exec_times_[num_thread]);
+
+                    detail::scheduling_loop(
+                        num_thread, sched_, state_, counters,
                         util::bind(&policies::scheduler_base::idle_callback,
                             &sched_, num_thread
                         ));
@@ -518,7 +512,7 @@ namespace hpx { namespace threads { namespace detail
                         state_ == state_terminating);
                 }
                 catch (hpx::exception const& e) {
-                    LFATAL_
+                    LFATAL_ //-V128
                         << "thread_pool::thread_func: " << pool_name_
                         << " thread_num:" << num_thread //-V128
                         << " : caught hpx::exception: "
@@ -528,7 +522,7 @@ namespace hpx { namespace threads { namespace detail
                     return;
                 }
                 catch (boost::system::system_error const& e) {
-                    LFATAL_
+                    LFATAL_ //-V128
                         << "thread_pool::thread_func: " << pool_name_
                         << " thread_num:" << num_thread //-V128
                         << " : caught boost::system::system_error: "
@@ -544,7 +538,7 @@ namespace hpx { namespace threads { namespace detail
                 }
             }
             catch (...) {
-                LFATAL_
+                LFATAL_ //-V128
                     << "thread_pool::thread_func: " << pool_name_
                     << " thread_num:" << num_thread //-V128
                     << " : caught unexpected " //-V128
@@ -554,7 +548,7 @@ namespace hpx { namespace threads { namespace detail
                 return;
             }
 
-            LTM_(info)
+            LTM_(info) //-V128
                 << "thread_pool::thread_func: " << pool_name_
                 << " thread_num: " << num_thread
                 << " : ending OS thread, " //-V128
@@ -751,7 +745,7 @@ namespace hpx { namespace threads { namespace detail
         if (std::abs(tfunc_total) < 1e-16)   // avoid division by zero
             return 10000LL;
 
-        HPX_ASSERT(tfunc_total > exec_total);
+        HPX_ASSERT(tfunc_total >= exec_total);
 
         double const percent = 1. - (exec_total / tfunc_total);
         return boost::int64_t(10000. * percent);    // 0.01 percent
@@ -905,6 +899,12 @@ namespace hpx { namespace threads { namespace detail
 #include <hpx/runtime/threads/policies/local_queue_scheduler.hpp>
 template class HPX_EXPORT hpx::threads::detail::thread_pool<
     hpx::threads::policies::local_queue_scheduler<> >;
+#endif
+
+#if defined(HPX_HAVE_STATIC_SCHEDULER)
+#include <hpx/runtime/threads/policies/static_queue_scheduler.hpp>
+template class HPX_EXPORT hpx::threads::detail::thread_pool<
+    hpx::threads::policies::static_queue_scheduler<> >;
 #endif
 
 #if defined(HPX_HAVE_STATIC_PRIORITY_SCHEDULER)

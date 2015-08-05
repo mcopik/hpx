@@ -105,6 +105,7 @@ namespace hpx
 #else // DOXYGEN
 
 #include <hpx/hpx_fwd.hpp>
+#include <hpx/traits/acquire_shared_state.hpp>
 #include <hpx/lcos/when_some.hpp>
 #include <hpx/lcos/local/condition_variable.hpp>
 #include <hpx/util/detail/pack.hpp>
@@ -120,9 +121,8 @@ namespace hpx { namespace lcos
 {
     namespace detail
     {
-
         template <typename Tuple, typename F>
-        struct when_each_frame
+        struct when_each_frame //-V690
           : lcos::detail::future_data<void>
         {
             typedef lcos::future<void> type;
@@ -147,9 +147,9 @@ namespace hpx { namespace lcos
         protected:
             template <typename TupleIter>
             BOOST_FORCEINLINE
-            void await(TupleIter&&, boost::mpl::true_)
+            void do_await(TupleIter&&, boost::mpl::true_)
             {
-                this->set_result(util::unused);
+                this->set_value(util::unused);
             }
 
             // Current element is a range (vector) of futures
@@ -168,7 +168,8 @@ namespace hpx { namespace lcos
                 {
                     boost::intrusive_ptr<
                         lcos::detail::future_data<future_result_type>
-                    > next_future_data = lcos::detail::get_shared_state(*next);
+                    > next_future_data =
+                        traits::detail::get_shared_state(*next);
 
                     if (!next_future_data->is_ready())
                     {
@@ -193,7 +194,7 @@ namespace hpx { namespace lcos
                     ++count_;
                     if(count_ == needed_count_)
                     {
-                        await(std::move(iter), boost::mpl::true_());
+                        do_await(std::move(iter), boost::mpl::true_());
                         return;
                     }
                 }
@@ -203,7 +204,7 @@ namespace hpx { namespace lcos
 
                 typedef boost::is_same<next_type, end_type> pred;
 
-                await(boost::fusion::next(iter), pred());
+                do_await(boost::fusion::next(iter), pred());
             }
 
             template <typename TupleIter>
@@ -233,10 +234,12 @@ namespace hpx { namespace lcos
 
                 boost::intrusive_ptr<
                     lcos::detail::future_data<future_result_type>
-                > next_future_data = lcos::detail::get_shared_state(fut);
+                > next_future_data =
+                    traits::detail::get_shared_state(fut);
 
                 if (!next_future_data->is_ready())
                 {
+
                     next_future_data->execute_deferred();
 
                     // execute_deferred might have made the future ready
@@ -247,7 +250,6 @@ namespace hpx { namespace lcos
                         // (if any).
                         void (when_each_frame::*f)(TupleIter, true_, false_) =
                             &when_each_frame::await_next;
-
                         boost::intrusive_ptr<when_each_frame> this_(this);
                         next_future_data->set_on_completed(
                             hpx::util::bind(
@@ -261,7 +263,7 @@ namespace hpx { namespace lcos
                 ++count_;
                 if(count_ == needed_count_)
                 {
-                    await(std::move(iter), boost::mpl::true_());
+                    do_await(std::move(iter), boost::mpl::true_());
                     return;
                 }
 
@@ -269,12 +271,12 @@ namespace hpx { namespace lcos
                     next_type;
                 typedef boost::is_same<next_type, end_type> pred;
 
-                await(boost::fusion::next(iter), pred());
+                do_await(boost::fusion::next(iter), pred());
             }
 
             template <typename TupleIter>
             BOOST_FORCEINLINE
-            void await(TupleIter&& iter, boost::mpl::false_)
+            void do_await(TupleIter&& iter, boost::mpl::false_)
             {
                 typedef typename util::decay_unwrap<
                     typename boost::fusion::result_of::deref<TupleIter>::type
@@ -287,13 +289,13 @@ namespace hpx { namespace lcos
             }
 
         public:
-            BOOST_FORCEINLINE void await()
+            BOOST_FORCEINLINE void do_await()
             {
                 typedef typename boost::fusion::result_of::begin<Tuple>::type
                     begin_type;
                 typedef boost::is_same<begin_type, end_type> pred;
 
-                await(boost::fusion::begin(t_), pred());
+                do_await(boost::fusion::begin(t_), pred());
             }
 
         private:
@@ -327,7 +329,7 @@ namespace hpx { namespace lcos
             util::forward_as_tuple(std::move(lazy_values_)),
             std::forward<F>(func), lazy_values_.size()));
 
-        p->await();
+        p->do_await();
 
         using traits::future_access;
         return future_access<typename frame_type::type>::create(std::move(p));
@@ -418,7 +420,7 @@ namespace hpx { namespace lcos
         boost::intrusive_ptr<frame_type> p(new frame_type(
             std::move(lazy_values), std::forward<F>(f), sizeof...(Ts)));
 
-        p->await();
+        p->do_await();
 
         using traits::future_access;
         return future_access<typename frame_type::type>::create(std::move(p));

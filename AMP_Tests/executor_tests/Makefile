@@ -1,9 +1,9 @@
 # one needs to update this variables before compiling!
-BOOST_ROOT=/home/mcopik/Projekty/steiar/boost_1_58_0/
-AMP_SOURCE=/home/mcopik/Projekty/steiar/cppamp-driver-ng-35
-AMP_BUILD=/home/mcopik/Projekty/steiar/cppamp-driver-ng-35_build_new
-HPX_SOURCE=/home/mcopik/Projekty/steiar/hpx/
-HPX_BUILD=/home/mcopik/Projekty/steiar/hpx_build_libcc_35
+BOOST_ROOT=/home/mcopik/Projekty/hpx/boost_1_58_0/
+AMP_SOURCE=/home/mcopik/Projekty/hpx/cppamp-driver-ng-35
+AMP_BUILD=/home/mcopik/Projekty/hpx/cppamp-driver-ng-35_build
+HPX_SOURCE=/home/mcopik/Projekty/hpx/hpx/
+HPX_BUILD=/home/mcopik/Projekty/hpx/hpx_build_clang_custom_libcc
 
 LIBCXX_CXXFLAGS=-stdlib=libc++ -I $(AMP_SOURCE)/libc++/libcxx/include/ -I $(AMP_SOURCE)/libc++/libcxxrt/src/
 LIBCXX_LDFLAGS=-stdlib=libc++ -L$(AMP_BUILD)/libc++/libcxx/lib -L$(AMP_BUILD)/libc++/libcxxrt/lib -Wl,--rpath=$(AMP_BUILD)/build/Release/lib:$(AMP_BUILD)/libc++/libcxx/lib:$(AMP_BUILD)/libc++/libcxxrt/lib -lc++ -lcxxrt

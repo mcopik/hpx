@@ -12,6 +12,7 @@
 #include <hpx/runtime/threads/thread_executor.hpp>
 #include <hpx/runtime/applier/applier.hpp>
 #include <hpx/util/register_locks.hpp>
+#include <hpx/util/thread_specific_ptr.hpp>
 #ifdef HPX_HAVE_THREAD_BACKTRACE_ON_SUSPENSION
 #include <hpx/util/backtrace.hpp>
 #endif
@@ -241,9 +242,21 @@ namespace hpx { namespace threads
 #endif
 
     ////////////////////////////////////////////////////////////////////////////
+    struct continuation_recursion_count_tag {};
+    static util::thread_specific_ptr<
+            std::size_t, continuation_recursion_count_tag
+        > continuation_recursion_count;
+
     std::size_t& get_continuation_recursion_count()
     {
-        return get_self().get_continuation_recursion_count();
+        thread_self* self_ptr = get_self_ptr();
+        if (self_ptr)
+            return self_ptr->get_continuation_recursion_count();
+
+        if (0 == continuation_recursion_count.get())
+            continuation_recursion_count.reset(new std::size_t(0));
+
+        return *continuation_recursion_count.get();
     }
 
     ///////////////////////////////////////////////////////////////////////////

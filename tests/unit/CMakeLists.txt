@@ -8,11 +8,11 @@ set(subdirs
     actions
     #agas
     #build
-    components
+    component
     diagnostics
     lcos
     parcelset
-    performance_counters
+    performance_counter
     serialization
     threads
     traits
@@ -24,7 +24,7 @@ if(HPX_WITH_SECURITY)
 endif()
 
 if(HPX_WITH_CXX11_LAMBDAS)
-  #set(subdirs ${subdirs} parallel)
+  set(subdirs ${subdirs} parallel)
 endif()
 
 foreach(subdir ${subdirs})

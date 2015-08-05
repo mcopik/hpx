@@ -9,9 +9,15 @@ set(example_programs
   transpose_serial_block
   transpose_smp
   transpose_smp_block
-  transpose
+  transpose_block
   transpose_serial_vector
 )
+
+if(HPX_WITH_AWAIT)
+  set(example_programs
+    ${example_programs}
+    transpose_await)
+endif()
 
 foreach(example_program ${example_programs})
 

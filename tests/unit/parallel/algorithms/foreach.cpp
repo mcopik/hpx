@@ -18,6 +18,7 @@ void test_for_each()
     test_for_each(seq, IteratorTag());
     test_for_each(par, IteratorTag());
     test_for_each(par_vec, IteratorTag());
+    test_for_each(gpu, IteratorTag());
 
     test_for_each_async(seq(task), IteratorTag());
     test_for_each_async(par(task), IteratorTag());
@@ -25,6 +26,7 @@ void test_for_each()
     test_for_each(execution_policy(seq), IteratorTag());
     test_for_each(execution_policy(par), IteratorTag());
     test_for_each(execution_policy(par_vec), IteratorTag());
+    //test_for_each(execution_policy(gpu), IteratorTag());
 
     test_for_each(execution_policy(seq(task)), IteratorTag());
     test_for_each(execution_policy(par(task)), IteratorTag());

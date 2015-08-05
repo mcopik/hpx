@@ -15,6 +15,7 @@
 #include <hpx/util/assert.hpp>
 #include <hpx/util/reinitializable_static.hpp>
 #include <hpx/util/safe_lexical_cast.hpp>
+#include <hpx/util/high_resolution_clock.hpp>
 #include <hpx/runtime/actions/action_support.hpp>
 #include <hpx/runtime/parcelset/parcel.hpp>
 #include <hpx/runtime/parcelset/parcelport.hpp>
@@ -41,8 +42,10 @@
 #include <boost/make_shared.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/thread/locks.hpp>
 
 #include <sstream>
+#include <cstdlib>
 
 namespace hpx { namespace detail
 {
@@ -810,7 +813,7 @@ void notify_worker_security(notification_header_security const& header)
 ///////////////////////////////////////////////////////////////////////////////
 void big_boot_barrier::spin()
 {
-    boost::mutex::scoped_lock lock(mtx);
+    boost::unique_lock<boost::mutex> lock(mtx);
     while (connected)
         cond.wait(lock);
 }
@@ -954,8 +957,9 @@ void big_boot_barrier::wait_hosted(
         , unassigned
         , suggested_prefix);
 
+    std::srand(static_cast<unsigned>(util::high_resolution_clock::now()));
     apply(
-        naming::invalid_locality_id
+          static_cast<boost::uint32_t>(std::rand()) // random first parcel id
         , 0
         , bootstrap_agas
         , new actions::transfer_action<register_worker_action>(hdr));
@@ -966,7 +970,7 @@ void big_boot_barrier::wait_hosted(
 
 void big_boot_barrier::notify()
 {
-    boost::mutex::scoped_lock lk(mtx, boost::adopt_lock);
+    boost::lock_guard<boost::mutex> lk(mtx, boost::adopt_lock);
     --connected;
     cond.notify_all();
 }

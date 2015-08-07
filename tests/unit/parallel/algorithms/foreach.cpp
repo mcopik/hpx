@@ -26,7 +26,7 @@ void test_for_each()
     test_for_each(execution_policy(seq), IteratorTag());
     test_for_each(execution_policy(par), IteratorTag());
     test_for_each(execution_policy(par_vec), IteratorTag());
-    //test_for_each(execution_policy(gpu), IteratorTag());
+    test_for_each(execution_policy(gpu), IteratorTag());
 
     test_for_each(execution_policy(seq(task)), IteratorTag());
     test_for_each(execution_policy(par(task)), IteratorTag());
@@ -110,7 +110,7 @@ int hpx_main(boost::program_options::variables_map& vm)
     std::srand(seed);
 
     for_each_test();
-    for_each_exception_test();
+//    for_each_exception_test();
     for_each_bad_alloc_test();
     return hpx::finalize();
 }

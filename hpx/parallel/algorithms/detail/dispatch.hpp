@@ -214,6 +214,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1) { namespace detail
                     boost::mpl::false_(), std::forward<Args>(args)...);
             }
 
+            if (t == typeid(gpu_execution_policy))
+            {
+                return call(*policy.get<gpu_execution_policy>(),
+                    boost::mpl::false_(), std::forward<Args>(args)...);
+            }
+
             HPX_THROW_EXCEPTION(hpx::bad_parameter,
                 std::string("hpx::parallel::") + name_,
                 "The given execution policy is not supported");

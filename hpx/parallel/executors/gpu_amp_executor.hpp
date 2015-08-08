@@ -90,17 +90,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         >::type
         execute(F && f)
         {
-         /*   try {
-                return f();
-            }
-            catch (std::bad_alloc const& ba) {
-                boost::throw_exception(ba);
-            }
-            catch (...) {
-                boost::throw_exception(
-                    exception_list(boost::current_exception())
-                );
-            }*/
+        	throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
         }
 
         template <typename F>
@@ -109,7 +99,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         >::type>
         async_execute(F && f)
         {
-            //return hpx::async(launch::deferred, std::forward<F>(f));
+        	throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
         }
 
         template <typename F, typename Shape>
@@ -122,7 +112,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     detail::bulk_async_execute_result<F, Shape>::type
                 result_type;
             std::vector<hpx::future<result_type> > results;
-
+            std::cout << "ASYNC" << std::endl;
             /*try {
                 for (auto const& elem: shape)
                     results.push_back(hpx::async(launch::deferred, f, elem));
@@ -135,8 +125,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     exception_list(boost::current_exception())
                 );
             }*/
+        	throw std::runtime_error("Not implemented!");
 
-            return std::move(results);
+           // return std::move(results);
         }
 
         template <typename F, typename Shape>

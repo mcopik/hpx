@@ -86,8 +86,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             }
 
             template <typename F, typename Proj = util::projection_identity>
-	    static typename util::detail::algorithm_result<gpu_execution_policy, Iter>::type
-	    parallel(gpu_execution_policy policy, Iter first, std::size_t count,
+            static typename util::detail::algorithm_result<gpu_execution_policy, Iter>::type
+			parallel(gpu_execution_policy policy, Iter first, std::size_t count,
 	    	F && f, Proj && proj = Proj())
 			{
 
@@ -115,6 +115,39 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 						std::move(end));
 				}
 				return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
+					std::move(first));
+			}
+            //only temporary - join in one class!
+            template <typename F, typename Proj = util::projection_identity>
+			static typename util::detail::algorithm_result<gpu_task_execution_policy, Iter>::type
+			parallel(gpu_task_execution_policy policy, Iter first, std::size_t count,
+			F && f, Proj && proj = Proj())
+			{
+
+				Iter end = first;
+				std::advance(end, count);
+
+				auto buffer = policy.executor().create_buffers(first, count);
+				auto gpu_buffer = buffer.buffer_view();
+
+				if (count != 0)
+				{
+					//dont'return right now - we have to sync buffers after the call
+					util::foreach_n_partitioner<gpu_task_execution_policy>::call(
+						policy, first, count,
+									[f, proj, &gpu_buffer](std::size_t part_begin, std::size_t part_size)
+						{
+							for(std::size_t i = 0; i < part_size; ++i)
+								f( proj(gpu_buffer[part_begin + i]) );
+						});
+
+					// the data needs to be transferred from gpu back to original buffer
+					buffer.sync();
+
+					return util::detail::algorithm_result<gpu_task_execution_policy, Iter>::get(
+						std::move(end));
+				}
+				return util::detail::algorithm_result<gpu_task_execution_policy, Iter>::get(
 					std::move(first));
 			}
         };

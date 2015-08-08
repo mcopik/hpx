@@ -787,6 +787,72 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     /// Default vector execution policy object.
     static parallel_vector_execution_policy const par_vec;
 
+    /// Extension: The class represents a policy of parallel execution on
+    /// a GPU node which may be executed asynchronously.
+    ///
+    /// The algorithm returns a future representing the result of the
+    /// corresponding algorithm when invoked with the gpu_execution_policy.
+    struct gpu_task_execution_policy
+    {
+        /// The type of the executor associated with this execution policy
+		typedef parallel::gpu_amp_executor executor_type;
+
+        /// The category of the execution agents created by this execution
+        /// policy.
+        typedef parallel::gpu_execution_tag execution_category;
+
+        /// \cond NOINTERNAL
+        gpu_task_execution_policy() : chunk_size_(1) {}
+        /// \endcond
+
+        /// Create a new gpu_task_execution_policy referencing a chunk size.
+        ///
+        /// \param chunk_size   [in] The chunk size controlling the number of
+        ///                     iterations scheduled to be executed on the same
+        ///                     HPX thread
+        ///
+        /// \returns The new gpu_task_execution_policy
+        ///
+        gpu_task_execution_policy operator()(std::size_t chunk_size) const
+        {
+            return gpu_task_execution_policy(chunk_size);
+        }
+
+        /// Create a new gpu_task_execution_policy from itself
+        ///
+        /// \param tag          [in] Specify that the corresponding asynchronous
+        ///                     execution policy should be used
+        ///
+        /// \returns The new gpu_task_execution_policy
+        ///
+        gpu_task_execution_policy operator()(
+            task_execution_policy_tag tag) const
+        {
+            return *this;
+        }
+
+        /// Return the associated executor object.
+        static executor_type& executor()
+        {
+            static executor_type exec;
+            return exec;
+        }
+
+        /// \cond NOINTERNAL
+        std::size_t get_chunk_size() const { return chunk_size_; }
+        /// \endcond
+    protected:
+        gpu_task_execution_policy(std::size_t chunk_size)
+          : chunk_size_(chunk_size)
+        {}
+
+    private:
+        std::size_t chunk_size_;
+        /// \endcond
+    };
+
+    /// Default parallel task execution policy object.
+    static gpu_task_execution_policy const gpu_task;
 
     ///////////////////////////////////////////////////////////////////////////
     /// The class gpu_execution_policy is an execution policy type used
@@ -802,22 +868,51 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 		typedef parallel::gpu_execution_tag execution_category;
 
 		/// \cond NOINTERNAL
-		gpu_execution_policy() {}
+		gpu_execution_policy() : chunk_size_(1) {}
 
-		static std::size_t get_chunk_size() { return 1; }
+		std::size_t get_chunk_size() const { return chunk_size_; }
 		/// \endcond
 
-		/// Create a new gpu_execution_policy from itself
+		/// Create a new gpu_execution_policy referencing a chunk size.
 		///
-		/// \param tag [in] Specify that the corresponding asynchronous
-		///            execution policy should be used
+		/// \param chunk_size   [in] The chunk size controlling the number of
+		///                     iterations scheduled to be executed on the same
+		///                     GPU thread
 		///
 		/// \returns The new gpu_execution_policy
 		///
-		gpu_execution_policy operator()(
+		gpu_execution_policy operator()(std::size_t chunk_size) const
+		{
+			return gpu_execution_policy(chunk_size);
+		}
+
+		/// Create a new gpu_execution_policy referencing a chunk size.
+		///
+		/// \param tag          [in] Specify that the corresponding asynchronous
+		///                     execution policy should be used
+		/// \param chunk_size   [in] The chunk size controlling the number of
+		///                     iterations scheduled to be executed on the same
+		///                     GPU thread
+		///
+		/// \returns The new gpu_task_execution_policy
+		///
+		gpu_task_execution_policy operator()(task_execution_policy_tag tag,
+			std::size_t chunk_size) const
+		{
+			return gpu_task(chunk_size);
+		}
+
+		/// Create a new parallel_execution_policy referencing a chunk size.
+		///
+		/// \param tag          [in] Specify that the corresponding asynchronous
+		///                     execution policy should be used
+		///
+		/// \returns The new parallel_execution_policy
+		///
+		gpu_task_execution_policy operator()(
 			task_execution_policy_tag tag) const
 		{
-			return *this;
+			return gpu_task( this->get_chunk_size() );
 		}
 
 		/// Return the associated executor object.
@@ -826,6 +921,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 			static executor_type exec;
 			return exec;
 		}
+    protected:
+		gpu_execution_policy(std::size_t chunk_size) : chunk_size_(chunk_size)
+		{
+
+		}
+    private:
+        std::size_t chunk_size_;
 	};
 
     static gpu_execution_policy const gpu;
@@ -961,6 +1063,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         {};
 
         template <>
+        struct is_execution_policy<gpu_task_execution_policy>
+          : boost::mpl::true_
+        {};
+
+        template <>
         struct is_execution_policy<sequential_execution_policy>
           : boost::mpl::true_
         {};
@@ -1037,6 +1144,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
         template <>
         struct is_parallel_execution_policy<gpu_execution_policy>
+          : boost::mpl::true_
+        {};
+
+        template <>
+        struct is_parallel_execution_policy<gpu_task_execution_policy>
           : boost::mpl::true_
         {};
 
@@ -1135,6 +1247,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
         template <>
         struct is_async_execution_policy<parallel_task_execution_policy>
+          : boost::mpl::true_
+        {};
+
+        template <>
+        struct is_async_execution_policy<gpu_task_execution_policy>
           : boost::mpl::true_
         {};
         /// \endcond

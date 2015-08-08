@@ -15,7 +15,7 @@ HPX_INCLUDES= -I$(HPX_SOURCE) -I$(HPX_BUILD) -I$(HPX_SOURCE)/external/serializat
 
 
 # AMP flags
-AMP_CXXFLAGS=$(LIBCXX_CXXFLAGS) -std=c++amp -O3
+AMP_CXXFLAGS=$(LIBCXX_CXXFLAGS) -std=c++amp -O3 -g
 AMP_INCLUDES=-I$(AMP_SOURCE)/include
 
 SRCS=executor_test.cpp
@@ -27,7 +27,7 @@ OBJS=$(SRCS:%.cpp=%.o)
 BOOST_LDFLAGS=-L$(BOOST_ROOT)/lib -lboost_chrono -lboost_date_time -lboost_filesystem -lboost_program_options -lboost_regex -lboost_system -lboost_thread $(BOOST_ROOT)/lib/libboost_chrono.so $(BOOST_ROOT)/lib/libboost_date_time.so $(BOOST_ROOT)/lib/libboost_filesystem.so $(BOOST_ROOT)/lib/libboost_program_options.so $(BOOST_ROOT)/lib/libboost_regex.so $(BOOST_ROOT)/lib/libboost_system.so $(BOOST_ROOT)/lib/libboost_thread.so $(BOOST_ROOT)/lib/libboost_context.so $(BOOST_ROOT)/lib/libboost_random.so $(BOOST_ROOT)/lib/libboost_atomic.so -Wl,-rpath,$(HPX_BUILD)/lib:$(BOOST_ROOT)/lib: 
 HPX_LDFLAGS=-L$(HPX_BUILD)/lib -rdynamic $(HPX_BUILD)/lib/libhpx.so.0.9.11 $(HPX_BUILD)/lib/libhpx_init.a
 AMP_LDFLAGS=-L$(AMP_BUILD)/build/Release/lib -ldl -lpthread -Wl,--whole-archive -lmcwamp -Wl,--no-whole-archive
-LDFLAGS=-std=c++amp -O3 $(LIBCXX_LDFLAGS)
+LDFLAGS=-std=c++amp -O3 $(LIBCXX_LDFLAGS) -g
 
 TARGET_DIR=../bin
 TARGET=$(TARGET_DIR)/executor_test

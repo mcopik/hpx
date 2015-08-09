@@ -147,7 +147,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					 * Sync the data after finishing GPU computation.
 					 */
 					hpx::future<Iter> s = x.then( [=](hpx::future<Iter> it)
-								{ buffer.get()->sync(); return it.get(); });
+								{ it.wait(); buffer.get()->sync(); return it.get(); });
 					return s;
 				}
 				return util::detail::algorithm_result<gpu_task_execution_policy, Iter>::get(

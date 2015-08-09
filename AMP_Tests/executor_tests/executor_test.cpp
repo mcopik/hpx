@@ -60,13 +60,13 @@ int hpx_main(boost::program_options::variables_map& vm)
 			}).wait();
 
 		// verify values
-		/*count = 0;
+		count = 0;
 		std::for_each(boost::begin(c), boost::end(c),
 			[&count](std::size_t v) -> void {
 				HPX_TEST_EQ(v, std::size_t(42));
 				++count;
 			});
-		HPX_TEST_EQ(count, c.size());*/
+		HPX_TEST_EQ(count, c.size());
 
 		/*std::iota(boost::begin(c), boost::end(c), std::rand());
 		std::cout << c[0] << " " << c[99001] << std::endl;

@@ -168,32 +168,22 @@ namespace hpx { namespace parallel { namespace util
 
 				try {
 
-					// TODO: extend for more GPUs
 					std::vector<int> positions = {0};
-					//std::vector<std::pair<std::vector<int>::iterator, std::size_t> > shape{ {positions.begin(), count} };
 					std::vector< std::pair<std::size_t, std::size_t> > shape{ {0, count} };
 
-
-                  //  auto new_f = [f1](FwdIter part_begin, std::size_t part_size)
-					//	{
-							//	util::loop_n(part_begin, part_size,
-							//	[&f1](FwdIter const& curr)
-								//{
-								//	f1(*curr);
-								//});
-					//	};
-
+					/**
+					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
+					 * one of them will point to the starting index and the second one will give the size.
+					 */
 					auto f = [f1](std::pair<std::size_t, std::size_t> const& elem)
-					//auto f = [f1](const std::size_t &x, const std::size_t & y)
 					{
-                        //return f1(*(elem.first), elem.second);
 						return f1(elem.first, elem.second);
 					};
+
 					workitems.reserve(shape.size());
 					//workitems = executor_traits::async_execute(
-					//	policy.executor(), f1, shape);
-					executor_traits::execute(
-						policy.executor(), f, shape);
+						//policy.executor(), f, shape);
+					executor_traits::execute(policy.executor(), f, shape);
 				}
                 catch (...) {
                     detail::handle_local_exceptions<ExPolicy>::call(
@@ -201,19 +191,19 @@ namespace hpx { namespace parallel { namespace util
                 }
 
                 // wait for all tasks to finish
-                //hpx::wait_all(inititems);
-                //hpx::wait_all(workitems);
+                hpx::wait_all(workitems);
+                hpx::wait_all(inititems);
 
                 // handle exceptions
                 detail::handle_local_exceptions<ExPolicy>::call(
-                    inititems, errors);
-                detail::handle_local_exceptions<ExPolicy>::call(
                     workitems, errors);
+                detail::handle_local_exceptions<ExPolicy>::call(
+                    inititems, errors);
 
                 return last;
 			}
 		};
-		//todo: remove later
+
 		template <typename Result>
 		struct foreach_n_static_partitioner<gpu_task_execution_policy, Result>
 		{
@@ -232,17 +222,17 @@ namespace hpx { namespace parallel { namespace util
 
 				std::vector<hpx::future<Result> > inititems, workitems;
 				std::list<boost::exception_ptr> errors;
-				std::vector<tuple> shape;
 
 				try {
-					// estimates a chunk size based on number of cores used
 					std::vector<int> positions = {0};
-					//std::vector<std::pair<std::vector<int>::iterator, std::size_t> > shape{ {positions.begin(), count} };
 					std::vector< std::pair<std::size_t, std::size_t> > shape{ {0, count} };
+
+					/**
+					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
+					 * one of them will point to the starting index and the second one will give the size.
+					 */
 					auto f = [f1](std::pair<std::size_t, std::size_t> const& elem)
-					//auto f = [f1](const std::size_t &x, const std::size_t & y)
 					{
-                        //return f1(*(elem.first), elem.second);
 						return f1(elem.first, elem.second);
 					};
 
@@ -316,9 +306,6 @@ namespace hpx { namespace parallel { namespace util
             }
         };
 
-        /**
-         * TODO: extend for async
-         */
         template <typename Result>
 		struct foreach_n_partitioner<gpu_execution_policy, Result,
 				parallel::traits::static_partitioner_tag>

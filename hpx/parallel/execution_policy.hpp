@@ -787,6 +787,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     /// Default vector execution policy object.
     static parallel_vector_execution_policy const par_vec;
 
+    ///////////////////////////////////////////////////////////////////////////
     /// Extension: The class represents a policy of parallel execution on
     /// a GPU node which may be executed asynchronously.
     ///
@@ -809,7 +810,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         ///
         /// \param chunk_size   [in] The chunk size controlling the number of
         ///                     iterations scheduled to be executed on the same
-        ///                     HPX thread
+        ///                     GPU thread
         ///
         /// \returns The new gpu_task_execution_policy
         ///
@@ -856,8 +857,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
     ///////////////////////////////////////////////////////////////////////////
     /// The class gpu_execution_policy is an execution policy type used
-    /// as a unique type to disambiguate parallel algorithm overloading and
-    /// indicate that a parallel algorithm's execution may be parallelized.
+    /// as a unique type to disambiguate parallel execution on a GPU node.
     struct gpu_execution_policy
 	{
 		/// The type of the default executor associated with this execution policy
@@ -886,7 +886,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 			return gpu_execution_policy(chunk_size);
 		}
 
-		/// Create a new gpu_execution_policy referencing a chunk size.
+		/// Create a new asynchronous gpu_execution_policy referencing a chunk size.
 		///
 		/// \param tag          [in] Specify that the corresponding asynchronous
 		///                     execution policy should be used
@@ -902,7 +902,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 			return gpu_task(chunk_size);
 		}
 
-		/// Create a new parallel_execution_policy referencing a chunk size.
+		/// Create a new asynchronous gpu_execution_policy.
 		///
 		/// \param tag          [in] Specify that the corresponding asynchronous
 		///                     execution policy should be used

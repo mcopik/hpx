@@ -174,19 +174,32 @@ namespace hpx { namespace parallel { namespace util
 					/**
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
 					 * one of them will point to the starting index and the second one will give the size.
+					 *
+					 * The wrapping is necessary, otherwise the code in executor_traits will not be able to
+					 * correcly detect the return type of this lambda
 					 */
 					auto f = [f1](std::pair<std::size_t, std::size_t> const& elem)
 					{
-						return f1(elem.first, elem.second);
+						f1(elem.first, elem.second);
 					};
 
-					workitems.reserve(shape.size());
+					/*Concurrency::extent<1> e(shape[0].second);
+					Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
+						auto _x = std::make_pair(idx[0], 1);
+						f(_x);
+					});*/
+
+					//workitems.reserve(shape.size());
 					//workitems = executor_traits::async_execute(
 						//policy.executor(), f, shape);
-					executor_traits::execute(policy.executor(), f, shape);
+
+					executor_traits::execute(policy.executor(),
+							std::forward<decltype(f)>(f),
+							shape);
 				}
                 catch (...) {
-                    detail::handle_local_exceptions<ExPolicy>::call(
+                    std::cout << "error" << std::endl;
+                	detail::handle_local_exceptions<ExPolicy>::call(
                         boost::current_exception(), errors);
                 }
 

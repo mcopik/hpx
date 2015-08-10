@@ -76,6 +76,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     		{
 				Concurrency::copy(*buffer.get(), cpu_buffer);
     		}
+
+    		void print()
+    		{
+    			std::cout << "buffer: " << *cpu_buffer << std::endl;
+    		}
 		};
 
     	template<typename Iter>
@@ -131,7 +136,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 							Concurrency::extent<1> e(y);
 							Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp)
 							{
-								auto _x = std::make_pair(x + idx[0], y);
+								auto _x = std::make_pair(x + idx[0], 1);
 								f(_x);
 							});
                     	},
@@ -157,19 +162,24 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         static typename detail::bulk_execute_result<F, Shape>::type
         bulk_execute(F && f, Shape const& shape)
         {
+			Concurrency::extent<1> e(shape[0].second);
+			Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
+    			auto _x = std::make_pair(idx[0], 1);
+				f(_x);
+			});
         	/**
         	 * The elements of pair are:
         	 * begin at array, # of elements to process
         	 */
-        	for(auto const & elem : shape) {
+        	/*for(auto const & elem : shape) {
 				std::size_t x = elem.first;
 				std::size_t y = elem.second;
 	        	Concurrency::extent<1> e(y);
         		Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
-        			auto _x = std::make_pair(x + idx[0], y);
+        			auto _x = std::make_pair(x + idx[0], 1);
 	        		f(_x);
 				});
-        	}
+        	}*/
         }
 
         std::size_t os_thread_count()

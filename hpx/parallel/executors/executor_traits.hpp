@@ -28,6 +28,8 @@
 #include <boost/range/functions.hpp>
 #include <boost/range/irange.hpp>
 
+#include <amp.h>
+
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 {
     ///////////////////////////////////////////////////////////////////////////
@@ -540,7 +542,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         static typename detail::bulk_execute_result<F, Shape>::type
         execute(executor_type& exec, F && f, Shape const& shape)
         {
-            return detail::call_bulk_execute(exec, std::forward<F>(f), shape);
+        	Concurrency::extent<1> e(shape[0].second);
+			Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
+    			auto _x = std::make_pair(idx[0], 1);
+				f(_x);
+		});
+            //return detail::call_bulk_execute(exec, std::forward<F>(f), shape);
         }
 
         /// Retrieve the number of (kernel-)threads used by the associated

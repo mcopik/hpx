@@ -315,7 +315,7 @@ namespace hpx { namespace parallel { namespace util
             }
         };
 
-        template <typename Result>
+		template <typename Result>
 		struct foreach_n_partitioner<gpu_execution_policy, Result,
 				parallel::traits::static_partitioner_tag>
 		{
@@ -329,7 +329,7 @@ namespace hpx { namespace parallel { namespace util
 			}
 		};
 
-        template <typename Result>
+		template <typename Result>
 		struct foreach_n_partitioner<gpu_task_execution_policy, Result,
 				parallel::traits::static_partitioner_tag>
 		{

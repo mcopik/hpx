@@ -44,13 +44,13 @@ int hpx_main()
 				v = 400;
 			});
 
-		std::iota(boost::begin(d), boost::end(d), std::rand());
+/*		std::iota(boost::begin(d), boost::end(d), std::rand());
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(d), boost::end(d),
 			[](std::size_t& v) {
-				printf("%lu \n", v); 
+				//printf("%lu \n", v); 
 				v = 43;
-			});
+			});*/
 
 
 
@@ -63,21 +63,19 @@ int hpx_main()
 			});
 		HPX_TEST_EQ(count, c.size());
 
-		count = 0;
+		/*count = 0;
 		std::for_each(boost::begin(d), boost::end(d),
 			[&count](std::size_t v) -> void {
 				HPX_TEST_EQ(v, std::size_t(43));
 				++count;
 			});
-		HPX_TEST_EQ(count, d.size());
+		HPX_TEST_EQ(count, d.size());*/
 
 		/**
 		 * First, size
 		 */
-/*		std::iota(boost::begin(c), boost::end(c), std::rand());
+		std::iota(boost::begin(c), boost::end(c), std::rand());
 		std::iota(boost::begin(d), boost::end(d), std::rand());
-		c[0] =  1;
-		d[0] = 2;
 		std::vector< hpx::future<std::vector<std::size_t>::iterator> > tasks;
 		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task),
 			boost::begin(c), n,
@@ -85,16 +83,13 @@ int hpx_main()
 				v = 42;
 			}) );
 
-		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task),
+		/*tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task),
                         boost::begin(d), n,
                         [](std::size_t& v) {
                                 v = 43;
-                        }) );
+                        }) );*/
 
-
-		//tasks[0].wait();
 		hpx::wait_all(tasks);
-		std::cout << c[0] << " " << d[0] << std::endl;
 		// verify values
 		count = 0;
 		std::for_each(boost::begin(c), boost::end(c),
@@ -104,33 +99,13 @@ int hpx_main()
 			});
 		HPX_TEST_EQ(count, c.size());
 
-                count = 0;
-                std::for_each(boost::begin(d), boost::end(d),
-                        [&count](std::size_t v) -> void {
-                                HPX_TEST_EQ(v, std::size_t(43));
-                                ++count;
-                        });
-                HPX_TEST_EQ(count, d.size());
-
-		/*std::iota(boost::begin(c), boost::end(c), std::rand());
-		std::cout << c[0] << " " << c[99001] << std::endl;
-		hpx::future<void> f = hpx::parallel::for_each(hpx::parallel::gpu,
-				boost::begin(c), boost::end(c),
-				[](std::size_t& v) {
-					v = 43;
+		/*count = 0;
+		std::for_each(boost::begin(d), boost::end(d),
+				[&count](std::size_t v) -> void {
+				        HPX_TEST_EQ(v, std::size_t(43));
+				        ++count;
 				});
-		f.wait();
-
-		std::cout << c[0] << " " << c[99001] << std::endl;
-
-		// verify values
-		count = 0;
-		std::for_each(boost::begin(c), boost::end(c),
-			[&count](std::size_t v) -> void {
-				HPX_TEST_EQ(v, std::size_t(43));
-				++count;
-			});
-		HPX_TEST_EQ(count, c.size());*/
+		HPX_TEST_EQ(count, d.size());*/
 
 
 		double elapsed = t.elapsed();

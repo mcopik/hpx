@@ -95,43 +95,44 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     		return std::make_shared<gpu_amp_buffer<Iter>>(first, count);
 		}
 
-        template <typename F>
-        static typename hpx::util::result_of<
-            typename hpx::util::decay<F>::type()
-        >::type
-        execute(F && f)
-        {
-        	throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
-        }
+		template <typename F>
+		static typename hpx::util::result_of<
+			typename hpx::util::decay<F>::type()
+		>::type
+		execute(F && f)
+		{
+			throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
+		}
 
-        template <typename F>
-        static hpx::future<typename hpx::util::result_of<
-            typename hpx::util::decay<F>::type()
-        >::type>
-        async_execute(F && f)
-        {
-        	throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
-        }
+		template <typename F>
+		static hpx::future<typename hpx::util::result_of<
+			typename hpx::util::decay<F>::type()
+		>::type>
+		async_execute(F && f)
+		{
+			throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
+		}
 
-        template <typename F, typename Shape>
-        static std::vector<hpx::future<
-            typename detail::bulk_async_execute_result<F, Shape>::type
-        > >
-        bulk_async_execute(F && f, Shape const& shape)
-        {
-            typedef typename
-                    detail::bulk_async_execute_result<F, Shape>::type
-                result_type;
-            std::vector<hpx::future<result_type> > results;
-
-            try {
-                for (auto const& elem: shape) {
-    				std::size_t x = elem.first;
-    				std::size_t y = elem.second;
-                    results.push_back(hpx::async(launch::async,
-                    	/**
-                    	 * Lambda calling the AMP parallel execution.
-                    	 */
+		template <typename F, typename Shape>
+		static std::vector<hpx::future<
+			typename detail::bulk_async_execute_result<F, Shape>::type
+		> >
+		bulk_async_execute(F && f, Shape const& shape)
+		{
+			typedef typename
+				    detail::bulk_async_execute_result<F, Shape>::type
+				result_type;
+			std::vector<hpx::future<result_type> > results;
+			std::cout << "Async" << std::endl;
+			try {
+				for (auto const& elem: shape) {
+					std::size_t x = elem.first;
+					std::size_t y = elem.second;
+					std::cout << x << " " << y << std::endl;
+					results.push_back(hpx::async(launch::async,
+						/**
+						 * Lambda calling the AMP parallel execution.
+						 */
 						[=](std::size_t x, std::size_t y) {
 							Concurrency::extent<1> e(y);
 							Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp)
@@ -139,48 +140,45 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 								auto _x = std::make_pair(x + idx[0], 1);
 								f(_x);
 							});
-                    	},
+						},
 						/**
 						 * Args of lambda - start position and size
 						 */
 						x, y));
-                }
-            }
-            catch (std::bad_alloc const& ba) {
-                boost::throw_exception(ba);
-            }
-            catch (...) {
-                boost::throw_exception(
-                    exception_list(boost::current_exception())
-                );
-            }
+				}
+			}
+			catch (std::bad_alloc const& ba) {
+				boost::throw_exception(ba);
+			}
+			catch (...) {
+				boost::throw_exception(
+				    exception_list(boost::current_exception())
+				);
+			}
 
-        	return std::move(results);
-        }
+			std::cout << "Async" << std::endl;
+			return std::move(results);
+		}
 
-        template <typename F, typename Shape>
-        static typename detail::bulk_execute_result<F, Shape>::type
-        bulk_execute(F && f, Shape const& shape)
-        {
-			Concurrency::extent<1> e(shape[0].second);
-			Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
-    			auto _x = std::make_pair(idx[0], 1);
-				f(_x);
-			});
-        	/**
-        	 * The elements of pair are:
-        	 * begin at array, # of elements to process
-        	 */
-        	/*for(auto const & elem : shape) {
+		template <typename F, typename Shape>
+		static typename detail::bulk_execute_result<F, Shape>::type
+		bulk_execute(F && f, Shape const& shape)
+		{
+			/**
+			 * The elements of pair are:
+			 * begin at array, # of elements to process
+			 */
+			for(auto const & elem : shape) {
 				std::size_t x = elem.first;
 				std::size_t y = elem.second;
-	        	Concurrency::extent<1> e(y);
-        		Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
-        			auto _x = std::make_pair(x + idx[0], 1);
-	        		f(_x);
+				Concurrency::extent<1> e(y);
+				Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) 
+				{
+					auto _x = std::make_pair(x + idx[0], 1);
+					f(_x);
 				});
-        	}*/
-        }
+			}
+		}
 
         std::size_t os_thread_count()
         {

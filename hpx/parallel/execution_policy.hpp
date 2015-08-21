@@ -1243,7 +1243,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///////////////////////////////////////////////////////////////////////////
     /// The class gpu_execution_policy is an execution policy type used
     /// as a unique type to disambiguate parallel execution on a GPU node.
-    struct gpu_execution_policy
+	struct gpu_execution_policy
 	{
 		/// The type of the default executor associated with this execution policy
 		typedef parallel::gpu_amp_executor executor_type;
@@ -1306,13 +1306,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 			static executor_type exec;
 			return exec;
 		}
-    protected:
+	protected:
 		gpu_execution_policy(std::size_t chunk_size) : chunk_size_(chunk_size)
 		{
 
 		}
-    private:
-        std::size_t chunk_size_;
+	private:
+		std::size_t chunk_size_;
 	};
 
     static gpu_execution_policy const gpu;

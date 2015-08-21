@@ -94,35 +94,22 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 	        	Iter end = first;
 	        	std::advance(end, count);
 
-	        	//auto buffer = policy.executor().create_buffers(first, count);
-	        	//auto gpu_buffer = buffer.buffer_view();
+	        	auto buffer = policy.executor().create_buffers(first, count);
+	        	auto gpu_buffer = buffer.buffer_view();
 
 				if (count != 0)
 				{
-					//buffer.print();
-					std::size_t x = 0;
-					f(x);
-					std::cout << "func: " << x << std::endl;
-
-		    		Concurrency::extent<1> extent(count);
-					Concurrency::array<std::size_t> ar(extent, first, end);
-					Concurrency::array_view<std::size_t> av(ar);
-
 					//dont'return right now - we have to sync buffers after the call
 					util::foreach_n_partitioner<gpu_execution_policy>::call(
 						policy, first, count,
-			                        [f, proj, av](std::size_t part_begin, std::size_t part_size)
+                        [f, proj, gpu_buffer](std::size_t part_begin, std::size_t part_size)
 						{
 							for(std::size_t i = 0; i < part_size; ++i)
-								//f( proj(gpu_buffer[part_begin + i]) );
-								f( av[part_begin + i] );
+								f( proj(gpu_buffer[part_begin + i]) );
 						});
-					Concurrency::copy(av, first);
-					std::cout << "Data: " << *first << std::endl;
 
 					// the data needs to be transferred from gpu back to original buffer
-					//buffer.sync();
-					//buffer.print();
+					buffer.sync();
 
 					return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
 						std::move(end));
@@ -148,8 +135,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					 */
 					auto buffer = policy.executor().create_buffers_shared(first, count);
 					auto gpu_buffer = buffer.get()->buffer_view();
-					buffer.get()->print();
-
 					hpx::future<Iter> x = util::foreach_n_partitioner<gpu_task_execution_policy>::call(
 							policy, first, count,
 							[f, proj, gpu_buffer](std::size_t part_begin, std::size_t part_size)
@@ -160,10 +145,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					/**
 					 * Sync the data after finishing GPU computation.
 					 */
+					std::cout << "Task execution" << std::endl;
 					hpx::future<Iter> s = x.then( [=](hpx::future<Iter> it)
-								{ it.wait(); buffer.get()->sync();
-								buffer.get()->print(); return it.get(); });
-					//std::cout << *(s.get()) << std::endl;
+								{ it.wait(); buffer.get()->sync(); return it.get(); });
 					return s;
 				}
 				return util::detail::algorithm_result<gpu_task_execution_policy, Iter>::get(

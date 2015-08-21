@@ -19,12 +19,13 @@
 
 
 
-int hpx_main(boost::program_options::variables_map& vm)
+//int hpx_main(boost::program_options::variables_map& vm)
+int hpx_main()
 {
 
 
-	boost::uint64_t n = vm["n-value"].as<boost::uint64_t>();
-
+	//boost::uint64_t n = vm["n-value"].as<boost::uint64_t>();
+	boost::uint64_t n = 10;
 	{
 		hpx::util::high_resolution_timer t;
 
@@ -39,6 +40,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(c), boost::end(c),
 			[](std::size_t& v) {
+
 				v = 400;
 			});
 
@@ -46,6 +48,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(d), boost::end(d),
 			[](std::size_t& v) {
+				printf("%lu \n", v); 
 				v = 43;
 			});
 
@@ -142,6 +145,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 
 int main(int argc, char* argv[])
 {
+	hpx_main();
 	using boost::program_options::options_description;
 	using boost::program_options::value;
 

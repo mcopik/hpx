@@ -1,29 +1,62 @@
+
 #include <iostream>
 #include <cassert>
 #include <numeric>
+#include <utility>
+#include <vector>
+
+#include <boost/range.hpp>
 #include <amp.h>
 
 
-void run_amp(std::vector<int> & vec)
-{
-	auto f = [&](int & v) -> void { v = 42; };
-	Concurrency::array_view<int> av(vec.size(), vec);
-	Concurrency::parallel_for_each(av.get_extent(), [=](Concurrency::index<1> idx) restrict(amp) {
-		f(av[idx]);
-	});
-}
-
 namespace hpx { namespace parallel { inline namespace v3 { namespace detail {
-class ProperExecutor {
+
+class ImProperExecutor {
 public:
-	template<typename F>
-	static void run(F && f, std::size_t count)
+	template<typename X, typename F, typename Data>
+	static void run(X && x, F && f, Data count)
 	{
 		Concurrency::extent<1> e(count);
 		Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
 			auto _x = std::make_pair(idx[0], 1);
 			f(_x);
 		});
+	}
+	template<typename X, typename F>
+	static void run(X && x, F && f, std::size_t count)
+	{
+		Concurrency::extent<1> e(count);
+		Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
+			auto _x = std::make_pair(idx[0], 1);
+			f(_x);
+		});
+	}
+};
+
+class ProperExecutor {
+public:
+	template<typename F, typename Data>
+	static void run(F && f, Data count)
+	{
+		std::vector<int> x;
+		ImProperExecutor::run(x, std::forward<F>(f),count);
+/*		Concurrency::extent<1> e(count);
+		Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
+			auto _x = std::make_pair(idx[0], 1);
+			f(_x);
+		});*/
+	}
+
+	template<typename F>
+	static void run(F && f, std::size_t count)
+	{
+		std::vector<int> x;
+		ImProperExecutor::run(x, std::forward<F>(f),count);
+		/*Concurrency::extent<1> e(count);
+		Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
+			auto _x = std::make_pair(idx[0], 1);
+			f(_x);
+		});*/
 	}
 };
 } } } }
@@ -39,7 +72,7 @@ public:
 				//ignore second in this example
 				f1(elem.first, elem.second);
 			};
-		ProperExecutor::run(f, count);
+		ProperExecutor::run(std::forward<decltype(f)>(f), count);
 	}
 };
 } } } }
@@ -50,7 +83,7 @@ public:
 	template<typename F>
 	static void partition_run(F && f, std::size_t count)
 	{
-		Executor::run(f, count);
+		Executor::run(std::forward<F>(f), count);
 	}
 };
 } } } }
@@ -59,7 +92,7 @@ namespace hpx { namespace parallel { inline namespace v3 { namespace detail {
 template<typename F>
 void partition_run(F && f, std::size_t count)
 {
-	Partitioner::partition_run(f, count);
+	Partitioner::partition_run(f,count);//std::forward<F>(f), count);
 }
 } } } }
 
@@ -87,14 +120,14 @@ int main(int argc, char ** argv)
 
 	Concurrency::extent<1> extentc(n);
 	Concurrency::extent<1> extentd(n);
-	Concurrency::array<std::size_t> arc(extentc, std::begin(c), std::end(c));
-	Concurrency::array<std::size_t> ard(extentd, std::begin(d), std::end(d));
+	Concurrency::array<std::size_t> arc(extentc, boost::begin(c), boost::end(c));
+	Concurrency::array<std::size_t> ard(extentd, boost::begin(d), boost::end(d));
 	Concurrency::array_view<std::size_t> avc(arc);
 	Concurrency::array_view<std::size_t> avd(ard);
 	hpx::parallel::run([fc, &avc](std::size_t pos) { fc(avc[pos]); }, n);
 	hpx::parallel::run([fd, &avd](std::size_t pos) { fd(avd[pos]); }, n);
-	Concurrency::copy(avc, std::begin(c));
-	Concurrency::copy(avd, std::begin(d));
+	Concurrency::copy(avc, boost::begin(c));
+	Concurrency::copy(avd, boost::begin(d));
 
 
 	std::size_t count = 0;

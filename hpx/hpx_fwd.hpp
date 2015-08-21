@@ -34,18 +34,19 @@
 #include <boost/intrusive_ptr.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/detail/scoped_enum_emulation.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/type_traits/remove_reference.hpp>
 
 #include <hpx/traits.hpp>
 #include <hpx/lcos/local/once_fwd.hpp>
-#include <hpx/util/function.hpp>            // this has to come before the naming/id_type.hpp below
+#include <hpx/util/function.hpp>
+// ^ this has to come before the naming/id_type.hpp below
 #include <hpx/util/move.hpp>
 #include <hpx/util/unique_function.hpp>
 #include <hpx/util/unused.hpp>
 #include <hpx/util/coroutine/detail/default_context_impl.hpp>
 #include <hpx/util/coroutine/detail/coroutine_impl.hpp>
+#include <hpx/runtime/launch_policy.hpp>
 #include <hpx/runtime/naming/id_type.hpp>
 #include <hpx/runtime/threads/detail/tagged_thread_state.hpp>
 #include <hpx/runtime/threads/thread_enums.hpp>
@@ -382,25 +383,6 @@ namespace hpx
             thread_priority priority, thread_state_enum state = unknown);
     }
 
-    /// \namespace actions
-    ///
-    /// The namespace \a actions contains all definitions needed for the
-    /// class \a hpx#action_manager#action_manager and its related
-    /// functionality. This namespace is part of the HPX core module.
-    namespace actions
-    {
-        struct HPX_API_EXPORT base_action;
-        typedef boost::shared_ptr<base_action> action_type;
-
-        class HPX_API_EXPORT continuation;
-        typedef boost::shared_ptr<continuation> continuation_type;
-
-        class HPX_API_EXPORT action_manager;
-
-        template <typename Component, typename Signature, typename Derived>
-        struct basic_action;
-    }
-
     class HPX_API_EXPORT runtime;
     class HPX_API_EXPORT thread;
 
@@ -666,35 +648,6 @@ namespace hpx
     namespace performance_counters
     {
         struct counter_info;
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Launch policy for \a hpx::async
-    BOOST_SCOPED_ENUM_START(launch)
-    {
-        async = 0x01,
-        deferred = 0x02,
-        task = 0x04,        // see N3632
-        sync = 0x08,
-        fork = 0x10,        // same as async, but forces continuation stealing
-
-        sync_policies = 0x0a,       // sync | deferred
-        async_policies = 0x15,      // async | task | fork
-        all = 0x1f                  // async | deferred | task | sync | fork
-    };
-    BOOST_SCOPED_ENUM_END
-
-    inline bool
-    operator&(BOOST_SCOPED_ENUM(launch) lhs, BOOST_SCOPED_ENUM(launch) rhs)
-    {
-        return (static_cast<int>(lhs) & static_cast<int>(rhs)) != 0;
-    }
-
-    inline BOOST_SCOPED_ENUM(launch)
-    operator|(BOOST_SCOPED_ENUM(launch) lhs, BOOST_SCOPED_ENUM(launch) rhs)
-    {
-        return static_cast<BOOST_SCOPED_ENUM(launch)>(
-            static_cast<int>(lhs) | static_cast<int>(rhs));
     }
 
     ///////////////////////////////////////////////////////////////////////////

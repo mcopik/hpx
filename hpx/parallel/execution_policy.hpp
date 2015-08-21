@@ -791,7 +791,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///////////////////////////////////////////////////////////////////////////
     /// The class gpu_execution_policy is an execution policy type used
     /// as a unique type to disambiguate parallel algorithm overloading and
-    /// indicate that a parallel algorithm's execution may be parallelized.
+    /// indicate that a parallel algorithm's execution may be parallelized on GPUs.
     struct gpu_execution_policy
 	{
 		/// The type of the default executor associated with this execution policy

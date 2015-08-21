@@ -145,7 +145,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					/**
 					 * Sync the data after finishing GPU computation.
 					 */
-					std::cout << "Task execution" << std::endl;
 					hpx::future<Iter> s = x.then( [=](hpx::future<Iter> it)
 								{ it.wait(); buffer.get()->sync(); return it.get(); });
 					return s;

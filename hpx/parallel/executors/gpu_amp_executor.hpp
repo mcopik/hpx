@@ -123,12 +123,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				    detail::bulk_async_execute_result<F, Shape>::type
 				result_type;
 			std::vector<hpx::future<result_type> > results;
-			std::cout << "Async" << std::endl;
+
 			try {
 				for (auto const& elem: shape) {
 					std::size_t x = elem.first;
 					std::size_t y = elem.second;
-					std::cout << x << " " << y << std::endl;
 					results.push_back(hpx::async(launch::async,
 						/**
 						 * Lambda calling the AMP parallel execution.
@@ -156,7 +155,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				);
 			}
 
-			std::cout << "Async" << std::endl;
 			return std::move(results);
 		}
 

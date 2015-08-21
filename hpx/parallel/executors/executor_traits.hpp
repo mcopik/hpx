@@ -1,5 +1,6 @@
 //  Copyright (c) 2007-2015 Hartmut Kaiser
 //  Copyright (c) 2015 Daniel Bourgeois
+//  Copyright (c) 2015 Marcin Copik
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -33,8 +34,6 @@
 #define HPX_ENABLE_WORKAROUND_FOR_GCC46
 #endif
 
-#include <amp.h>
-
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 {
     ///////////////////////////////////////////////////////////////////////////
@@ -59,7 +58,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     ///       \a parallel_execution_tag.
     struct vector_execution_tag {};
 
-    /// TODO!
+    ///////////////////////////////////////////////////////////////////////////
+    /// Function invocations executed by a specialized GPU executor.
+	/// Currently, only gpu_amp_executor uses this tag.
     struct gpu_execution_tag {};
 
     namespace detail
@@ -220,7 +221,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     std::iterator_traits<iterator_type>::value_type
                 value_type;
             typedef typename hpx::util::result_of<
-                   typename hpx::util::decay<F>::type(value_type)
+					typename hpx::util::decay<F>::type(value_type)
                 >::type type;
         };
 
@@ -664,14 +665,17 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     struct is_executor;         // defined in hpx/traits/is_executor.hpp
 
     ///////////////////////////////////////////////////////////////////////////
-    namespace detail
+	namespace detail
 	{
-    	template <typename Iter, typename BufferType>
-    	struct gpu_executor_buffer
+		///////////////////////////////////////////////////////////////////////////
+   		/// Parent class for GPU buffers, e.g. for C++AMP and Khronos 
+		/// SYCL implementations.
+		template <typename Iter, typename BufferType>
+		struct gpu_executor_buffer
 		{
-    		virtual ~gpu_executor_buffer() {}
-    		virtual BufferType & buffer_view() = 0;
-    		virtual void sync() = 0;
+			virtual ~gpu_executor_buffer() {}
+			virtual BufferType & buffer_view() = 0;
+			virtual void sync() = 0;
 		};
 	}
 }}}

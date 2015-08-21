@@ -1,4 +1,5 @@
 components/iostream 
+examples/1d_stencil
 examples/1d_hydro
 examples/allgather
 examples/async_io

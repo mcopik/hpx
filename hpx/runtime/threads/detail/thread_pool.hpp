@@ -8,6 +8,7 @@
 
 #include <hpx/config.hpp>
 #include <hpx/state.hpp>
+#include <hpx/runtime/threads/detail/thread_num_tss.hpp>
 #include <hpx/runtime/threads/policies/affinity_data.hpp>
 #include <hpx/runtime/threads/policies/scheduler_base.hpp>
 #include <hpx/util/thread_specific_ptr.hpp>
@@ -84,9 +85,9 @@ namespace hpx { namespace threads { namespace detail
 #endif
 
 #ifdef HPX_HAVE_THREAD_IDLE_RATES
-        ///////////////////////////////////////////////////////////////////////
-        boost::int64_t avg_idle_rate(bool reset);
-        boost::int64_t avg_idle_rate(std::size_t num_thread, bool reset);
+    ///////////////////////////////////////////////////////////////////////////
+    boost::int64_t avg_idle_rate(bool reset);
+    boost::int64_t avg_idle_rate(std::size_t num_thread, bool reset);
 
 #if defined(HPX_HAVE_THREAD_CREATION_AND_CLEANUP_RATES)
         boost::int64_t avg_creation_idle_rate(bool reset);
@@ -165,10 +166,6 @@ namespace hpx { namespace threads { namespace detail
         // Stores the mask identifying all processing units used by this
         // thread manager.
         threads::mask_type used_processing_units_;
-
-        // the TSS holds the number associated with a given OS thread
-        struct tls_tag {};
-        static hpx::util::thread_specific_ptr<std::size_t, tls_tag> thread_num_;
     };
 }}}
 

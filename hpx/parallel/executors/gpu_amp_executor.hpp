@@ -76,6 +76,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     		{
 				Concurrency::copy(*buffer.get(), cpu_buffer);
     		}
+
+    		void print()
+    		{
+    			std::cout << "buffer: " << *cpu_buffer << std::endl;
+    		}
 		};
 
     	template<typename Iter>
@@ -84,23 +89,19 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     		return gpu_amp_buffer<Iter>(first, count);
 		}
 
+    	template<typename Iter>
+    	static std::shared_ptr<gpu_amp_buffer<Iter>> create_buffers_shared(Iter first, std::size_t count)
+		{
+    		return std::make_shared<gpu_amp_buffer<Iter>>(first, count);
+		}
+
         template <typename F>
         static typename hpx::util::result_of<
             typename hpx::util::decay<F>::type()
         >::type
         execute(F && f)
         {
-         /*   try {
-                return f();
-            }
-            catch (std::bad_alloc const& ba) {
-                boost::throw_exception(ba);
-            }
-            catch (...) {
-                boost::throw_exception(
-                    exception_list(boost::current_exception())
-                );
-            }*/
+        	throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
         }
 
         template <typename F>
@@ -109,7 +110,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         >::type>
         async_execute(F && f)
         {
-            //return hpx::async(launch::deferred, std::forward<F>(f));
+        	throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
         }
 
         template <typename F, typename Shape>
@@ -123,9 +124,27 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 result_type;
             std::vector<hpx::future<result_type> > results;
 
-            /*try {
-                for (auto const& elem: shape)
-                    results.push_back(hpx::async(launch::deferred, f, elem));
+            try {
+                for (auto const& elem: shape) {
+    				std::size_t x = elem.first;
+    				std::size_t y = elem.second;
+                    results.push_back(hpx::async(launch::async,
+                    	/**
+                    	 * Lambda calling the AMP parallel execution.
+                    	 */
+						[=](std::size_t x, std::size_t y) {
+							Concurrency::extent<1> e(y);
+							Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp)
+							{
+								auto _x = std::make_pair(x + idx[0], 1);
+								f(_x);
+							});
+                    	},
+						/**
+						 * Args of lambda - start position and size
+						 */
+						x, y));
+                }
             }
             catch (std::bad_alloc const& ba) {
                 boost::throw_exception(ba);
@@ -134,29 +153,33 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 boost::throw_exception(
                     exception_list(boost::current_exception())
                 );
-            }*/
+            }
 
-            return std::move(results);
+        	return std::move(results);
         }
 
         template <typename F, typename Shape>
         static typename detail::bulk_execute_result<F, Shape>::type
         bulk_execute(F && f, Shape const& shape)
         {
-
+			Concurrency::extent<1> e(shape[0].second);
+			Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
+    			auto _x = std::make_pair(idx[0], 1);
+				f(_x);
+			});
         	/**
         	 * The elements of pair are:
         	 * begin at array, # of elements to process
         	 */
-        	for(auto const & elem : shape) {
+        	/*for(auto const & elem : shape) {
 				std::size_t x = elem.first;
 				std::size_t y = elem.second;
 	        	Concurrency::extent<1> e(y);
         		Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) {
-        			auto _x = std::make_pair(x + idx[0], y);
+        			auto _x = std::make_pair(x + idx[0], 1);
 	        		f(_x);
 				});
-        	}
+        	}*/
         }
 
         std::size_t os_thread_count()

@@ -19,46 +19,82 @@
 
 
 
-int hpx_main(boost::program_options::variables_map& vm)
+//int hpx_main(boost::program_options::variables_map& vm)
+int hpx_main()
 {
 
 
-	boost::uint64_t n = vm["n-value"].as<boost::uint64_t>();
-
+	//boost::uint64_t n = vm["n-value"].as<boost::uint64_t>();
+	boost::uint64_t n = 10;
 	{
 		hpx::util::high_resolution_timer t;
 
 		std::vector<std::size_t> c(n);
-
+		std::vector<std::size_t> e(1000);
+		std::vector<std::size_t> d(n);
 		/**
 		 * First, last
 		 */
 		std::iota(boost::begin(c), boost::end(c), std::rand());
+		std::iota(boost::begin(d), boost::end(d), std::rand());
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(c), boost::end(c),
 			[](std::size_t& v) {
-				v = 42;
+
+				v = 400;
 			});
+
+		std::iota(boost::begin(d), boost::end(d), std::rand());
+		hpx::parallel::for_each(hpx::parallel::gpu,
+			boost::begin(d), boost::end(d),
+			[](std::size_t& v) {
+				printf("%lu \n", v); 
+				v = 43;
+			});
+
+
 
 		// verify values
 		std::size_t count = 0;
 		std::for_each(boost::begin(c), boost::end(c),
 			[&count](std::size_t v) -> void {
-				HPX_TEST_EQ(v, std::size_t(42));
+				HPX_TEST_EQ(v, std::size_t(400));
 				++count;
 			});
 		HPX_TEST_EQ(count, c.size());
 
+		count = 0;
+		std::for_each(boost::begin(d), boost::end(d),
+			[&count](std::size_t v) -> void {
+				HPX_TEST_EQ(v, std::size_t(43));
+				++count;
+			});
+		HPX_TEST_EQ(count, d.size());
+
 		/**
 		 * First, size
 		 */
-		std::iota(boost::begin(c), boost::end(c), std::rand());
-		hpx::parallel::for_each_n(hpx::parallel::gpu,
+/*		std::iota(boost::begin(c), boost::end(c), std::rand());
+		std::iota(boost::begin(d), boost::end(d), std::rand());
+		c[0] =  1;
+		d[0] = 2;
+		std::vector< hpx::future<std::vector<std::size_t>::iterator> > tasks;
+		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task),
 			boost::begin(c), n,
 			[](std::size_t& v) {
 				v = 42;
-			});
+			}) );
 
+		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task),
+                        boost::begin(d), n,
+                        [](std::size_t& v) {
+                                v = 43;
+                        }) );
+
+
+		//tasks[0].wait();
+		hpx::wait_all(tasks);
+		std::cout << c[0] << " " << d[0] << std::endl;
 		// verify values
 		count = 0;
 		std::for_each(boost::begin(c), boost::end(c),
@@ -67,6 +103,14 @@ int hpx_main(boost::program_options::variables_map& vm)
 				++count;
 			});
 		HPX_TEST_EQ(count, c.size());
+
+                count = 0;
+                std::for_each(boost::begin(d), boost::end(d),
+                        [&count](std::size_t v) -> void {
+                                HPX_TEST_EQ(v, std::size_t(43));
+                                ++count;
+                        });
+                HPX_TEST_EQ(count, d.size());
 
 		/*std::iota(boost::begin(c), boost::end(c), std::rand());
 		std::cout << c[0] << " " << c[99001] << std::endl;
@@ -101,6 +145,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 
 int main(int argc, char* argv[])
 {
+	hpx_main();
 	using boost::program_options::options_description;
 	using boost::program_options::value;
 

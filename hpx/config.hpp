@@ -438,7 +438,11 @@
 // This limits how deep the internal recursion of future continuations will go
 // before a new operation is re-spawned.
 #if !defined(HPX_CONTINUATION_MAX_RECURSION_DEPTH)
-#define HPX_CONTINUATION_MAX_RECURSION_DEPTH 16
+#if defined(HPX_DEBUG)
+#define HPX_CONTINUATION_MAX_RECURSION_DEPTH 14
+#else
+#define HPX_CONTINUATION_MAX_RECURSION_DEPTH 20
+#endif
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////

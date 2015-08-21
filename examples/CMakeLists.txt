@@ -19,6 +19,7 @@ set(subdirs
     jacobi_smp
     nqueen
     #performance_counters
+	queue
     #quickstart
     qt
     random_mem_access
@@ -31,7 +32,7 @@ set(subdirs
 
  if(HPX_WITH_CXX11_LAMBDAS)
   set(subdirs ${subdirs}
-     1d_stencil
+     #1d_stencil
      #diskperf
      #tuplespace
      transpose

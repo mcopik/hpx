@@ -44,7 +44,7 @@ endif()
 # Kalmar compiler configuration
 # It has to be done before any call to project()!
 ################################################################################
-if(HPX_WITH_KALMAR_CXX)
+if(HPX_WITH_KALMAR)
   #include(KalmarConfigure) works only after project()
   include(cmake/KalmarConfigure.cmake)
   kalmar_configure_cxx()
@@ -573,7 +573,7 @@ endif()
 # Kalmar compiler
 ################################################################################
 
-hpx_option(HPX_WITH_KALMAR_CXX STRING
+hpx_option(HPX_WITH_KALMAR STRING
 	"Use the Kalmar C++AMP compiler for HPX. Requires the path to install directory"
 	"" ADVANCED)
 
@@ -677,12 +677,7 @@ endif()
 ################################################################################
 # Kalmar configuration and flags
 ################################################################################
-if(HPX_WITH_KALMAR_CXX)
-  execute_process(COMMAND find ${HPX_WITH_KALMAR_CXX} -name clang++ -print OUTPUT_VARIABLE KALMAR_CXX OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND find ${HPX_WITH_KALMAR_CXX} -name clamp-config -print OUTPUT_VARIABLE KALMAR_CONFIG OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${KALMAR_CONFIG} --build --cxxflags OUTPUT_VARIABLE KALMAR_CXX_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${KALMAR_CONFIG} --build --ldflags OUTPUT_VARIABLE KALMAR_LD_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-
+if(HPX_WITH_KALMAR)
   kalmar_configure()
 endif()
 

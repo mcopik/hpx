@@ -5,6 +5,7 @@
 # Copyright (c)      2011 Vinay C Amatya
 # Copyright (c)      2013 Jeroen Habraken
 # Copyright (c)      2014 Andreas Schäfer
+# Copyright (c)      2015 Marcin Copik
 #
 # Distributed under the Boost Software License, Version 1.0. (See accompanying
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -40,8 +41,19 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 ################################################################################
+# Kalmar compiler configuration
+# It has to be done before any call to project()!
+################################################################################
+if(HPX_WITH_KALMAR_CXX)
+  #include(KalmarConfigure) works only after project()
+  include(cmake/KalmarConfigure.cmake)
+  kalmar_configure_cxx()
+endif()
+
+################################################################################
 # project metadata
 ################################################################################
+
 project(HPX CXX C)
 
 set(HPX_MAJOR_VERSION 0)
@@ -558,6 +570,14 @@ if(HPX_WITH_COMPONENT_GET_GID_COMPATIBILITY)
 endif()
 
 ################################################################################
+# Kalmar compiler
+################################################################################
+
+hpx_option(HPX_WITH_KALMAR_CXX STRING
+	"Use the Kalmar C++AMP compiler for HPX. Requires the path to install directory"
+	"" ADVANCED)
+
+################################################################################
 # Set basic search paths for HPX
 ################################################################################
 include_directories("${PROJECT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}")
@@ -651,8 +671,19 @@ if(NOT MSVC)
       endif()
     endif()
   endif()
-  set(CXX_FLAG -std=c++amp)
   hpx_add_compile_flag(${CXX_FLAG})
+endif()
+
+################################################################################
+# Kalmar configuration and flags
+################################################################################
+if(HPX_WITH_KALMAR_CXX)
+  execute_process(COMMAND find ${HPX_WITH_KALMAR_CXX} -name clang++ -print OUTPUT_VARIABLE KALMAR_CXX OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND find ${HPX_WITH_KALMAR_CXX} -name clamp-config -print OUTPUT_VARIABLE KALMAR_CONFIG OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${KALMAR_CONFIG} --build --cxxflags OUTPUT_VARIABLE KALMAR_CXX_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${KALMAR_CONFIG} --build --ldflags OUTPUT_VARIABLE KALMAR_LD_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+  kalmar_configure()
 endif()
 
 ################################################################################

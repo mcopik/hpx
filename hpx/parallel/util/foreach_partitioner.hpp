@@ -148,6 +148,7 @@ namespace hpx { namespace parallel { namespace util
             }
         };
 
+#ifdef HPX_WITH_AMP
         ///////////////////////////////////////////////////////////////////////
 		template <typename Result>
 		struct foreach_n_static_partitioner<gpu_execution_policy, Result>
@@ -188,7 +189,7 @@ namespace hpx { namespace parallel { namespace util
 
 					//workitems.reserve(shape.size());
 					//workitems = executor_traits::async_execute(
-						//policy.executor(), f, shape);
+					//	policy.executor(), f, shape);
 
 					executor_traits::execute(policy.executor(),
 							std::forward<decltype(f)>(f),
@@ -273,6 +274,7 @@ namespace hpx { namespace parallel { namespace util
 					std::move(inititems), std::move(workitems));
 			}
 		};
+#endif
 
         template <typename Executor, typename Parameters, typename Result>
         struct foreach_n_static_partitioner<
@@ -316,6 +318,7 @@ namespace hpx { namespace parallel { namespace util
             }
         };
 
+#ifdef HPX_WITH_AMP
 		template <typename Result>
 		struct foreach_n_partitioner<gpu_execution_policy, Result,
 				parallel::traits::static_partitioner_tag>
@@ -343,6 +346,7 @@ namespace hpx { namespace parallel { namespace util
 					policy, first, count, std::forward<F1>(f1), chunk_size);
 			}
 		};
+#endif
 
         template <typename Executor, typename Parameters, typename Result>
         struct foreach_n_partitioner<

@@ -14,7 +14,9 @@
 
 #include <hpx/parallel/executors/parallel_executor.hpp>
 #include <hpx/parallel/executors/sequential_executor.hpp>
-#include <hpx/parallel/executors/gpu_amp_executor.hpp>
+#ifdef HPX_WITH_AMP
+  #include <hpx/parallel/executors/gpu_amp_executor.hpp>
+#endif
 #include <hpx/parallel/executors/distribution_policy_executor.hpp>
 #include <hpx/parallel/executors/service_executors.hpp>
 #include <hpx/parallel/executors/this_thread_executors.hpp>

@@ -16,6 +16,8 @@ endmacro()
 
 macro(kalmar_configure)
 
+  add_definitions(-DHPX_WITH_AMP)
+
   hpx_add_compile_flag(${KALMAR_CXX_FLAGS})
   #using hpx_add_link_flag will modify also static linking flags
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${KALMAR_LD_FLAGS}")

@@ -178,6 +178,7 @@ namespace hpx { namespace parallel { namespace util { namespace detail
       : algorithm_result_impl<parallel_task_execution_policy, void>
     {};
 
+#ifdef HPX_WITH_AMP
     template <typename T>
     struct algorithm_result_impl<
             gpu_task_execution_policy, T>
@@ -189,6 +190,7 @@ namespace hpx { namespace parallel { namespace util { namespace detail
 			gpu_task_execution_policy, void>
       : algorithm_result_impl<parallel_task_execution_policy, void>
     {};
+#endif
 
     ///////////////////////////////////////////////////////////////////////////
     template <typename ExPolicy, typename T = void>

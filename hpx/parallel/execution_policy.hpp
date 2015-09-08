@@ -1179,6 +1179,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///
     /// The algorithm returns a future representing the result of the
     /// corresponding algorithm when invoked with the gpu_execution_policy.
+#ifdef HPX_WITH_AMP
     struct gpu_task_execution_policy
     {
         /// The type of the executor associated with this execution policy
@@ -1317,7 +1318,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 	};
 
     static gpu_execution_policy const gpu;
-
+#endif
     ///////////////////////////////////////////////////////////////////////////
     // Allow to detect execution policies which were created as a result
     // of a rebind operation. This information can be used to inhibit the
@@ -1444,6 +1445,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
           : boost::mpl::true_
         {};
 
+#ifdef HPX_WITH_AMP
         template <>
         struct is_execution_policy<gpu_execution_policy>
           : boost::mpl::true_
@@ -1453,6 +1455,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         struct is_execution_policy<gpu_task_execution_policy>
           : boost::mpl::true_
         {};
+#endif
 
         template <>
         struct is_execution_policy<sequential_execution_policy>
@@ -1530,6 +1533,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
           : boost::mpl::true_
         {};
 
+#ifdef HPX_WITH_AMP
         template <>
         struct is_parallel_execution_policy<gpu_execution_policy>
           : boost::mpl::true_
@@ -1539,6 +1543,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         struct is_parallel_execution_policy<gpu_task_execution_policy>
           : boost::mpl::true_
         {};
+#endif
 
         template <>
         struct is_parallel_execution_policy<parallel_task_execution_policy>
@@ -1638,10 +1643,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
           : boost::mpl::true_
         {};
 
+#ifdef HPX_WITH_AMP
         template <>
         struct is_async_execution_policy<gpu_task_execution_policy>
           : boost::mpl::true_
         {};
+#endif
+
         /// \endcond
     }
 

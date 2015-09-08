@@ -86,6 +86,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                     std::move(first));
             }
 
+#ifdef HPX_WITH_AMP
             template <typename F, typename Proj = util::projection_identity>
             static typename util::detail::algorithm_result<gpu_execution_policy, Iter>::type
 			parallel(gpu_execution_policy policy, Iter first, std::size_t count,
@@ -153,6 +154,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 				return util::detail::algorithm_result<gpu_task_execution_policy, Iter>::get(
 					std::move(first));
 			}
+#endif
         };
         /// \endcond
     }

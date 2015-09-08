@@ -217,11 +217,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1) { namespace detail
                     boost::mpl::false_(), std::forward<Args>(args)...);
             }
 
+#ifdef HPX_WITH_AMP
             if (t == typeid(gpu_execution_policy))
             {
                 return call(*policy.get<gpu_execution_policy>(),
                     boost::mpl::false_(), std::forward<Args>(args)...);
             }
+#endif
 
             HPX_THROW_EXCEPTION(hpx::bad_parameter,
                 std::string("hpx::parallel::") + name_,

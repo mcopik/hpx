@@ -45,31 +45,31 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		template<typename Iter,
 				typename value_type = typename std::iterator_traits<Iter>::value_type,
     			typename buffer_type = cl::sycl::buffer<typename std::iterator_traits<Iter>::value_type, 1>,
-				typename buffer_view_type =  decltype( std::declval< buffer_type >().template get_access<cl::sycl::access::mode::read_write>() )>
+				typename buffer_view_type =  decltype( std::declval< buffer_type >().template get_access<cl::sycl::access::mode::read_write>( std::declval<cl::sycl::handler &>() ) )>
     	struct gpu_sycl_buffer : detail::gpu_executor_buffer<Iter, buffer_view_type>
 		{
-    		//typedef typename decltype(std::declval< cl::sycl::buffer<value_type>>.get_access<cl::sycl::access::mode::read_write>()) buffer_view_type;
 
 			cl::sycl::default_selector selector;
 			cl::sycl::queue queue;
     		Iter cpu_buffer;
     		std::shared_ptr<buffer_type> buffer;
-    		buffer_view_type _buffer_view;
+			// TODO: possibly not safe, change letter
+    		buffer_view_type * _buffer_view;
 
     		gpu_sycl_buffer(Iter first, std::size_t count) :
 				queue( selector ),
-    			cpu_buffer( first )
+    			cpu_buffer( first ),
+				_buffer_view( nullptr )
     		{
     			Iter last = first;
     			std::advance(last, count);
 
     			buffer.reset( new buffer_type(first, last) );
-    			_buffer_view.reset( buffer.get_access<cl::sycl::access::read_write>() ) );
     		}
 
-    		buffer_view_type & buffer_view()
+    		buffer_view_type * buffer_view()
     		{
-    			return _buffer_view.get();
+    			return _buffer_view;
     		}
 
     		void sync()

@@ -684,7 +684,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		struct gpu_executor_buffer
 		{
 			virtual ~gpu_executor_buffer() {}
-			virtual BufferType & buffer_view() = 0;
+			virtual BufferType * buffer_view() = 0;
 			virtual void sync() = 0;
 		};
 	}

@@ -1179,11 +1179,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///
     /// The algorithm returns a future representing the result of the
     /// corresponding algorithm when invoked with the gpu_execution_policy.
-#ifdef HPX_WITH_AMP
+#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
     struct gpu_task_execution_policy
     {
         /// The type of the executor associated with this execution policy
-		typedef parallel::gpu_amp_executor executor_type;
+		//typedef parallel::gpu_amp_executor executor_type;
+		typedef parallel::gpu_sycl_executor executor_type;
 
         /// The category of the execution agents created by this execution
         /// policy.
@@ -1248,7 +1249,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 	struct gpu_execution_policy
 	{
 		/// The type of the default executor associated with this execution policy
-		typedef parallel::gpu_amp_executor executor_type;
+		//typedef parallel::gpu_amp_executor executor_type;
+		typedef parallel::gpu_sycl_executor executor_type;
 
 		/// The category of the execution agents created by this execution
 		/// policy.
@@ -1445,7 +1447,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
           : boost::mpl::true_
         {};
 
-#ifdef HPX_WITH_AMP
+#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
         template <>
         struct is_execution_policy<gpu_execution_policy>
           : boost::mpl::true_
@@ -1533,7 +1535,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
           : boost::mpl::true_
         {};
 
-#ifdef HPX_WITH_AMP
+#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
         template <>
         struct is_parallel_execution_policy<gpu_execution_policy>
           : boost::mpl::true_
@@ -1643,7 +1645,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
           : boost::mpl::true_
         {};
 
-#ifdef HPX_WITH_AMP
+#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
         template <>
         struct is_async_execution_policy<gpu_task_execution_policy>
           : boost::mpl::true_

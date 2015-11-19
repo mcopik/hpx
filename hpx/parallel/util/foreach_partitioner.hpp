@@ -148,7 +148,7 @@ namespace hpx { namespace parallel { namespace util
             }
         };
 
-#ifdef HPX_WITH_AMP
+#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
         ///////////////////////////////////////////////////////////////////////
 		template <typename Result>
 		struct foreach_n_static_partitioner<gpu_execution_policy, Result>
@@ -318,7 +318,7 @@ namespace hpx { namespace parallel { namespace util
             }
         };
 
-#ifdef HPX_WITH_AMP
+#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
 		template <typename Result>
 		struct foreach_n_partitioner<gpu_execution_policy, Result,
 				parallel::traits::static_partitioner_tag>

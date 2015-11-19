@@ -41,6 +41,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				/// Create a new sequential executor
 				gpu_sycl_executor() {}
 		#endif
+		
+		template<typename ValueType, typename BufferType>
+		struct gpu_sycl_buffer_view_wrapper
+		{
+			ValueType & operator[](std::size_t idx);
+		};
 
 		template<typename Iter,
 				typename value_type = typename std::iterator_traits<Iter>::value_type,
@@ -48,7 +54,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				typename buffer_view_type =  decltype( std::declval< buffer_type >().template get_access<cl::sycl::access::mode::read_write>( std::declval<cl::sycl::handler &>() ) )>
     	struct gpu_sycl_buffer : detail::gpu_executor_buffer<Iter, buffer_view_type>
 		{
-
 			cl::sycl::default_selector selector;
 			cl::sycl::queue queue;
     		Iter cpu_buffer;
@@ -112,11 +117,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
 		}
 
-		template <typename F, typename Shape>
+		template <typename F, typename Shape, typename GPUBuffer>
 		static std::vector<hpx::future<
 			typename detail::bulk_async_execute_result<F, Shape>::type
 		> >
-		bulk_async_execute(F && f, Shape const& shape)
+		bulk_async_execute(F && f, Shape const& shape, GPUBuffer &)
 		{
 			typedef typename detail::bulk_async_execute_result<F, Shape>::type result_type;
 			std::vector<hpx::future<result_type> > results;
@@ -124,8 +129,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			try {
 				for (auto const& elem: shape) {
 					std::size_t x = elem.first;
-					std::size_t y = elem.second;
-					std::cout << "SYCL execution" << std::endl;					
+					std::size_t y = elem.second;			
 					//results.push_back(hpx::async(launch::async,
 						/**
 						 * Lambda calling the AMP parallel execution.
@@ -142,7 +146,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 						 * Args of lambda - start position and size
 						 */
 						//x, y));
-						//[=](std::size_t x, std::size_t y) {
 						
 				}
 			}
@@ -158,25 +161,33 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			return std::move(results);
 		}
 
-		template <typename F, typename Shape>
+		template <typename F, typename Shape, typename GPUBuffer>
 		static typename detail::bulk_execute_result<F, Shape>::type
-		bulk_execute(F && f, Shape const& shape)
+		bulk_execute(F && f, Shape const& shape, GPUBuffer & buffer)
 		{
 			/**
 			 * The elements of pair are:
 			 * begin at array, # of elements to process
 			 */
-			/*for(auto const & elem : shape) {
+			for(auto const & elem : shape) {
 				std::size_t x = elem.first;
 				std::size_t y = elem.second;
-				Concurrency::extent<1> e(y);
-				Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) 
-				{
-					auto _x = std::make_pair(x + idx[0], 1);
-					f(_x);
+				F _f( std::move(f) );
+
+				buffer.queue.submit( [_f, &buffer, x, y](cl::sycl::handler & cgh) {
+					auto sycl_buffer = buffer.buffer.get();
+					auto buffer_view = (*sycl_buffer).template get_access<cl::sycl::access::mode::read_write>(cgh);
+					buffer._buffer_view = &buffer_view;
+
+					cgh.parallel_for<class hpx_foreach>(cl::sycl::range<1>(y),
+						[=] (cl::sycl::id<1> index)
+						{
+							auto _x = std::make_pair(x + index[0], 1);
+							_f(_x);
+						});
 				});
-			}*/
-			std::cout << "SYCL execution" << std::endl;		
+			}
+			
 		}
 
         std::size_t os_thread_count()

@@ -352,6 +352,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             {
                 return exec.bulk_execute(std::forward<F>(f), shape);
             }
+
+            template <typename Executor, typename F, typename S, typename GPUBuffer>
+            static auto call(int, Executor& exec, F && f, S const& shape, GPUBuffer & buffer)
+            ->  decltype(exec.bulk_execute(std::forward<F>(f), shape, buffer))
+            {
+                return exec.bulk_execute(std::forward<F>(f), shape, buffer);
+            }
         };
 
         template <typename Executor, typename F, typename S>
@@ -363,6 +370,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 #endif
         {
             return bulk_execute_helper::call(0, exec, std::forward<F>(f), shape);
+        }
+
+        template <typename Executor, typename F, typename S, typename GPUBuffer>
+        auto call_bulk_execute(Executor& exec, F && f, S const& shape, GPUBuffer & buffer)
+        ->  decltype(bulk_execute_helper::call(0, exec, std::forward<F>(f), shape, buffer))
+        {
+            return bulk_execute_helper::call(0, exec, std::forward<F>(f), shape, buffer);
         }
 
         ///////////////////////////////////////////////////////////////////////
@@ -625,6 +639,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 #endif
         {
             return detail::call_bulk_execute(exec, std::forward<F>(f), shape);
+        }
+
+        template <typename F, typename Shape, typename GPUBuffer>
+        static auto execute(executor_type& exec, F && f, Shape const& shape, GPUBuffer & buffer)
+        ->  decltype(detail::call_bulk_execute(exec, std::forward<F>(f), shape, buffer))
+        {
+            return detail::call_bulk_execute(exec, std::forward<F>(f), shape, buffer);
         }
 
         /// Retrieve the number of (kernel-)threads used by the associated

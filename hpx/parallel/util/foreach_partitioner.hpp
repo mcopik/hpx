@@ -162,6 +162,8 @@ namespace hpx { namespace parallel { namespace util
 				typedef typename hpx::parallel::executor_traits<executor_type>
 					executor_traits;
 
+				typedef typename GPUBuffer::buffer_view_type buffer_view;
+
 				FwdIter last = first;
 				std::advance(last, count);
 
@@ -173,7 +175,7 @@ namespace hpx { namespace parallel { namespace util
 					// TODO: extend for more GPUs
 					// right now it sends whole computation on one device
 					std::vector<int> positions = {0};
-					std::vector< std::pair<std::size_t, std::size_t> > shape{ {0, count} };
+					std::vector< std::tuple<buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, 0, count) };
 
 					/**
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
@@ -183,9 +185,9 @@ namespace hpx { namespace parallel { namespace util
 					 * correcly detect the return type of this lambda
 					 */
 					F1 _f1 = std::move(f1);				
-					auto f = [_f1](std::pair<std::size_t, std::size_t> const& elem)
+					auto f = [_f1](std::tuple<buffer_view *, std::size_t, std::size_t> const& elem)
 					{
-						_f1(elem.first, elem.second);
+						_f1(*std::get<0>(elem), std::get<1>(elem), std::get<2>(elem) );
 					};
 
 					//workitems.reserve(shape.size());

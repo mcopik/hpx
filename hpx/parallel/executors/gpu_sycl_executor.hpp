@@ -51,13 +51,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		template<typename Iter,
 				typename value_type = typename std::iterator_traits<Iter>::value_type,
     			typename buffer_type = cl::sycl::buffer<typename std::iterator_traits<Iter>::value_type, 1>,
-				typename buffer_view_type =  decltype( std::declval< buffer_type >().template get_access<cl::sycl::access::mode::read_write>( std::declval<cl::sycl::handler &>() ) )>
-    	struct gpu_sycl_buffer : detail::gpu_executor_buffer<Iter, buffer_view_type>
+				typename _buffer_view_type =  decltype( std::declval< buffer_type >().template get_access<cl::sycl::access::mode::read_write>( std::declval<cl::sycl::handler &>() ) )>
+    	struct gpu_sycl_buffer : detail::gpu_executor_buffer<Iter, _buffer_view_type>
 		{
 			cl::sycl::default_selector selector;
 			cl::sycl::queue queue;
     		Iter cpu_buffer;
     		std::shared_ptr<buffer_type> buffer;
+			typedef _buffer_view_type buffer_view_type;
 			// TODO: possibly not safe, change letter
     		buffer_view_type * _buffer_view;
 
@@ -68,8 +69,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     		{
     			Iter last = first;
     			std::advance(last, count);
-
-    			buffer.reset( new buffer_type(first, last) );
+				std::shared_ptr<value_type> buf{new value_type[count], [first, count](value_type * ptr) {
+								std::cout << "Copy values: " << *ptr << std::endl;								
+								std::copy(ptr, ptr + count, first);
+								delete[] ptr;
+							}};
+				std::copy(first, last, buf.get());
+				buffer.reset( new buffer_type(buf, cl::sycl::range<1>(count)) );
+				buffer.get()->set_final_data(buf);
     		}
 
     		buffer_view_type * buffer_view()
@@ -85,6 +92,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     		{
     			std::cout << "buffer: " << *cpu_buffer << std::endl;
     		}
+		};
+
+		//TODO: move to buffer parent class?
+		template<typename Iter>
+		struct buffer_traits {
+			typedef typename gpu_sycl_buffer<Iter>::buffer_view_type type;		
 		};
 
     	template<typename Iter>
@@ -163,29 +176,32 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
 		template <typename F, typename Shape, typename GPUBuffer>
 		static typename detail::bulk_execute_result<F, Shape>::type
-		bulk_execute(F && f, Shape const& shape, GPUBuffer & buffer)
+		bulk_execute(F && f, Shape const& shape, GPUBuffer & sycl_buffer)
 		{
+			//typedef typename GPUBuffer::buffer_view_type::value_type value_type;
+			typedef typename GPUBuffer::buffer_view_type buffer_view_type;
 			/**
 			 * The elements of pair are:
 			 * begin at array, # of elements to process
 			 */
 			for(auto const & elem : shape) {
-				std::size_t x = elem.first;
-				std::size_t y = elem.second;
+				std::size_t x = std::get<1>(elem);
+				std::size_t y = std::get<2>(elem);
 				F _f( std::move(f) );
 
-				buffer.queue.submit( [_f, &buffer, x, y](cl::sycl::handler & cgh) {
-					auto sycl_buffer = buffer.buffer.get();
-					auto buffer_view = (*sycl_buffer).template get_access<cl::sycl::access::mode::read_write>(cgh);
-					buffer._buffer_view = &buffer_view;
+				sycl_buffer.queue.submit( [_f, &sycl_buffer, x, y](cl::sycl::handler & cgh) {
+					//buffer<value_type, 1> resultBuf(data, range<1>(1024));//buffer.buffer.get();
+					buffer_view_type buffer_view = (*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
+					//buffer._buffer_view = &buffer_view;
 
 					cgh.parallel_for<class hpx_foreach>(cl::sycl::range<1>(y),
 						[=] (cl::sycl::id<1> index)
 						{
-							auto _x = std::make_pair(x + index[0], 1);
-							_f(_x);
+							buffer_view[x + index[0]] = 1;
+							//auto _x = std::tuple<buffer_view_type *, std::size_t, std::size_t>(&buffer_view, x + index[0], 1);
+							//_f(_x);
 						});
-				});
+				});	
 			}
 			
 		}

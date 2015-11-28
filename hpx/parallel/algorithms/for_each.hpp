@@ -95,7 +95,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
 	        	Iter end = first;
 	        	std::advance(end, count);
-
+				F _f = std::move(f);
 	        	auto buffer = policy.executor().create_buffers(first, count);
 				Proj _proj(std::move(proj));
 				typedef typename gpu_execution_policy::executor_type::buffer_traits<Iter>::type gpu_buffer_type;
@@ -107,10 +107,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					//dont'return right now - we have to sync buffers after the call
 					util::foreach_n_partitioner<gpu_execution_policy>::call(
 						policy, first, count,
-                        std::move([f, _proj](gpu_buffer_type & gpu_buffer, std::size_t part_begin, std::size_t part_size)
+                        std::move([_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
 						{
+							//_f( (*gpu_buffer)[part_begin] );
+							//for(std::size_t i = 0; i < part_size; ++i)
+							//(*gpu_buffer)[i] = part_begin;
 							for(std::size_t i = 0; i < part_size; ++i)
-								f( _proj( gpu_buffer[part_begin + i]) );
+								_f( _proj( (*gpu_buffer)[part_begin + i]) );
 						}), buffer);
 
 					// the data needs to be transferred from gpu back to original buffer

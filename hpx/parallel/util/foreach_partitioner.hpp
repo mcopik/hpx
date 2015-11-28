@@ -175,7 +175,7 @@ namespace hpx { namespace parallel { namespace util
 					// TODO: extend for more GPUs
 					// right now it sends whole computation on one device
 					std::vector<int> positions = {0};
-					std::vector< std::tuple<buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, 0, count) };
+					std::vector< std::tuple<const buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, 0, count) };
 
 					/**
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
@@ -185,9 +185,14 @@ namespace hpx { namespace parallel { namespace util
 					 * correcly detect the return type of this lambda
 					 */
 					F1 _f1 = std::move(f1);				
-					auto f = [_f1](std::tuple<buffer_view *, std::size_t, std::size_t> const& elem)
+					auto f = [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
-						_f1(*std::get<0>(elem), std::get<1>(elem), std::get<2>(elem) );
+						_f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem) );
+						
+								//for(std::size_t i = 0;i < 10;++i)
+									//(*std::get<0>(elem))[ std::get<1>(elem) ] = std::get<1>(elem);	
+							//for(std::size_t i = 0; i < 10; ++i)
+							//(*std::get<0>(elem))[i] = std::get<1>(elem);
 					};
 
 					//workitems.reserve(shape.size());

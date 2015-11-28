@@ -192,14 +192,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
 				sycl_buffer.queue.submit( [_f, &sycl_buffer, x, y](cl::sycl::handler & cgh) {
 
-					//buffer<value_type, 1> resultBuf(data, range<1>(1024));//buffer.buffer.get();
-					buffer_view_type buffer_view = (*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
+					buffer_view_type buffer_view = 
+						(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
 
 					cgh.parallel_for<class hpx_foreach>(cl::sycl::range<1>(y),
 						[=] (cl::sycl::id<1> index)
 						{	
-							// This works:
-							auto _x = std::make_tuple/*<const buffer_view_type *, std::size_t, std::size_t>*/(&buffer_view, index[0], 1);
+							// This works. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
+							auto _x = std::make_tuple(&buffer_view, index[0], 1);
 							// This doesn't:
 							// auto _x = std::make_tuple(&buffer_view, x + index[0], y);
 							_f(_x);

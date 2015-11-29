@@ -9,12 +9,17 @@
 
 #include <hpx/config.hpp>
 #include <hpx/exception.hpp>
+#include <hpx/traits/is_component.hpp>
 #include <hpx/runtime/components/component_type.hpp>
 #include <hpx/runtime/components/server/create_component_fwd.hpp>
 #include <hpx/runtime/naming/name.hpp>
 #include <hpx/runtime/naming/address.hpp>
 #include <hpx/runtime/applier/applier.hpp>
 #include <hpx/runtime/applier/bind_naming_wrappers.hpp>
+#include <hpx/util/unique_function.hpp>
+
+#include <boost/mpl/bool.hpp>
+#include <boost/type_traits/is_base_and_derived.hpp>
 
 #include <sstream>
 
@@ -26,7 +31,7 @@ class fixed_component;
 
 ///////////////////////////////////////////////////////////////////////////
 template <typename Component>
-class fixed_component_base : public detail::fixed_component_tag
+class fixed_component_base : public traits::detail::fixed_component_tag
 {
 private:
     typedef typename boost::mpl::if_<
@@ -79,11 +84,11 @@ private:
 
     template <typename Component_>
     friend naming::gid_type server::create(
-        util::function_nonser<void(void*)> const& ctor);
+        util::unique_function_nonser<void(void*)> const& ctor);
 
     template <typename Component_>
     friend naming::gid_type server::create(naming::gid_type const& gid,
-        util::function_nonser<void(void*)> const& ctor);
+        util::unique_function_nonser<void(void*)> const& ctor);
 
     // Return the component's fixed GID.
     naming::gid_type get_base_gid(

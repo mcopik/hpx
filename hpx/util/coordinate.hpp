@@ -8,17 +8,15 @@
 #if !defined(HPX_UTIL_COORDINATE_NOV_03_2014_0227PM)
 #define HPX_UTIL_COORDINATE_NOV_03_2014_0227PM
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
 #include <hpx/util/assert.hpp>
 
 #include <algorithm>
 #include <numeric>
 #include <cstddef>
-#if !defined(BOOST_NO_CXX11_UNIFIED_INITIALIZATION_SYNTAX)
+#if defined(HPX_HAVE_CXX11_INITIALIZER_LIST)
 #include <initializer_list>
 #endif
-
-#include <boost/static_assert.hpp>
 
 namespace hpx { namespace util
 {
@@ -33,7 +31,7 @@ namespace hpx { namespace util
     template <int Rank>
     class index
     {
-        BOOST_STATIC_ASSERT_MSG(Rank > 0, "Rank shall be greater than 0");
+        static_assert(Rank > 0, "Rank shall be greater than 0");
 
     public:
         // constants and types
@@ -51,7 +49,7 @@ namespace hpx { namespace util
             std::fill(vs_ + 0, vs_ + rank, 0);
         }
 
-#if !defined(BOOST_NO_CXX11_UNIFIED_INITIALIZATION_SYNTAX) && !defined(HPX_INTEL_VERSION)
+#if defined(HPX_HAVE_CXX11_INITIALIZER_LIST) && !defined(HPX_INTEL_VERSION)
         //! Requires: il.size() == Rank.
         //! Effects: For all i in the range [0, Rank), initializes the ith
         //! component of *this with *(il.begin() + i).
@@ -197,7 +195,7 @@ namespace hpx { namespace util
     template <int Rank>
     class bounds
     {
-        BOOST_STATIC_ASSERT_MSG(Rank > 0, "Rank shall be greater than 0");
+        static_assert(Rank > 0, "Rank shall be greater than 0");
 
     public:
         // constants and types
@@ -218,7 +216,7 @@ namespace hpx { namespace util
             std::fill(vs_ + 0, vs_ + rank, 0);
         }
 
-#if !defined(BOOST_NO_CXX11_UNIFIED_INITIALIZATION_SYNTAX) && !defined(HPX_INTEL_VERSION)
+#if defined(HPX_HAVE_CXX11_INITIALIZER_LIST) && !defined(HPX_INTEL_VERSION)
         //! Requires: il.size() == Rank.
         //! Effects: For all i in the range [0, Rank), initializes the ith
         //! component of *this with *(il.begin() + i).

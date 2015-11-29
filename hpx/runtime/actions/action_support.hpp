@@ -102,11 +102,9 @@ namespace hpx { namespace actions
             /// you have a HPX_REGISTER_ACTION macro somewhere in a source file,
             /// but the header in which the action is defined misses a
             /// HPX_REGISTER_ACTION_DECLARATION
-            BOOST_MPL_ASSERT_MSG(
-                traits::needs_automatic_registration<Action>::value
-              , HPX_REGISTER_ACTION_DECLARATION_MISSING
-              , (Action)
-            );
+            static_assert(
+                traits::needs_automatic_registration<Action>::value,
+                "HPX_REGISTER_ACTION_DECLARATION missing");
             return util::type_id<Action>::typeid_.type_id();
         }
 #endif
@@ -235,11 +233,11 @@ namespace hpx { namespace actions
         /// Return all data needed for thread initialization
         virtual void schedule_thread(naming::id_type const& target,
             naming::address::address_type lva,
-            threads::thread_state_enum initial_state) = 0;
+            threads::thread_state_enum initial_state, std::size_t num_thred) = 0;
 
         virtual void schedule_thread(std::unique_ptr<continuation> cont,
             naming::id_type const& target, naming::address::address_type lva,
-            threads::thread_state_enum initial_state) = 0;
+            threads::thread_state_enum initial_state, std::size_t num_thred) = 0;
 
         /// Return a pointer to the filter to be used while serializing an
         /// instance of this action type.
@@ -260,6 +258,7 @@ namespace hpx { namespace actions
         template <typename Archive>
         void serialize(Archive &, unsigned)
         {}
+
         HPX_SERIALIZATION_POLYMORPHIC_ABSTRACT(base_action);
     };
 

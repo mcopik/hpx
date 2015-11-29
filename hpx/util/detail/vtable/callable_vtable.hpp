@@ -11,9 +11,9 @@
 #include <hpx/config/forceinline.hpp>
 #include <hpx/util/detail/vtable/vtable.hpp>
 #include <hpx/util/invoke.hpp>
-#include <hpx/util/move.hpp>
 
 #include <typeinfo>
+#include <utility>
 
 namespace hpx { namespace util { namespace detail
 {
@@ -26,7 +26,7 @@ namespace hpx { namespace util { namespace detail
         template <typename T>
         BOOST_FORCEINLINE static R invoke(void** f, Ts&&... vs)
         {
-            return util::invoke_r<R>(
+            return util::invoke<R>(
                 vtable::get<T>(f), std::forward<Ts>(vs)...);
         }
         typedef R (*invoke_t)(void**, Ts&&...);

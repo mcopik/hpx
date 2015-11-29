@@ -11,6 +11,7 @@
 
 #include <hpx/config.hpp>
 #include <hpx/util/move.hpp>
+#include <hpx/util/invoke.hpp>
 #include <hpx/traits/segmented_iterator_traits.hpp>
 #include <hpx/traits/is_callable.hpp>
 #include <hpx/traits/concepts.hpp>
@@ -29,7 +30,6 @@
 #include <iterator>
 #include <type_traits>
 
-#include <boost/static_assert.hpp>
 #include <boost/utility/enable_if.hpp>
 #include <boost/type_traits/is_base_of.hpp>
 #include <boost/type_traits/is_same.hpp>
@@ -57,7 +57,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 return util::loop_n(first, count,
                     [&f, &proj](Iter const& curr)
                     {
-                        f(proj(*curr));
+                        f(hpx::util::invoke(proj, *curr));
                     });
             }
 
@@ -77,7 +77,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                             util::loop_n(part_begin, part_size,
                                 [=](Iter const& curr)
                                 {
-                                    f(proj(*curr));
+                                    f(hpx::util::invoke(proj, *curr));
                                 });
                         });
                 }
@@ -251,7 +251,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<InIter>::iterator_category
             iterator_category;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<std::input_iterator_tag, iterator_category>::value),
             "Requires at least input iterator.");
 
@@ -294,7 +294,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 return util::loop(first, last,
                     [&f, &proj](Iter const& curr)
                     {
-                        f(proj(*curr));
+                        f(hpx::util::invoke(proj, *curr));
                     });
             }
 
@@ -445,7 +445,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<InIter>::iterator_category
             iterator_category;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<std::input_iterator_tag, iterator_category>::value),
             "Requires at least input iterator.");
 

@@ -42,13 +42,13 @@ int hpx_main(boost::program_options::variables_map& vm)
 				v = 400;
 			});
 
-/*		std::iota(boost::begin(d), boost::end(d), std::rand());
+		std::iota(boost::begin(d), boost::end(d), std::rand());
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(d), boost::end(d),
 			[](std::size_t& v) {
 				//printf("%lu \n", v); 
 				v = 43;
-			});*/
+			});
 
 
 
@@ -56,7 +56,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 		std::size_t count = 0;
 		std::for_each(boost::begin(c), boost::end(c),
 			[&count](std::size_t v) -> void {
-				HPX_TEST_EQ(v, std::size_t(400));
+				HPX_TEST_EQ(v, std::size_t(43));
 				++count;
 			});
 		HPX_TEST_EQ(count, c.size());

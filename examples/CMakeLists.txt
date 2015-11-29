@@ -1,4 +1,4 @@
-# Copyright (c) 2007-2009 Hartmut Kaiser
+# Copyright (c) 2007-2015 Hartmut Kaiser
 # Copyright (c) 2011      Bryce Lelbach
 # Copyright (c) 2011      Dylan Stark
 #
@@ -6,37 +6,47 @@
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 set(subdirs
-    #1d_hydro
-    accumulator
-    #allgather
-    #async_io
+    1d_hydro
+    accumulators
+    allgather
+    async_io
     balancing
     cancelable_action
-    #future_reduce
-    #heartbeat
+    future_reduce
+    heartbeat
     interpolate1d
-    #jacobi
+    jacobi
     jacobi_smp
     nqueen
-    #performance_counters
-	queue
-    #quickstart
+    performance_counters
+    queue
+    quickstart
     qt
     random_mem_access
-    sheneos
     spell_check
     startup_shutdown
-    #thread_aware_timer
-    #throttle
+    thread_aware_timer
+    throttle
    )
 
- if(HPX_WITH_CXX11_LAMBDAS)
+if(HPX_WITH_FORTRAN)
   set(subdirs ${subdirs}
-     #1d_stencil
-     #diskperf
-     #tuplespace
-     transpose
-      )
+    sheneos
+    )
+endif()
+
+if(HPX_WITH_CXX11_LAMBDAS)
+  set(subdirs ${subdirs}
+      1d_stencil
+      tuplespace
+      transpose
+     )
+endif()
+
+if(HPX_WITH_APEX)
+  set(subdirs ${subdirs}
+      apex
+     )
 endif()
 
 foreach(subdir ${subdirs})

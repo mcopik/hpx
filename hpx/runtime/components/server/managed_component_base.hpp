@@ -9,11 +9,13 @@
 
 #include <hpx/config.hpp>
 #include <hpx/exception.hpp>
+#include <hpx/traits/is_component.hpp>
 #include <hpx/runtime/components/component_type.hpp>
 #include <hpx/runtime/components/server/wrapper_heap.hpp>
 #include <hpx/runtime/components/server/wrapper_heap_list.hpp>
 #include <hpx/runtime/components/server/create_component_fwd.hpp>
 #include <hpx/util/reinitializable_static.hpp>
+#include <hpx/util/unique_function.hpp>
 
 #include <boost/throw_exception.hpp>
 #include <boost/noncopyable.hpp>
@@ -177,7 +179,7 @@ namespace hpx { namespace components
     template <typename Component, typename Wrapper,
         typename CtorPolicy, typename DtorPolicy>
     class managed_component_base
-      : public detail::managed_component_tag, boost::noncopyable
+      : public traits::detail::managed_component_tag, boost::noncopyable
     {
     public:
         typedef typename boost::mpl::if_<
@@ -193,10 +195,13 @@ namespace hpx { namespace components
 
         // make sure that we have a back_ptr whenever we need to control the
         // lifetime of the managed_component
-        BOOST_STATIC_ASSERT((
+        static_assert((
             boost::is_same<ctor_policy, traits::construct_without_back_ptr>::value ||
             boost::is_same<dtor_policy,
-            traits::managed_object_controls_lifetime>::value));
+            traits::managed_object_controls_lifetime>::value),
+            "boost::is_same<ctor_policy, traits::construct_without_back_ptr>::value || "
+            "boost::is_same<dtor_policy, "
+            "traits::managed_object_controls_lifetime>::value");
 
         managed_component_base()
           : back_ptr_(0)
@@ -648,11 +653,11 @@ namespace hpx { namespace components
 
         template <typename Component_>
         friend naming::gid_type server::create(
-            util::function_nonser<void(void*)> const& ctor);
+            util::unique_function_nonser<void(void*)> const& ctor);
 
         template <typename Component_>
         friend naming::gid_type server::create(naming::gid_type const& gid,
-            util::function_nonser<void(void*)> const& ctor);
+            util::unique_function_nonser<void(void*)> const& ctor);
 #endif
 
         naming::gid_type get_base_gid(

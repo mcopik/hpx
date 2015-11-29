@@ -15,7 +15,7 @@ HPX_INCLUDES= -I$(HPX_SOURCE) -I$(HPX_BUILD) -I$(HPX_SOURCE)/external/serializat
 
 
 # AMP flags
-AMP_CXXFLAGS=$(LIBCXX_CXXFLAGS) -std=c++amp -O3 -g
+AMP_CXXFLAGS=$(LIBCXX_CXXFLAGS) -std=c++14 -std=c++amp -O3 -g -DHPX_WITH_AMP
 AMP_INCLUDES=-I$(AMP_SOURCE)/include
 
 SRCS=executor_test.cpp

@@ -22,6 +22,9 @@
 #ifdef HPX_WITH_AMP
   #include <hpx/parallel/executors/gpu_amp_executor.hpp>
 #endif
+#ifdef HPX_WITH_SYCL
+  #include <hpx/parallel/executors/gpu_sycl_executor.hpp>
+#endif
 #include <hpx/parallel/executors/distribution_policy_executor.hpp>
 #include <hpx/parallel/executors/service_executors.hpp>
 #include <hpx/parallel/executors/this_thread_executors.hpp>

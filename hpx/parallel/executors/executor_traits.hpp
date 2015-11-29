@@ -352,6 +352,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             {
                 return exec.bulk_execute(std::forward<F>(f), shape);
             }
+
+            template <typename Executor, typename F, typename S, typename GPUBuffer>
+            static auto call(int, Executor& exec, F && f, S const& shape, GPUBuffer & buffer)
+            ->  decltype(exec.bulk_execute(std::forward<F>(f), shape, buffer))
+            {
+                return exec.bulk_execute(std::forward<F>(f), shape, buffer);
+            }
         };
 
         template <typename Executor, typename F, typename S>
@@ -363,6 +370,64 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 #endif
         {
             return bulk_execute_helper::call(0, exec, std::forward<F>(f), shape);
+        }
+
+        template <typename Executor, typename F, typename S, typename GPUBuffer>
+        auto call_bulk_execute(Executor& exec, F && f, S const& shape, GPUBuffer & buffer)
+        ->  decltype(bulk_execute_helper::call(0, exec, std::forward<F>(f), shape, buffer))
+        {
+            return bulk_execute_helper::call(0, exec, std::forward<F>(f), shape, buffer);
+        }
+
+        ///////////////////////////////////////////////////////////////////////
+        template <typename Parameters>
+        std::size_t call_processing_units_parameter_count(Parameters& params);
+
+        struct processing_units_count_helper
+        {
+            template <typename Executor, typename Parameters>
+            static std::size_t call(wrap_int, Executor& exec,
+                Parameters& params)
+            {
+                return call_processing_units_parameter_count(params);
+            }
+
+            template <typename Executor, typename Parameters>
+            static auto call(int, Executor& exec, Parameters& params)
+            ->  decltype(exec.processing_units_count(params))
+            {
+                return exec.processing_units_count(params);
+            }
+        };
+
+        template <typename Executor, typename Parameters>
+        std::size_t call_processing_units_count(Executor& exec,
+            Parameters& params)
+        {
+            return processing_units_count_helper::call(0, exec, params);
+        }
+
+        ///////////////////////////////////////////////////////////////////////
+        struct has_pending_closures_helper
+        {
+            template <typename Executor>
+            static auto call(wrap_int, Executor& exec) -> bool
+            {
+                return false;   // assume stateless scheduling
+            }
+
+            template <typename Executor>
+            static auto call(int, Executor& exec)
+                ->  decltype(exec.has_pending_closures())
+            {
+                return exec.has_pending_closures();
+            }
+        };
+
+        template <typename Executor>
+        bool call_has_pending_closures(Executor& exec)
+        {
+            return has_pending_closures_helper::call(0, exec);
         }
         /// \endcond
     }
@@ -574,6 +639,45 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 #endif
         {
             return detail::call_bulk_execute(exec, std::forward<F>(f), shape);
+        }
+
+        template <typename F, typename Shape, typename GPUBuffer>
+        static auto execute(executor_type& exec, F && f, Shape const& shape, GPUBuffer & buffer)
+        ->  decltype(detail::call_bulk_execute(exec, std::forward<F>(f), shape, buffer))
+        {
+            return detail::call_bulk_execute(exec, std::forward<F>(f), shape, buffer);
+        }
+
+        /// Retrieve the number of (kernel-)threads used by the associated
+        /// executor.
+        ///
+        /// \param exec  [in] The executor object to use for scheduling of the
+        ///              function \a f.
+        /// \param params [in] The executor parameters object to use as a
+        ///              fallback if the executor does not expose
+        ///
+        /// \note This calls exec.processing_units_count() if it exists;
+        ///       otherwise it forwards teh request to the executor parameters
+        ///       object.
+        ///
+        template <typename Parameters>
+        static std::size_t processing_units_count(executor_type const& exec,
+            Parameters& params)
+        {
+            return detail::call_processing_units_count(exec, params);
+        }
+
+        /// Retrieve whether this executor has operations pending or not.
+        ///
+        /// \param exec  [in] The executor object to use for scheduling of the
+        ///              function \a f.
+        ///
+        /// \note If the executor does not expose this information, this call
+        ///       will always return \a false
+        ///
+        static bool has_pending_closures(executor_type& exec)
+        {
+            return detail::call_has_pending_closures(exec);
         }
     };
 

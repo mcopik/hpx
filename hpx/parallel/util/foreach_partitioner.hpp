@@ -148,14 +148,14 @@ namespace hpx { namespace parallel { namespace util
             }
         };
 
-#ifdef HPX_WITH_AMP
+#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
         ///////////////////////////////////////////////////////////////////////
 		template <typename Result>
 		struct foreach_n_static_partitioner<gpu_execution_policy, Result>
 		{
-			template <typename ExPolicy, typename FwdIter, typename F1>
+			template <typename ExPolicy, typename FwdIter, typename F1, typename GPUBuffer>
 			static FwdIter call(ExPolicy policy,
-				FwdIter first, std::size_t count, F1 && f1,
+				FwdIter first, std::size_t count, F1 && f1, GPUBuffer & buffer,
 				std::size_t chunk_size)
 			{
 				typedef typename ExPolicy::executor_type executor_type;
@@ -182,9 +182,10 @@ namespace hpx { namespace parallel { namespace util
 					 * The wrapping is necessary, otherwise the code in executor_traits will not be able to
 					 * correcly detect the return type of this lambda
 					 */
-					auto f = [f1](std::pair<std::size_t, std::size_t> const& elem)
+					F1 _f1 = std::move(f1);				
+					auto f = [_f1](std::pair<std::size_t, std::size_t> const& elem)
 					{
-						f1(elem.first, elem.second);
+						_f1(elem.first, elem.second);
 					};
 
 					//workitems.reserve(shape.size());
@@ -192,8 +193,9 @@ namespace hpx { namespace parallel { namespace util
 					//	policy.executor(), f, shape);
 
 					executor_traits::execute(policy.executor(),
-							std::forward<decltype(f)>(f),
-							shape);
+							//std::forward<decltype(f)>(f),
+							std::move(f),
+							shape, buffer);
 				}
                 catch (...) {
                 	detail::handle_local_exceptions<ExPolicy>::call(
@@ -318,18 +320,18 @@ namespace hpx { namespace parallel { namespace util
             }
         };
 
-#ifdef HPX_WITH_AMP
+#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
 		template <typename Result>
 		struct foreach_n_partitioner<gpu_execution_policy, Result,
 				parallel::traits::static_partitioner_tag>
 		{
-			template <typename ExPolicy, typename FwdIter, typename F1>
+			template <typename ExPolicy, typename FwdIter, typename F1, typename GPUBuffer>
 			static FwdIter call(ExPolicy policy,
-				FwdIter first, std::size_t count, F1 && f1,
+				FwdIter first, std::size_t count, F1 && f1, GPUBuffer & buffer,
 				std::size_t chunk_size = 0)
 			{
 				return foreach_n_static_partitioner<gpu_execution_policy, Result>::call(
-					policy, first, count, std::forward<F1>(f1), chunk_size);
+					policy, first, count, std::forward<F1>(f1), buffer, chunk_size);
 			}
 		};
 

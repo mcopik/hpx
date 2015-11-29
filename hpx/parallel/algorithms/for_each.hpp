@@ -86,7 +86,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                     std::move(first));
             }
 
-#ifdef HPX_WITH_AMP
+#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
             template <typename F, typename Proj = util::projection_identity>
             static typename util::detail::algorithm_result<gpu_execution_policy, Iter>::type
 			parallel(gpu_execution_policy policy, Iter first, std::size_t count,
@@ -97,6 +97,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 	        	std::advance(end, count);
 
 	        	auto buffer = policy.executor().create_buffers(first, count);
+				Proj _proj(std::move(proj));
+				
 	        	auto gpu_buffer = buffer.buffer_view();
 
 				if (count != 0)
@@ -104,11 +106,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					//dont'return right now - we have to sync buffers after the call
 					util::foreach_n_partitioner<gpu_execution_policy>::call(
 						policy, first, count,
-                        [f, proj, gpu_buffer](std::size_t part_begin, std::size_t part_size)
+                        std::move([f, _proj, gpu_buffer](std::size_t part_begin, std::size_t part_size)
 						{
 							for(std::size_t i = 0; i < part_size; ++i)
-								f( proj(gpu_buffer[part_begin + i]) );
-						});
+								f( _proj( (*gpu_buffer)[part_begin + i]) );
+						}), buffer);
 
 					// the data needs to be transferred from gpu back to original buffer
 					buffer.sync();
@@ -136,13 +138,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					 * Allocate data on the GPU.
 					 */
 					auto buffer = policy.executor().create_buffers_shared(first, count);
-					auto gpu_buffer = buffer.get()->buffer_view();
+					auto * gpu_buffer = buffer.get()->buffer_view();
 					hpx::future<Iter> x = util::foreach_n_partitioner<gpu_task_execution_policy>::call(
 							policy, first, count,
-							[f, proj, gpu_buffer](std::size_t part_begin, std::size_t part_size)
+							[f, proj, &gpu_buffer](std::size_t part_begin, std::size_t part_size)
 							{
 								for(std::size_t i = 0; i < part_size; ++i)
-									f( proj(gpu_buffer[part_begin + i]) );
+									f( proj( (*gpu_buffer)[part_begin + i]) );
 							});
 					/**
 					 * Sync the data after finishing GPU computation.

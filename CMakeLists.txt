@@ -51,6 +51,16 @@ if(HPX_WITH_KALMAR)
 endif()
 
 ################################################################################
+# ComputeCPP compiler configuration
+# It has to be done before any call to project()!
+################################################################################
+if(HPX_WITH_COMPUTECPP)
+  #include(ComputeCPPConfigure) works only after project()
+  include(cmake/ComputeCPPConfigure.cmake)
+  computecpp_configure_cxx()
+endif()
+
+################################################################################
 # project metadata
 ################################################################################
 
@@ -623,6 +633,13 @@ hpx_option(HPX_WITH_KALMAR STRING
 	"" ADVANCED)
 
 ################################################################################
+# ComputeCPP compiler
+################################################################################
+
+hpx_option(HPX_WITH_COMPUTECPP STRING
+	"Use the ComputeCpp SYCL compiler for HPX. Requires the path to install directory" "" ADVANCED)
+
+################################################################################
 # Set basic search paths for HPX
 ################################################################################
 include_directories("${PROJECT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}")
@@ -724,6 +741,13 @@ endif()
 ################################################################################
 if(HPX_WITH_KALMAR)
   kalmar_configure()
+endif()
+
+################################################################################
+# ComputeCPP configuration and flags
+################################################################################
+if(HPX_WITH_COMPUTECPP)
+  computecpp_configure()
 endif()
 
 ################################################################################

@@ -6,9 +6,9 @@
 
 set(subdirs
     agas
-    #actions
+    actions
     block_matrix
-    #iostreams
+    iostreams
     lcos
     performance_counters
     threads

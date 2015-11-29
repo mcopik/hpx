@@ -4,7 +4,7 @@
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 set(example_programs
-    #os_thread_num
+    os_thread_num
     hpx_thread_phase)
 
 set(os_thread_num_FLAGS DEPENDENCIES iostreams_component)

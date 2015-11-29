@@ -96,7 +96,7 @@ set(print_heterogeneous_payloads_FLAGS NOLIBS
 set(benchmarks ${benchmarks}
     boost_tls_overhead
     hpx_tls_overhead
-    #native_tls_overhead
+    native_tls_overhead
    )
 
 set(benchmarks ${benchmarks}

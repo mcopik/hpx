@@ -5,16 +5,16 @@
 #  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 set(tests
-    #action_invoke_no_more_than
+    action_invoke_no_more_than
     copy_component
     distribution_policy_executor
     get_gid
     get_ptr
-    #inheritance_2_classes_abstract
-    #inheritance_2_classes_concrete
-    #inheritance_3_classes_1_abstract
-    #inheritance_3_classes_2_abstract
-    #inheritance_3_classes_concrete
+    inheritance_2_classes_abstract
+    inheritance_2_classes_concrete
+    inheritance_3_classes_1_abstract
+    inheritance_3_classes_2_abstract
+    inheritance_3_classes_concrete
     migrate_component
     migrate_component_to_storage
     new_

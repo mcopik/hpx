@@ -157,12 +157,5 @@ macro(add_hpx_executable name)
     HPX_PREFIX ${${name}_HPX_PREFIX}
     ${_target_flags}
   )
-
-  add_custom_command(
-    TARGET my_actual_target
-    PRE_BUILD
-    COMMAND echo " I am prebuilt to actual target"
-    COMMENT " Running PRE_BUILD action"
-  )
 endmacro()
 

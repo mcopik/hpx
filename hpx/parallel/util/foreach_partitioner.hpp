@@ -187,10 +187,10 @@ namespace hpx { namespace parallel { namespace util
 					F1 _f1 = std::move(f1);				
 					auto f = [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
-						_f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem) );
+						//_f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem) );
 						
-								//for(std::size_t i = 0;i < 10;++i)
-									//(*std::get<0>(elem))[ std::get<1>(elem) ] = std::get<1>(elem);	
+						//for(std::size_t i = 0;i < 10;++i)
+							(*std::get<0>(elem))[ 0 ] = std::get<1>(elem);	
 							//for(std::size_t i = 0; i < 10; ++i)
 							//(*std::get<0>(elem))[i] = std::get<1>(elem);
 					};

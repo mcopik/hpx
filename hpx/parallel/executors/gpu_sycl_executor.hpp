@@ -86,6 +86,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
     		void sync()
     		{
+				buffer.reset();
     		}
 
     		void print()
@@ -199,13 +200,16 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 						[=] (cl::sycl::id<1> index)
 						{	
 							// This works. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
-							auto _x = std::make_tuple(&buffer_view, index[0], 1);
+							//auto _x = std::make_tuple(&buffer_view, index[0], 1);
 							// This doesn't:
-							// auto _x = std::make_tuple(&buffer_view, x + index[0], y);
-							_f(_x);
-
 							// This would show that x has an undefined value
+							auto x_copy = x;
 							//buffer_view[ index[0] ] = x;
+							//auto new_x = 
+							auto _x = std::make_tuple(&buffer_view, index[0], 1);
+							//std::tuple<const buffer_view_type *, size_t, size_t> _x(&buffer_view, index[0], 1);
+							//_f(_x);
+
 						});
 				});	
 			}

@@ -1,10 +1,10 @@
 # one needs to update this variables before compiling!
 BOOST_ROOT=/usr/lib/x86_64-linux-gnu/
 HPX_SOURCE=/home/mcopik/Projekty/hpx/hpx/
-HPX_BUILD=/home/mcopik/Projekty/hpx/hpx_build_gcc
+HPX_BUILD=/home/mcopik/Projekty/hpx/hpx_build_sycl_notls
 
 
-SYCL_CXX=/opt/ComputeCpp-15.05-Linux/sample_code/../bin/compute++
+SYCL_CXX=/opt/ComputeCpp-15.10-Linux/sample_code/../bin/compute++
 SYCL_INCLUDE=-I /opt/ComputeCpp-15.05-Linux/include/
 SYCL_FLAGS=-sycl -intelspirmetadata -emit-llvm -D__DEVICE_SPIR32__ -DBUILD_PLATFORM_SPIR $(SYCL_INCLUDE)
 SYCL_CXX_FLAGS=-DBUILD_PLATFORM_SPI

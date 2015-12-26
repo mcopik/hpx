@@ -18,7 +18,6 @@ set(tests
 #    bind_fastcall_test
 #    bind_not_test
     bind_placeholder_test
-    bind_ref_test
 #    bind_rel_test
     bind_rv_sp_test
     bind_rvalue_test
@@ -44,10 +43,6 @@ foreach(test ${tests})
                      FOLDER "Tests/Unit/Util/Bind")
 
   add_hpx_unit_test("util.bind" ${test} ${${test}_PARAMETERS})
-
-  set_property(TARGET ${test}_test_exe APPEND
-               PROPERTY COMPILE_DEFINITIONS
-               "HPX_LIMIT=9")
 
   # add a custom target for this example
   add_hpx_pseudo_target(tests.unit.util.binddir.${test})

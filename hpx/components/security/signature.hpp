@@ -6,19 +6,23 @@
 #ifndef HPX_COMPONENTS_SECURITY_SERVER_SIGNATURE_HPP
 #define HPX_COMPONENTS_SECURITY_SERVER_SIGNATURE_HPP
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
+
+#if defined(HPX_HAVE_SECURITY)
+
 #include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/serialization/array.hpp>
 #include <hpx/traits/is_bitwise_serializable.hpp>
 
 #include <boost/array.hpp>
 #include <boost/io/ios_state.hpp>
+#include <boost/mpl/bool.hpp>
 
 #include <sodium.h>
 
 namespace hpx { namespace components { namespace security
 {
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(push, 1)
 #endif
 
@@ -63,7 +67,7 @@ namespace hpx { namespace components { namespace security
         > bytes_;
     };
 
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(pop)
 #endif
 }}}
@@ -73,8 +77,10 @@ namespace hpx { namespace traits
     template <>
     struct is_bitwise_serializable<
             hpx::components::security::signature>
-       : mpl::true_
+       : boost::mpl::true_
     {};
 }}
+
+#endif
 
 #endif

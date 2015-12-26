@@ -12,6 +12,7 @@
 #include <hpx/config.hpp>
 #include <hpx/util/try_lock_wrapper.hpp>
 #include <hpx/util/logging.hpp>
+#include <hpx/runtime/threads/thread_data.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace threads { namespace policies
@@ -62,7 +63,7 @@ namespace detail
         typename Map::const_iterator end = tm.end();
         for (typename Map::const_iterator it = tm.begin(); it != end; ++it)
         {
-            threads::thread_data_base const* thrd = (*it).get();
+            threads::thread_data const* thrd = (*it).get();
             threads::thread_state state = thrd->get_state();
             threads::thread_state marked_state = thrd->get_marked_state();
 

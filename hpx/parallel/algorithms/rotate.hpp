@@ -10,7 +10,7 @@
 
 #include <hpx/hpx_fwd.hpp>
 #include <hpx/util/unwrapped.hpp>
-#include <hpx/lcos/local/dataflow.hpp>
+#include <hpx/dataflow.hpp>
 
 #include <hpx/parallel/config/inline_namespace.hpp>
 #include <hpx/parallel/execution_policy.hpp>
@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <iterator>
 
-#include <boost/static_assert.hpp>
 #include <boost/utility/enable_if.hpp>
 #include <boost/type_traits/is_base_of.hpp>
 
@@ -73,7 +72,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 parallel_task_execution_policy().with(policy.parameters());
 
             detail::reverse r;
-            return lcos::local::dataflow(
+            return dataflow(
                 hpx::util::unwrapped([=]() mutable -> hpx::future<FwdIter>
                 {
                     hpx::future<void> f = r.call(p, non_seq(), first, last);
@@ -171,7 +170,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<FwdIter>::iterator_category
             iterator_category;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::forward_iterator_tag, iterator_category>::value),
             "Required at least forward iterator.");
@@ -301,12 +300,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<OutIter>::iterator_category
             output_iterator_category;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::forward_iterator_tag, forward_iterator_category>::value),
             "Required at least forward iterator.");
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::mpl::or_<
                 boost::is_base_of<
                     std::forward_iterator_tag, output_iterator_category>,

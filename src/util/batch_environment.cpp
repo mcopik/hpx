@@ -4,30 +4,26 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
 #include <hpx/exception.hpp>
+#include <hpx/config/asio.hpp>
 
 #include <hpx/runtime/threads/policies/topology.hpp>
-
+#include <hpx/util/asio_util.hpp>
 #include <hpx/util/batch_environment.hpp>
 
 #include <hpx/util/batch_environments/alps_environment.hpp>
 #include <hpx/util/batch_environments/slurm_environment.hpp>
 #include <hpx/util/batch_environments/pbs_environment.hpp>
-#include <hpx/util/safe_lexical_cast.hpp>
 
 #include <iostream>
-#include <fstream>
 
-#include <boost/lexical_cast.hpp>
+#include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/host_name.hpp>
-#include <boost/tokenizer.hpp>
-#include <boost/format.hpp>
 
 namespace hpx { namespace util
 {
     batch_environment::batch_environment(std::vector<std::string> & nodelist,
-            bool debug, bool enable)
+            util::runtime_configuration const& cfg, bool debug, bool enable)
       : agas_node_num_(0)
       , node_num_(-1)
       , num_threads_(-1)
@@ -54,7 +50,7 @@ namespace hpx { namespace util
             node_num_ = slurm_env.node_num();
             return;
         }
-        batch_environments::pbs_environment pbs_env(nodelist, debug);
+        batch_environments::pbs_environment pbs_env(nodelist, debug, cfg);
         if(pbs_env.valid())
         {
             batch_name_ = "PBS";

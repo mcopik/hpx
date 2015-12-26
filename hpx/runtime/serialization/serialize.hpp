@@ -7,19 +7,16 @@
 #ifndef HPX_SERIALIZATION_SERIALIZE_HPP
 #define HPX_SERIALIZATION_SERIALIZE_HPP
 
+#include <hpx/config.hpp>
 #include <hpx/runtime/serialization/access.hpp>
 #include <hpx/runtime/serialization/input_archive.hpp>
 #include <hpx/runtime/serialization/output_archive.hpp>
 #include <hpx/runtime/serialization/detail/size_gatherer_container.hpp>
 
+#include <boost/type_traits/is_same.hpp>
+
 namespace hpx { namespace serialization
 {
-    template <typename Archive, typename T>
-    void serialize(Archive & ar, T & t, unsigned)
-    {
-        access::serialize(ar, t, 0);
-    }
-
     template <typename T>
     output_archive & operator<<(output_archive & ar, T const & t)
     {

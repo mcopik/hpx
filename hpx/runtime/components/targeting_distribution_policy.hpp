@@ -18,9 +18,10 @@
 #include <hpx/runtime/components/stubs/stub_base.hpp>
 #include <hpx/runtime/naming/name.hpp>
 #include <hpx/runtime/naming/id_type.hpp>
+#include <hpx/runtime/launch_policy.hpp>
 #include <hpx/lcos/packaged_action.hpp>
 #include <hpx/lcos/future.hpp>
-#include <hpx/lcos/local/dataflow.hpp>
+#include <hpx/dataflow.hpp>
 #include <hpx/lcos/detail/async_implementations_fwd.hpp>
 #include <hpx/util/move.hpp>
 
@@ -118,7 +119,7 @@ namespace hpx { namespace components
         ///       this class
         ///
         template <typename Action, typename ...Ts>
-        BOOST_FORCEINLINE hpx::future<
+        HPX_FORCEINLINE hpx::future<
             typename traits::promise_local_result<
                 typename hpx::actions::extract_action<Action>::remote_result_type
             >::type>
@@ -132,7 +133,7 @@ namespace hpx { namespace components
         ///       this class
         ///
         template <typename Action, typename Callback, typename ...Ts>
-        BOOST_FORCEINLINE hpx::future<
+        HPX_FORCEINLINE hpx::future<
             typename traits::promise_local_result<
                 typename hpx::actions::extract_action<Action>::remote_result_type
             >::type>

@@ -6,14 +6,15 @@
 #ifndef HPX_CONFIG_FORCEINLINE_HPP
 #define HPX_CONFIG_FORCEINLINE_HPP
 
-#include <boost/config/suffix.hpp>
 #include <hpx/config/compiler_specific.hpp>
 
-#if !defined(BOOST_FORCEINLINE)
-#   if defined(_MSC_VER)
-#       define BOOST_FORCEINLINE __forceinline
+#if !defined(HPX_FORCEINLINE)
+#   if defined(HPX_MSVC)
+#       define HPX_FORCEINLINE __forceinline
+#   elif defined(__GNUC__)
+    #       define HPX_FORCEINLINE inline __attribute__ ((__always_inline__))
 #   else
-#       define BOOST_FORCEINLINE inline
+#       define HPX_FORCEINLINE inline
 #   endif
 #endif
 

@@ -34,7 +34,7 @@ namespace hpx { namespace traits
     struct acquire_future_disp
     {
         template <typename T>
-        BOOST_FORCEINLINE typename acquire_future<T>::type
+        HPX_FORCEINLINE typename acquire_future<T>::type
         operator()(T && t) const
         {
             return acquire_future<T>()(std::forward<T>(t));
@@ -48,7 +48,7 @@ namespace hpx { namespace traits
         typedef T type;
 
         template <typename T_>
-        BOOST_FORCEINLINE
+        HPX_FORCEINLINE
         T operator()(T_ && value) const
         {
             return std::forward<T_>(value);
@@ -60,13 +60,13 @@ namespace hpx { namespace traits
     {
         typedef hpx::lcos::future<R> type;
 
-        BOOST_FORCEINLINE hpx::lcos::future<R>
+        HPX_FORCEINLINE hpx::lcos::future<R>
         operator()(hpx::lcos::future<R>& future) const
         {
             return std::move(future);
         }
 
-        BOOST_FORCEINLINE hpx::lcos::future<R>
+        HPX_FORCEINLINE hpx::lcos::future<R>
         operator()(hpx::lcos::future<R>&& future) const
         {
             return std::move(future);
@@ -78,7 +78,7 @@ namespace hpx { namespace traits
     {
         typedef hpx::lcos::shared_future<R> type;
 
-        BOOST_FORCEINLINE hpx::lcos::shared_future<R>
+        HPX_FORCEINLINE hpx::lcos::shared_future<R>
         operator()(hpx::lcos::shared_future<R> future) const
         {
             return future;
@@ -90,22 +90,29 @@ namespace hpx { namespace traits
         // Reserve sufficient space in the given vector if the underlying
         // iterator type of the given range allow calculating the size on O(1).
         template <typename Future, typename Range>
-        BOOST_FORCEINLINE
-        void reserve_if_random_access(std::vector<Future>& v, Range const& r,
+        HPX_FORCEINLINE
+        void reserve_if_random_access(std::vector<Future>&, Range const&,
             boost::mpl::false_)
         {
         }
 
         template <typename Future, typename Range>
-        BOOST_FORCEINLINE
+        HPX_FORCEINLINE
         void reserve_if_random_access(std::vector<Future>& v, Range const& r,
             boost::mpl::true_)
         {
             v.reserve(boost::size(r));
         }
 
+        template <typename Range1, typename Range2>
+        HPX_FORCEINLINE
+        void reserve_if_random_access(Range1&, Range2 const&)
+        {
+            // do nothing if it's not a vector
+        }
+
         template <typename Future, typename Range>
-        BOOST_FORCEINLINE
+        HPX_FORCEINLINE
         void reserve_if_random_access(std::vector<Future>& v, Range const& r)
         {
             typedef typename std::iterator_traits<
@@ -118,6 +125,19 @@ namespace hpx { namespace traits
 
             reserve_if_random_access(v, r, is_random_access());
         }
+
+        template <typename Container>
+        HPX_FORCEINLINE
+        void reserve_if_vector(Container&, std::size_t)
+        {
+        }
+
+        template <typename Future>
+        HPX_FORCEINLINE
+        void reserve_if_vector(std::vector<Future>& v, std::size_t n)
+        {
+            v.reserve(n);
+        }
     }
 
     template <typename Range>
@@ -127,23 +147,19 @@ namespace hpx { namespace traits
         typedef typename traits::future_range_traits<Range>::future_type
             future_type;
 
-        typedef std::vector<future_type> type;
+        typedef Range type;
 
-        template <typename Future>
-        BOOST_FORCEINLINE
-        typename boost::enable_if<
-            traits::is_future<Future>, std::vector<Future>
-        >::type
-        operator()(std::vector<Future>&& futures) const
+        HPX_FORCEINLINE Range
+        operator()(Range&& futures) const
         {
             return std::move(futures);
         }
 
         template <typename Range_>
-        BOOST_FORCEINLINE std::vector<future_type>
+        HPX_FORCEINLINE Range
         operator()(Range_&& futures) const
         {
-            std::vector<future_type> values;
+            Range values;
             detail::reserve_if_random_access(values, futures);
 
             std::transform(boost::begin(futures), boost::end(futures),

@@ -15,12 +15,19 @@
 #include <hpx/util/result_of.hpp>
 #include <hpx/lcos/future.hpp>
 
-#ifndef BOOST_MSVC
+#ifndef HPX_MSVC
 #include <boost/utility/enable_if.hpp>
 #endif
 
 namespace hpx
 {
+    ///////////////////////////////////////////////////////////////////////////
+    namespace actions { namespace detail
+    {
+        template <typename Result>
+        struct remote_action_result;
+    }}
+
     ///////////////////////////////////////////////////////////////////////////
     namespace detail
     {
@@ -70,7 +77,7 @@ namespace hpx
 
     ///////////////////////////////////////////////////////////////////////////
     // MSVC complains about ambiguities if it sees this forward declaration
-#ifndef BOOST_MSVC
+#ifndef HPX_MSVC
     template <typename Action, typename Cont, typename DistPolicy,
         typename ...Ts>
     typename boost::enable_if_c<

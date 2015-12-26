@@ -1,4 +1,4 @@
-//  Copyright (c) 2007-2014 Hartmut Kaiser
+//  Copyright (c) 2007-2015 Hartmut Kaiser
 //  Copyright (c)      2011 Bryce Lelbach
 //  Copyright (c)      2011 Thomas Heller
 //
@@ -12,19 +12,23 @@
 
 #include <hpx/config.hpp>
 #include <hpx/lcos/async_fwd.hpp>
+#include <hpx/runtime_fwd.hpp>
 #include <hpx/runtime/get_lva.hpp>
+#include <hpx/runtime/launch_policy.hpp>
 #include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/actions/action_support.hpp>
 #include <hpx/runtime/actions/basic_action_fwd.hpp>
 #include <hpx/runtime/actions/continuation.hpp>
+#include <hpx/runtime/actions/invocation_count_registry.hpp>
 #include <hpx/runtime/threads/thread_helpers.hpp>
 #include <hpx/traits/action_decorate_function.hpp>
-#include <hpx/traits/is_future.hpp>
 #include <hpx/util/bind.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/deferred_call.hpp>
 #include <hpx/util/move.hpp>
 #include <hpx/util/tuple.hpp>
+#include <hpx/util/void_guard.hpp>
+#include <hpx/util/get_and_reset_value.hpp>
 #include <hpx/util/detail/count_num_args.hpp>
 #include <hpx/util/detail/pack.hpp>
 
@@ -36,6 +40,7 @@
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/type_traits/is_array.hpp>
 #include <boost/type_traits/is_pointer.hpp>
+#include <boost/atomic.hpp>
 
 #include <sstream>
 
@@ -58,13 +63,12 @@ namespace hpx { namespace actions
             HPX_MOVABLE_BUT_NOT_COPYABLE(continuation_thread_function);
 
         public:
-            template <typename F_, typename ...Ts_>
-            explicit continuation_thread_function(std::unique_ptr<continuation> cont,
-                naming::address::address_type lva, F_&& f, Ts_&&... vs)
+            explicit continuation_thread_function(
+                std::unique_ptr<continuation> cont,
+                naming::address::address_type lva, F&& f, Ts&&... vs)
               : cont_(std::move(cont))
               , lva_(lva)
-              , f_(util::deferred_call(
-                    std::forward<F_>(f), std::forward<Ts_>(vs)...))
+              , f_(std::forward<F>(f), std::forward<Ts>(vs)...)
             {}
 
             continuation_thread_function(continuation_thread_function && other)
@@ -74,7 +78,7 @@ namespace hpx { namespace actions
 
             typedef threads::thread_state_enum result_type;
 
-            BOOST_FORCEINLINE result_type operator()(threads::thread_state_ex_enum)
+            HPX_FORCEINLINE result_type operator()(threads::thread_state_ex_enum)
             {
                 LTM_(debug) << "Executing " << Action::get_action_name(lva_)
                     << " with continuation(" << cont_->get_id() << ")";
@@ -86,10 +90,7 @@ namespace hpx { namespace actions
         private:
             std::unique_ptr<continuation> cont_;
             naming::address::address_type lva_;
-            util::detail::deferred_call_impl<
-                typename util::decay<F>::type
-              , util::tuple<typename util::decay_unwrap<Ts>::type...>
-            > f_;
+            util::detail::deferred<F(Ts&&...)> f_;
         };
 
         ///////////////////////////////////////////////////////////////////////
@@ -106,19 +107,19 @@ namespace hpx { namespace actions
     struct basic_action<Component, R(Args...), Derived>
     {
         // Flag the use of raw pointer types as action arguments
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             !util::detail::any_of<std::is_pointer<Args>...>::value,
             "Using raw pointers as arguments for actions is not supported.");
 
         // Flag the use of array types as action arguments
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             !util::detail::any_of<
                 std::is_array<typename std::remove_reference<Args>::type>...
             >::value,
             "Using arrays as arguments for actions is not supported.");
 
         // Flag the use of non-const reference types as action arguments
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             !util::detail::any_of<
                 detail::is_non_const_reference<Args>...
             >::value,
@@ -187,7 +188,7 @@ namespace hpx { namespace actions
             typedef threads::thread_state_enum result_type;
 
             template <typename ...Ts>
-            BOOST_FORCEINLINE result_type operator()(
+            HPX_FORCEINLINE result_type operator()(
                 naming::address::address_type lva, Ts&&... vs) const
             {
                 try {
@@ -250,7 +251,7 @@ namespace hpx { namespace actions
             naming::address::address_type lva, Ts&&... vs)
         {
             typedef detail::continuation_thread_function<
-                Derived, invoker, naming::address::address_type, Ts...
+                Derived, invoker, naming::address::address_type&, Ts&&...
             > thread_function;
 
             return traits::action_decorate_function<Derived>::call(lva,
@@ -260,7 +261,7 @@ namespace hpx { namespace actions
 
         // direct execution
         template <typename ...Ts>
-        static BOOST_FORCEINLINE result_type
+        static HPX_FORCEINLINE result_type
         execute_function(naming::address::address_type lva, Ts&&... vs)
         {
             LTM_(debug)
@@ -277,7 +278,7 @@ namespace hpx { namespace actions
         struct sync_invoke
         {
             template <typename IdOrPolicy, typename ...Ts>
-            BOOST_FORCEINLINE static LocalResult call(
+            HPX_FORCEINLINE static LocalResult call(
                 boost::mpl::false_, BOOST_SCOPED_ENUM(launch) policy,
                 IdOrPolicy const& id_or_policy, error_code& ec, Ts&&... vs)
             {
@@ -286,7 +287,7 @@ namespace hpx { namespace actions
             }
 
             template <typename IdOrPolicy, typename ...Ts>
-            BOOST_FORCEINLINE static LocalResult call(
+            HPX_FORCEINLINE static LocalResult call(
                 boost::mpl::true_, BOOST_SCOPED_ENUM(launch) policy,
                 IdOrPolicy const& id_or_policy, error_code& /*ec*/, Ts&&... vs)
             {
@@ -297,7 +298,7 @@ namespace hpx { namespace actions
 
         ///////////////////////////////////////////////////////////////////////
         template <typename ...Ts>
-        BOOST_FORCEINLINE local_result_type operator()(
+        HPX_FORCEINLINE local_result_type operator()(
             BOOST_SCOPED_ENUM(launch) policy, naming::id_type const& id,
             error_code& ec, Ts&&... vs) const
         {
@@ -307,14 +308,14 @@ namespace hpx { namespace actions
         }
 
         template <typename ...Ts>
-        BOOST_FORCEINLINE local_result_type operator()(
+        HPX_FORCEINLINE local_result_type operator()(
             naming::id_type const& id, error_code& ec, Ts&&... vs) const
         {
             return (*this)(launch::all, id, ec, std::forward<Ts>(vs)...);
         }
 
         template <typename ...Ts>
-        BOOST_FORCEINLINE local_result_type operator()(
+        HPX_FORCEINLINE local_result_type operator()(
             BOOST_SCOPED_ENUM(launch) policy, naming::id_type const& id,
             Ts&&... vs) const
         {
@@ -322,7 +323,7 @@ namespace hpx { namespace actions
         }
 
         template <typename ...Ts>
-        BOOST_FORCEINLINE local_result_type operator()(
+        HPX_FORCEINLINE local_result_type operator()(
             naming::id_type const& id, Ts&&... vs) const
         {
             return (*this)(launch::all, id, throws, std::forward<Ts>(vs)...);
@@ -330,7 +331,7 @@ namespace hpx { namespace actions
 
         ///////////////////////////////////////////////////////////////////////
         template <typename DistPolicy, typename ...Ts>
-        BOOST_FORCEINLINE
+        HPX_FORCEINLINE
         typename boost::enable_if_c<
             traits::is_distribution_policy<DistPolicy>::value,
             local_result_type
@@ -346,7 +347,7 @@ namespace hpx { namespace actions
         }
 
         template <typename DistPolicy, typename ...Ts>
-        BOOST_FORCEINLINE
+        HPX_FORCEINLINE
         typename boost::enable_if_c<
             traits::is_distribution_policy<DistPolicy>::value,
             local_result_type
@@ -359,7 +360,7 @@ namespace hpx { namespace actions
         }
 
         template <typename DistPolicy, typename ...Ts>
-        BOOST_FORCEINLINE
+        HPX_FORCEINLINE
         typename boost::enable_if_c<
             traits::is_distribution_policy<DistPolicy>::value,
             local_result_type
@@ -372,7 +373,7 @@ namespace hpx { namespace actions
         }
 
         template <typename DistPolicy, typename ...Ts>
-        BOOST_FORCEINLINE
+        HPX_FORCEINLINE
         typename boost::enable_if_c<
             traits::is_distribution_policy<DistPolicy>::value,
             local_result_type
@@ -397,13 +398,44 @@ namespace hpx { namespace actions
             return base_action::plain_action;
         }
 
+        /// Extract the current invocation count for this action
+        static boost::int64_t get_invocation_count(bool reset)
+        {
+            return util::get_and_reset_value(invocation_count_, reset);
+        }
+
     private:
         // serialization support
         friend class hpx::serialization::access;
 
         template <typename Archive>
-        BOOST_FORCEINLINE void serialize(Archive& ar, const unsigned int) {}
+        HPX_FORCEINLINE void serialize(Archive& ar, const unsigned int) {}
+
+        static boost::atomic<boost::int64_t> invocation_count_;
+
+    protected:
+        static void increment_invocation_count()
+        {
+            ++invocation_count_;
+        }
     };
+
+    template <typename Component, typename R, typename ...Args, typename Derived>
+    boost::atomic<boost::int64_t>
+        basic_action<Component, R(Args...), Derived>::invocation_count_(0);
+
+    namespace detail
+    {
+        template <typename Action>
+        void register_local_action_invocation_count(
+            invocation_count_registry& registry)
+        {
+            registry.register_class(
+                hpx::actions::detail::get_action_name<Action>(),
+                &Action::get_invocation_count
+            );
+        }
+    }
 
     ///////////////////////////////////////////////////////////////////////////
     namespace detail
@@ -658,7 +690,9 @@ namespace hpx { namespace actions
 /**/
 #define HPX_REGISTER_ACTION_2(action, actionname)                             \
     HPX_DEFINE_GET_ACTION_NAME_(action, actionname)                           \
+    HPX_REGISTER_ACTION_INVOCATION_COUNT(action)                              \
 /**/
+
 ///////////////////////////////////////////////////////////////////////////////
 #define HPX_REGISTER_ACTION_DECLARATION_NO_DEFAULT_GUID(action)               \
     namespace hpx { namespace actions { namespace detail {                    \
@@ -714,8 +748,16 @@ namespace hpx { namespace actions
 #define HPX_ACTION_USES_HUGE_STACK(action)                                    \
     HPX_ACTION_USES_STACK(action, threads::thread_stacksize_huge)             \
 /**/
-#define HPX_ACTION_DOES_NOT_SUSPEND(action)                                   \
-    HPX_ACTION_USES_STACK(action, threads::thread_stacksize_nostack)          \
+// This macro is deprecated. It expands to an inline function which will emit a
+// warning.
+#define HPX_ACTION_DOES_NOT_SUSPEND(action)                                    \
+    HPX_DEPRECATED("HPX_ACTION_DOES_NOT_SUSPEND is deprecated and will be "    \
+                   "removed in the next release")                              \
+    static inline void BOOST_PP_CAT(HPX_ACTION_DOES_NOT_SUSPEND_, action)();   \
+    void BOOST_PP_CAT(HPX_ACTION_DOES_NOT_SUSPEND_, action)()                  \
+    {                                                                          \
+        BOOST_PP_CAT(HPX_ACTION_DOES_NOT_SUSPEND_, action)();                  \
+    }                                                                          \
 /**/
 
 ///////////////////////////////////////////////////////////////////////////////

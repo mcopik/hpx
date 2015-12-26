@@ -9,8 +9,12 @@
 #include <hpx/config/defines.hpp>
 
 #if defined(HPX_HAVE_PARCELPORT_MPI)
+// Intel MPI does not like to be included after stdio.h. As such, we include mpi.h
+// as soon as possible.
 #include <mpi.h>
 #endif
+
+#include <hpx/version.hpp>
 
 #include <hpx/hpx_fwd.hpp>
 #include <hpx/exception.hpp>
@@ -86,7 +90,11 @@ namespace hpx
         strm << "Unknown MPI";
 #endif
         // add general MPI version
+#if defined(MPI_VERSION) && defined(MPI_SUBVERSION)
         strm << ", MPI V" << MPI_VERSION << "." << MPI_SUBVERSION;
+#else
+        strm << ", unknown MPI version";
+#endif
         return strm.str();
     }
 #endif
@@ -201,7 +209,7 @@ namespace hpx
 #else
         strm << "  HPX_HAVE_ITTNOTIFY=OFF\n";
 #endif
-#if defined(BOOST_MSVC)
+#if defined(HPX_MSVC)
 #if defined(HPX_HAVE_FIBER_BASED_COROUTINES)
         strm << "  HPX_HAVE_FIBER_BASED_COROUTINES=ON\n";
 #else
@@ -219,9 +227,6 @@ namespace hpx
         strm << "  HPX_HAVE_RUN_MAIN_EVERYWHERE=OFF\n";
 #endif
 
-#if defined(HPX_LIMIT)
-        strm << "  HPX_LIMIT=" << HPX_LIMIT << "\n";
-#endif
 #if defined(HPX_PARCEL_MAX_CONNECTIONS)
         strm << "  HPX_PARCEL_MAX_CONNECTIONS="
              << HPX_PARCEL_MAX_CONNECTIONS << "\n";

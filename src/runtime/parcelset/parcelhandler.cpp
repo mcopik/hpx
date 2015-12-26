@@ -9,9 +9,11 @@
 #include <hpx/hpx_fwd.hpp>
 #include <hpx/state.hpp>
 #include <hpx/exception.hpp>
+#include <hpx/config/asio.hpp>
 #include <hpx/util/io_service_pool.hpp>
 #include <hpx/util/safe_lexical_cast.hpp>
 #include <hpx/util/runtime_configuration.hpp>
+#include <hpx/util/bind.hpp>
 #include <hpx/runtime/naming/resolver_client.hpp>
 #include <hpx/runtime/parcelset/parcelhandler.hpp>
 #include <hpx/runtime/parcelset/static_parcelports.hpp>
@@ -24,12 +26,13 @@
 
 #include <hpx/plugins/parcelport_factory_base.hpp>
 
+#include <boost/asio/error.hpp>
 #include <boost/assign/std/vector.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/asio/io_service.hpp>
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
 #include <boost/thread/locks.hpp>
+#include <boost/detail/endian.hpp>
 
 #include <algorithm>
 #include <sstream>
@@ -88,7 +91,7 @@ namespace hpx { namespace parcelset
             util::get_entry_as<int>(cfg, "hpx.parcel.message_handlers", "0") != 0
         ),
         count_routed_(0),
-        write_handler_(&parcelhandler::default_write_handler)
+        write_handler_(&default_write_handler)
     {
         for (plugins::parcelport_factory_base* factory : get_parcelport_factories())
         {
@@ -198,7 +201,7 @@ namespace hpx { namespace parcelset
     /// \brief Make sure the specified locality is not held by any
     /// connection caches anymore
     void parcelhandler::remove_from_connection_cache(
-        endpoints_type const& endpoints)
+        naming::gid_type const& gid, endpoints_type const& endpoints)
     {
         for (endpoints_type::value_type const& loc : endpoints)
         {
@@ -210,6 +213,9 @@ namespace hpx { namespace parcelset
                 }
             }
         }
+
+        HPX_ASSERT(resolver_);
+        resolver_->remove_resolved_locality(gid);
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -301,7 +307,8 @@ namespace hpx { namespace parcelset
         naming::gid_type const& dest_gid)
     {
         HPX_ASSERT(resolver_);
-        endpoints_type const & dest_endpoints = resolver_->resolve_locality(dest_gid);
+        endpoints_type const & dest_endpoints =
+            resolver_->resolve_locality(dest_gid);
 
         for (pports_type::value_type& pp : pports_)
         {
@@ -342,7 +349,7 @@ namespace hpx { namespace parcelset
 
     namespace detail
     {
-        void parcel_sent_handler(parcelhandler::write_handler_type f,
+        void parcel_sent_handler(parcelhandler::write_handler_type & f,
             boost::system::error_code const & ec, parcel const & p)
         {
             // inform termination detection of a sent message
@@ -360,11 +367,35 @@ namespace hpx { namespace parcelset
     {
         HPX_ASSERT(resolver_);
 
-        // properly initialize parcel
-        init_parcel(p);
-
         naming::id_type const* ids = p.destinations();
         naming::address* addrs = p.addrs();
+
+        // During bootstrap this is handled separately (see
+        // addressing_service::resolve_locality.
+        if (0 == hpx::threads::get_self_ptr() && !hpx::is_starting())
+        {
+            HPX_ASSERT(resolver_);
+            naming::gid_type locality =
+                naming::get_locality_from_gid(ids[0].get_gid());
+            if (!resolver_->has_resolved_locality(locality))
+            {
+                // reschedule request as an HPX thread to avoid hangs
+                void (parcelhandler::*put_parcel_ptr) (
+                        parcel p, write_handler_type f
+                    ) = &parcelhandler::put_parcel;
+
+                threads::register_thread_nullary(
+                    util::bind(
+                        util::one_shot(put_parcel_ptr), this,
+                        std::move(p), std::move(f)),
+                    "parcelhandler::put_parcel", threads::pending, true,
+                    threads::thread_priority_boost);
+                return;
+            }
+        }
+
+        // properly initialize parcel
+        init_parcel(p);
 
         bool resolved_locally = true;
 
@@ -443,8 +474,8 @@ namespace hpx { namespace parcelset
 
     ///////////////////////////////////////////////////////////////////////////
     // default callback for put_parcel
-    void parcelhandler::default_write_handler(
-        boost::system::error_code const& ec, parcel const& p)
+    void default_write_handler(boost::system::error_code const& ec,
+        parcel const& p)
     {
         if (ec) {
             // If we are in a stopped state, ignore some errors
@@ -463,7 +494,7 @@ namespace hpx { namespace parcelset
             // all unhandled exceptions terminate the whole application
             boost::exception_ptr exception =
                 hpx::detail::get_exception(hpx::exception(ec),
-                    "parcelhandler::default_write_handler", __FILE__,
+                    "default_write_handler", __FILE__,
                     __LINE__, parcelset::dump_parcel(p));
 
             hpx::report_error(exception);
@@ -556,21 +587,6 @@ namespace hpx { namespace parcelset
             }
         }
         return "<unknown>";
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    bool parcelhandler::enable(bool new_state)
-    {
-        new_state = enable_parcel_handling_.exchange(
-            new_state, boost::memory_order_acquire);
-
-        for (pports_type::value_type& pp : pports_)
-        {
-            if(pp.first > 0)
-                pp.second->enable(enable_parcel_handling_);
-        }
-
-        return new_state;
     }
 
     ///////////////////////////////////////////////////////////////////////////

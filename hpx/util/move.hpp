@@ -10,10 +10,6 @@
 
 #include <hpx/util/decay.hpp>
 
-#if defined(BOOST_NO_CXX11_RVALUE_REFERENCES)
-#error HPX needs rvalue reference support
-#endif
-
 #include <utility>
 
 #if !defined(HPX_HAVE_CXX11_DELETED_FUNCTIONS)
@@ -35,7 +31,7 @@ namespace hpx { namespace util { namespace detail
 {
     ///////////////////////////////////////////////////////////////////////////
     template <typename T>
-    BOOST_FORCEINLINE typename decay<T>::type
+    HPX_FORCEINLINE typename decay<T>::type
     decay_copy(T&& v)
     {
         return std::forward<T>(v);
@@ -48,7 +44,7 @@ namespace hpx { namespace util { namespace detail
         typedef T && type;
 
         template <typename U>
-        BOOST_FORCEINLINE static T && call(U& u)
+        HPX_FORCEINLINE static T && call(U& u)
         {
             return std::move(u);
         }
@@ -59,7 +55,7 @@ namespace hpx { namespace util { namespace detail
     {
         typedef T type;
 
-        BOOST_FORCEINLINE static T call(T& u)
+        HPX_FORCEINLINE static T call(T& u)
         {
             return u;
         }
@@ -70,21 +66,21 @@ namespace hpx { namespace util { namespace detail
     {
         typedef T type;
 
-        BOOST_FORCEINLINE static T call(T const& u)
+        HPX_FORCEINLINE static T call(T const& u)
         {
             return u;
         }
     };
 
     template <typename T>
-    BOOST_FORCEINLINE typename detail::make_temporary_impl<T>::type
+    HPX_FORCEINLINE typename detail::make_temporary_impl<T>::type
     make_temporary(typename std::remove_reference<T>::type& v)
     {
         return detail::make_temporary_impl<T>::call(v);
     }
 
     template <typename T>
-    BOOST_FORCEINLINE typename detail::make_temporary_impl<T>::type
+    HPX_FORCEINLINE typename detail::make_temporary_impl<T>::type
     make_temporary(typename std::remove_reference<T>::type&& v)
     {
         return detail::make_temporary_impl<T>::call(v);

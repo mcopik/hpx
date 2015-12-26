@@ -12,6 +12,10 @@
 #ifndef HPX_PARCELSET_POLICIES_TCP_RECEIVER_HPP
 #define HPX_PARCELSET_POLICIES_TCP_RECEIVER_HPP
 
+#include <hpx/config/defines.hpp>
+#if defined(HPX_HAVE_PARCELPORT_TCP)
+
+#include <hpx/config/asio.hpp>
 #include <hpx/util/high_resolution_timer.hpp>
 #include <hpx/runtime/parcelset/parcelport_connection.hpp>
 #include <hpx/runtime/parcelset/decode_parcels.hpp>
@@ -44,9 +48,10 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
     {
         typedef hpx::lcos::local::spinlock mutex_type;
     public:
-        receiver(boost::asio::io_service& io_service, connection_handler& parcelport)
+        receiver(boost::asio::io_service& io_service, boost::uint64_t max_inbound_size,
+            connection_handler& parcelport)
           : socket_(io_service)
-          , max_inbound_size_(hpx::parcelset::get_max_inbound_size(parcelport))
+          , max_inbound_size_(max_inbound_size)
           , ack_(0)
           , parcelport_(parcelport)
         {}
@@ -297,7 +302,7 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
                     = &receiver::handle_write_ack<Handler>;
 
                 // decode the received parcels.
-                decode_parcels(parcelport_, std::move(buffer_));
+                decode_parcels(parcelport_, std::move(buffer_), -1);
                 buffer_ = parcel_buffer_type();
 
                 ack_ = true;
@@ -357,5 +362,7 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
         return lhs.get() < rhs.get();
     }
 }}}}
+
+#endif
 
 #endif

@@ -7,12 +7,13 @@
 #define HPX_LCOS_DETAIL_FUTURE_DATA_MAR_06_2012_1055AM
 
 #include <hpx/config.hpp>
-#include <hpx/hpx_fwd.hpp>
 #include <hpx/lcos/local/detail/condition_variable.hpp>
 #include <hpx/lcos/local/spinlock.hpp>
 #include <hpx/traits/get_remote_result.hpp>
 #include <hpx/runtime/threads/thread_helpers.hpp>
 #include <hpx/runtime/threads/thread_executor.hpp>
+#include <hpx/runtime/launch_policy.hpp>
+#include <hpx/runtime/get_worker_thread_num.hpp>
 #include <hpx/util/bind.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/move.hpp>
@@ -46,8 +47,6 @@ namespace hpx { namespace lcos
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace lcos
 {
-
-namespace local { template <typename T> struct channel; }
 
 namespace detail
 {
@@ -109,7 +108,7 @@ namespace detail
         typedef Result type;
 
         template <typename U>
-        BOOST_FORCEINLINE static
+        HPX_FORCEINLINE static
         U && set(U && u)
         {
             return std::forward<U>(u);
@@ -121,13 +120,13 @@ namespace detail
     {
         typedef Result* type;
 
-        BOOST_FORCEINLINE static
+        HPX_FORCEINLINE static
         Result* set(Result* u)
         {
             return u;
         }
 
-        BOOST_FORCEINLINE static
+        HPX_FORCEINLINE static
         Result* set(Result& u)
         {
             return &u;
@@ -139,7 +138,7 @@ namespace detail
     {
         typedef util::unused_type type;
 
-        BOOST_FORCEINLINE static
+        HPX_FORCEINLINE static
         util::unused_type set(util::unused_type u)
         {
             return u;
@@ -205,7 +204,7 @@ namespace detail
     };
 
     template <typename F1, typename F2>
-    static BOOST_FORCEINLINE util::unique_function_nonser<void()>
+    static HPX_FORCEINLINE util::unique_function_nonser<void()>
     compose_cb(F1 && f1, F2 && f2)
     {
         if (!f1)
@@ -584,7 +583,7 @@ namespace detail
                     cond_.wait_until(l, abs_time, "future_data::wait_until", ec);
                 if (ec) return future_status::uninitialized;
 
-                if (reason == threads::wait_signaled)
+                if (reason == threads::wait_timeout)
                     return future_status::timeout;
 
                 HPX_ASSERT(state_ != empty);
@@ -740,8 +739,7 @@ namespace detail
         {
             if (!started_test())
                 return future_status::deferred; //-V110
-            else
-                return this->future_data<Result>::wait_until(abs_time, ec);
+            return this->future_data<Result>::wait_until(abs_time, ec);
         };
 
     private:

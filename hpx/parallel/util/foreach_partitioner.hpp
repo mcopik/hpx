@@ -11,7 +11,7 @@
 #include <hpx/async.hpp>
 #include <hpx/exception_list.hpp>
 #include <hpx/lcos/wait_all.hpp>
-#include <hpx/lcos/local/dataflow.hpp>
+#include <hpx/dataflow.hpp>
 #include <hpx/util/bind.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/deferred_call.hpp>
@@ -135,7 +135,7 @@ namespace hpx { namespace parallel { namespace util
                 }
 
                 // wait for all tasks to finish
-                return hpx::lcos::local::dataflow(
+                return hpx::dataflow(
                     [last, errors](std::vector<hpx::future<Result> > && r1,
                             std::vector<hpx::future<Result> > && r2)
                         mutable -> FwdIter

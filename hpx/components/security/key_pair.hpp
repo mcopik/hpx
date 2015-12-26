@@ -6,13 +6,17 @@
 #ifndef HPX_COMPONENTS_SECURITY_SERVER_KEY_PAIR_HPP
 #define HPX_COMPONENTS_SECURITY_SERVER_KEY_PAIR_HPP
 
+#include <hpx/config.hpp>
+
+#if defined(HPX_HAVE_SECURITY)
+
 #include "public_key.hpp"
 #include "secret_key.hpp"
 #include "signed_type.hpp"
 
 namespace hpx { namespace components { namespace security
 {
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(push, 1)
 #endif
 
@@ -56,9 +60,11 @@ namespace hpx { namespace components { namespace security
         secret_key secret_key_;
     };
 
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(pop)
 #endif
 }}}
+
+#endif
 
 #endif

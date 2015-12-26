@@ -1,6 +1,6 @@
 #include <hpx/hpx_init.hpp>
 
-#if defined(BOOST_MSVC)
+#if defined(HPX_MSVC)
 #pragma warning(disable: 4786)  // identifier truncated in debug info
 #pragma warning(disable: 4710)  // function not inlined
 #pragma warning(disable: 4711)  // function selected for automatic inline expansion
@@ -60,11 +60,6 @@ int main()
     HPX_TEST( hpx::util::bind( &X::m, cx )() == 17041 );
     HPX_TEST( hpx::util::bind( &X::m, pcx )() == 17041 );
     HPX_TEST( hpx::util::bind( &X::m, boost::ref(cx) )() == 17041 );
-
-    int const v = 42;
-
-    HPX_TEST( hpx::util::bind( &X::m, hpx::util::bind( f,
-        placeholders::_1 ) )( v ) == v );
 
     return hpx::util::report_errors();
 }

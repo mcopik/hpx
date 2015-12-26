@@ -7,6 +7,9 @@
 #ifndef HPX_PARCELSET_POLICIES_MPI_LOCALITY_HPP
 #define HPX_PARCELSET_POLICIES_MPI_LOCALITY_HPP
 
+#include <hpx/config/defines.hpp>
+#if defined(HPX_HAVE_PARCELPORT_MPI)
+
 #include <hpx/hpx_fwd.hpp>
 #include <hpx/runtime/parcelset/locality.hpp>
 #include <hpx/runtime/serialization/serialize.hpp>
@@ -45,12 +48,12 @@ namespace hpx { namespace parcelset
 
             void save(serialization::output_archive & ar) const
             {
-                ar.save(rank_);
+                ar << rank_;
             }
 
             void load(serialization::input_archive & ar)
             {
-                ar.load(rank_);
+                ar >> rank_;
             }
 
         private:
@@ -76,6 +79,8 @@ namespace hpx { namespace parcelset
         };
     }}
 }}
+
+#endif
 
 #endif
 

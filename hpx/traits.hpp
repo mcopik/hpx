@@ -6,6 +6,8 @@
 #if !defined(HPX_TRAITS_OCT_26_2011_0838AM)
 #define HPX_TRAITS_OCT_26_2011_0838AM
 
+#include <hpx/config.hpp>
+
 namespace hpx { namespace traits
 {
     ///////////////////////////////////////////////////////////////////////////
@@ -31,6 +33,13 @@ namespace hpx { namespace traits
 
     template <typename Component, typename Enable = void>
     struct component_type_is_compatible;
+
+    ///////////////////////////////////////////////////////////////////////////
+    template <typename T, typename Enable = void>
+    struct is_client;
+
+    template <typename T, typename Enable = void>
+    struct is_client_or_client_array;
 
     ///////////////////////////////////////////////////////////////////////////
     // control the way managed_components are constructed
@@ -104,6 +113,9 @@ namespace hpx { namespace traits
     struct default_chunk_size;
 
     ///////////////////////////////////////////////////////////////////////////
+    template <typename Range, typename Enable = void>
+    struct is_range;
+
     template <typename Future, typename Enable = void>
     struct is_future;
 

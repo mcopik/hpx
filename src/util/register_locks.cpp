@@ -4,14 +4,14 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config/defines.hpp>
 #include <hpx/exception.hpp>
+#include <hpx/runtime/get_config_entry.hpp>
 #include <hpx/util/logging.hpp>
 #include <hpx/util/register_locks.hpp>
 #include <hpx/util/thread_specific_ptr.hpp>
 #include <hpx/lcos/local/spinlock.hpp>
 
-#include <boost/asio.hpp>
 #include <boost/ptr_container/ptr_map.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -134,6 +134,11 @@ namespace hpx { namespace util
                 HPX_ASSERT(NULL != m);
 
                 m->ignore_all_locks_ = enable;
+            }
+
+            static void reset_held_lock_data()
+            {
+                held_locks_.reset();
             }
         };
 
@@ -359,6 +364,11 @@ namespace hpx { namespace util
     {
         detail::register_locks::set_ignore_all_locks(false);
     }
+
+    void reset_held_lock_data()
+    {
+        detail::register_locks::reset_held_lock_data();
+    }
 #else
 
     bool register_lock(void const*, util::register_lock_data*)
@@ -392,6 +402,10 @@ namespace hpx { namespace util
     }
 
     void reset_ignored_all()
+    {
+    }
+
+    void reset_held_lock_data()
     {
     }
 #endif

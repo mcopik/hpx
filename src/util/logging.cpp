@@ -4,12 +4,12 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config/defines.hpp>
 
 #if defined(HPX_HAVE_LOGGING)
 
 #include <hpx/exception.hpp>
-#include <hpx/runtime/naming/name.hpp>
+#include <hpx/runtime/naming_fwd.hpp>
 #include <hpx/runtime/naming/resolver_client.hpp>
 #include <hpx/runtime/components/console_logging.hpp>
 #include <hpx/runtime/threads/threadmanager.hpp>

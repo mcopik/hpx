@@ -6,13 +6,14 @@
 #if !defined(HPX_UTIL_MAP_HOSTNAMES_AUG_29_2011_1257PM)
 #define HPX_UTIL_MAP_HOSTNAMES_AUG_29_2011_1257PM
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/util/function.hpp>
+
+#include <boost/cstdint.hpp>
 
 #include <map>
-#include <iostream>
-#include <fstream>
+#include <string>
 
-#if defined(BOOST_MSVC)
+#if defined(HPX_MSVC)
 #pragma warning(push)
 #pragma warning(disable:4251)
 #endif
@@ -56,7 +57,7 @@ namespace hpx { namespace util
     };
 }}
 
-#if defined(BOOST_MSVC)
+#if defined(HPX_MSVC)
 #pragma warning(pop)
 #endif
 

@@ -137,6 +137,27 @@ namespace hpx
             return false;     // destinations are remote
         }
 
+        template <typename Action, typename ...Ts>
+        inline bool
+        put_parcel_cb(naming::id_type const& id, naming::address&& addr,
+            threads::thread_priority priority,
+            parcelset::parcelhandler::write_handler_type && cb, Ts&&... vs)
+        {
+            typedef
+                typename hpx::actions::extract_action<Action>::type
+                action_type;
+
+            parcelset::parcelhandler& ph =
+                hpx::applier::get_applier().get_parcel_handler();
+
+            parcelset::parcel p(id, complement_addr<action_type>(addr),
+                action_type(), priority, std::forward<Ts>(vs)...);
+
+            ph.put_parcel(std::move(p), std::move(cb));
+
+            return false;     // destinations are remote
+        }
+
         template <typename Action, typename Continuation, typename ...Ts>
         inline bool
         put_parcel_cont_cb(naming::id_type const& id,
@@ -156,6 +177,29 @@ namespace hpx
                 action_type(), priority, std::forward<Ts>(vs)...);
 
             ph.put_parcel(std::move(p), cb);
+
+            return false;     // destinations are remote
+        }
+
+        template <typename Action, typename Continuation, typename ...Ts>
+        inline bool
+        put_parcel_cont_cb(naming::id_type const& id,
+            naming::address&& addr, threads::thread_priority priority,
+            Continuation && cont,
+            parcelset::parcelhandler::write_handler_type && cb, Ts&&... vs)
+        {
+            typedef
+                typename hpx::actions::extract_action<Action>::type
+                action_type;
+
+            parcelset::parcelhandler& ph =
+                hpx::applier::get_applier().get_parcel_handler();
+
+            parcelset::parcel p(id, complement_addr<action_type>(addr),
+                std::forward<Continuation>(cont),
+                action_type(), priority, std::forward<Ts>(vs)...);
+
+            ph.put_parcel(std::move(p), std::move(cb));
 
             return false;     // destinations are remote
         }
@@ -320,7 +364,7 @@ namespace hpx
         {
             template <typename Component, typename Signature, typename Derived,
                 typename ...Ts>
-            BOOST_FORCEINLINE static bool
+            HPX_FORCEINLINE static bool
             call(hpx::actions::basic_action<Component, Signature, Derived>,
                 naming::id_type const& id, Ts&&... ts)
             {
@@ -330,7 +374,7 @@ namespace hpx
 
             template <typename Component, typename Signature, typename Derived,
                 typename DistPolicy, typename ...Ts>
-            BOOST_FORCEINLINE static typename boost::enable_if_c<
+            HPX_FORCEINLINE static typename boost::enable_if_c<
                 traits::is_distribution_policy<DistPolicy>::value, bool
             >::type
             call(hpx::actions::basic_action<Component, Signature, Derived>,
@@ -546,7 +590,7 @@ namespace hpx
         {
             template <typename Component, typename Signature, typename Derived,
                 typename ...Ts>
-            BOOST_FORCEINLINE static bool
+            HPX_FORCEINLINE static bool
             call(Continuation && c,
                 hpx::actions::basic_action<Component, Signature, Derived>,
                 naming::id_type const& id, Ts&&... ts)
@@ -558,7 +602,7 @@ namespace hpx
 
             template <typename Component, typename Signature, typename Derived,
                 typename DistPolicy, typename ...Ts>
-            BOOST_FORCEINLINE static typename boost::enable_if_c<
+            HPX_FORCEINLINE static typename boost::enable_if_c<
                 traits::is_distribution_policy<DistPolicy>::value, bool
             >::type
             call(Continuation && c,

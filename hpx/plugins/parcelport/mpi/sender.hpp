@@ -7,13 +7,14 @@
 #ifndef HPX_PARCELSET_POLICIES_MPI_SENDER_HPP
 #define HPX_PARCELSET_POLICIES_MPI_SENDER_HPP
 
+#include <hpx/config/defines.hpp>
+#if defined(HPX_HAVE_PARCELPORT_MPI)
+
 #include <hpx/lcos/local/spinlock.hpp>
 
 #include <hpx/plugins/parcelport/mpi/mpi_environment.hpp>
 #include <hpx/plugins/parcelport/mpi/sender_connection.hpp>
 #include <hpx/plugins/parcelport/mpi/tag_provider.hpp>
-
-#include <hpx/util/memory_chunk_pool.hpp>
 
 #include <list>
 #include <iterator>
@@ -25,25 +26,16 @@ namespace hpx { namespace parcelset { namespace policies { namespace mpi
 {
     struct sender
     {
-        typedef util::memory_chunk_pool<> memory_pool_type;
-        typedef
-            util::detail::memory_chunk_pool_allocator<
-                char, util::memory_chunk_pool<>
-            >
-            allocator_type;
-        typedef
-            std::vector<char, allocator_type>
-            data_type;
         typedef
             sender_connection
             connection_type;
         typedef boost::shared_ptr<connection_type> connection_ptr;
-        typedef std::list<connection_ptr> connection_list;
+        typedef std::deque<connection_ptr> connection_list;
 
         typedef hpx::lcos::local::spinlock mutex_type;
-        sender(memory_pool_type & chunk_pool)
+
+        sender()
           : next_free_tag_(-1)
-          , chunk_pool_(chunk_pool)
         {
         }
 
@@ -53,12 +45,11 @@ namespace hpx { namespace parcelset { namespace policies { namespace mpi
         }
 
         connection_ptr create_connection(int dest,
-            boost::atomic<bool> & enable,
             performance_counters::parcels::gatherer & parcels_sent)
         {
             return
                 boost::make_shared<connection_type>(
-                    this, dest, chunk_pool_, enable, parcels_sent);
+                    this, dest, parcels_sent);
         }
 
         void add(connection_ptr const & ptr)
@@ -76,79 +67,49 @@ namespace hpx { namespace parcelset { namespace policies { namespace mpi
             connection_list connections
         )
         {
-            std::size_t k = 0;
-            connection_list::iterator it = connections.begin();
-            hpx::util::high_resolution_timer timer;
-
-            // We try to handle all receives within 1 second
-            while(it != connections.end())
-            {
-                if(timer.elapsed() > 1.0) break;
-
-                connection_type & sender = **it;
-                if(sender.send())
-                {
-                    connection_ptr s = *it;
-                    it = connections.erase(it);
-                    error_code ec;
-                    s->postprocess_handler_(ec, s->destination(), s);
-                }
-                else
-                {
-                    if(k < 32 || k & 1) //-V112
+            // We try to handle all sends
+            connection_list::iterator end = std::remove_if(
+                connections.begin()
+              , connections.end()
+              , [](connection_ptr sender) -> bool
+              {
+                    if(sender->send())
                     {
-                        if(threads::get_self_ptr())
-                            hpx::this_thread::suspend(hpx::threads::pending,
-                                "mpi::sender::wait_done");
+                        error_code ec;
+                        sender->postprocess_handler_(ec, sender->destination(), sender);
+                        return true;
                     }
-                    ++k;
-                    ++it;
-                }
-            }
+                    return false;
+              }
+            );
 
-            if(!connections.empty())
+            // If some are still in progress, give them back
+            if(connections.begin() != end)
             {
                 boost::unique_lock<mutex_type> l(connections_mtx_);
-                if(connections_.empty())
-                {
-                    std::swap(connections, connections_);
-                }
-                else
-                {
-                    connections_.insert(
-                        connections_.end()
-                      , std::make_move_iterator(connections.begin())
-                      , std::make_move_iterator(connections.end())
-                    );
-                }
+                connections_.insert(
+                    connections_.end()
+                  , std::make_move_iterator(connections.begin())
+                  , std::make_move_iterator(end)
+                );
             }
         }
 
-        bool background_work(std::size_t num_thread)
+        bool background_work()
         {
             connection_list connections;
             {
-                boost::unique_lock<mutex_type> l(connections_mtx_);
-                std::swap(connections, connections_);
+                boost::unique_lock<mutex_type> l(connections_mtx_, boost::try_to_lock);
+                if(l && !connections_.empty())
+                {
+                    connections.push_back(connections_.front());
+                    connections_.pop_front();
+                }
             }
             bool has_work = false;
             if(!connections.empty())
             {
-                if(hpx::is_starting())
-                {
-                    send_messages(std::move(connections));
-                }
-                else
-                {
-//                     error_code ec(lightweight);
-                    hpx::applier::register_thread_nullary(
-                        util::bind(
-                            util::one_shot(&sender::send_messages),
-                            this, std::move(connections)),
-                        "mpi::sender::send_messages",
-                        threads::pending, true, threads::thread_priority_boost,
-                        num_thread, threads::thread_stacksize_default);
-                }
+                send_messages(std::move(connections));
                 has_work = true;
             }
             next_free_tag();
@@ -209,17 +170,16 @@ namespace hpx { namespace parcelset { namespace policies { namespace mpi
         }
 
         mutex_type connections_mtx_;
-        lcos::local::detail::condition_variable connections_cond_;
         connection_list connections_;
 
         mutex_type next_free_tag_mtx_;
         MPI_Request next_free_tag_request_;
         int next_free_tag_;
-
-        memory_pool_type & chunk_pool_;
     };
 
 
 }}}}
+
+#endif
 
 #endif

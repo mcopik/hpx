@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <iterator>
 
-#include <boost/static_assert.hpp>
 #include <boost/utility/enable_if.hpp>
 #include <boost/type_traits/is_base_of.hpp>
 
@@ -142,14 +141,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///                     of the predicate function should be equivalent to
     ///                     the following:
     ///                     \code
-    ///                     bool pred(const Type1 &a, const Type2 &b);
+    ///                     bool pred(const Type1 &a, const Type1 &b);
     ///                     \endcode \n
     ///                     The signature does not need to have const &, but
     ///                     the function must not modify the objects passed to
-    ///                     it. The types \a Type1 and \a Type2 must be such
-    ///                     that objects of types \a InIter1 and \a InIter2 can
-    ///                     be dereferenced and then implicitly converted to
-    ///                     \a Type1 and \a Type2 respectively
+    ///                     it. The type \a Type1 must be such that objects of
+    ///                     type \a FwdIter can be dereferenced and then
+    ///                     implicitly converted to \a Type1.
     ///
     /// The comparisons in the parallel \a min_element algorithm invoked with
     /// an execution policy object of type \a sequential_execution_policy
@@ -182,7 +180,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<FwdIter>::iterator_category
             iterator_category;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::forward_iterator_tag, iterator_category>::value),
             "Required at least forward iterator.");
@@ -248,7 +246,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<FwdIter>::value_type
             value_type;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::forward_iterator_tag, iterator_category>::value),
             "Required at least forward iterator.");
@@ -374,14 +372,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///                     of the predicate function should be equivalent to
     ///                     the following:
     ///                     \code
-    ///                     bool pred(const Type1 &a, const Type2 &b);
+    ///                     bool pred(const Type1 &a, const Type1 &b);
     ///                     \endcode \n
     ///                     The signature does not need to have const &, but
     ///                     the function must not modify the objects passed to
-    ///                     it. The types \a Type1 and \a Type2 must be such
-    ///                     that objects of types \a InIter1 and \a InIter2 can
-    ///                     be dereferenced and then implicitly converted to
-    ///                     \a Type1 and \a Type2 respectively
+    ///                     it. The type \a Type1 must be such that objects of
+    ///                     type \a FwdIter can be dereferenced and then
+    ///                     implicitly converted to \a Type1.
     ///
     /// The comparisons in the parallel \a max_element algorithm invoked with
     /// an execution policy object of type \a sequential_execution_policy
@@ -414,7 +411,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<FwdIter>::iterator_category
             iterator_category;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::forward_iterator_tag, iterator_category>::value),
             "Required at least forward iterator.");
@@ -480,7 +477,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<FwdIter>::value_type
             value_type;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::forward_iterator_tag, iterator_category>::value),
             "Required at least forward iterator.");
@@ -618,14 +615,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///                     of the predicate function should be equivalent to
     ///                     the following:
     ///                     \code
-    ///                     bool pred(const Type1 &a, const Type2 &b);
+    ///                     bool pred(const Type1 &a, const Type1 &b);
     ///                     \endcode \n
     ///                     The signature does not need to have const &, but
     ///                     the function must not modify the objects passed to
-    ///                     it. The types \a Type1 and \a Type2 must be such
-    ///                     that objects of types \a InIter1 and \a InIter2 can
-    ///                     be dereferenced and then implicitly converted to
-    ///                     \a Type1 and \a Type2 respectively
+    ///                     it. The type \a Type1 must be such that objects of
+    ///                     type \a FwdIter can be dereferenced and then
+    ///                     implicitly converted to \a Type1.
     ///
     /// The comparisons in the parallel \a minmax_element algorithm invoked with
     /// an execution policy object of type \a sequential_execution_policy
@@ -663,7 +659,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<FwdIter>::iterator_category
             iterator_category;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::forward_iterator_tag, iterator_category>::value),
             "Required at least forward iterator.");
@@ -734,7 +730,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<FwdIter>::value_type
             value_type;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::forward_iterator_tag, iterator_category>::value),
             "Required at least forward iterator.");

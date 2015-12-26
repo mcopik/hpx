@@ -6,12 +6,8 @@
 #if !defined(HPX_UTIL_SERIALIZE_EXCEPTION_JAN_23_2009_0108PM)
 #define HPX_UTIL_SERIALIZE_EXCEPTION_JAN_23_2009_0108PM
 
-#include <hpx/hpx_fwd.hpp>
-#include <hpx/exception.hpp>
-#include <hpx/runtime/serialization/serialize.hpp>
-#include <hpx/traits/is_bitwise_serializable.hpp>
+#include <hpx/runtime/serialization/serialization_fwd.hpp>
 
-#include <boost/config.hpp>
 #include <boost/exception_ptr.hpp>
 
 namespace hpx { namespace util
@@ -27,10 +23,8 @@ namespace hpx { namespace util
         std_out_of_range = 3,
         std_logic_error = 4,
         std_bad_alloc = 5,
-#ifndef BOOST_NO_TYPEID
         std_bad_cast = 6,
         std_bad_typeid = 7,
-#endif
         std_bad_exception = 8,
         std_exception = 9,
 

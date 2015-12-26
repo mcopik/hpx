@@ -10,7 +10,6 @@
 
 #include <hpx/hpx_fwd.hpp>
 #include <hpx/traits/segmented_iterator_traits.hpp>
-#include <hpx/util/void_guard.hpp>
 #include <hpx/util/move.hpp>
 #include <hpx/util/decay.hpp>
 
@@ -27,7 +26,6 @@
 #include <iterator>
 
 #include <boost/shared_array.hpp>
-#include <boost/static_assert.hpp>
 #include <boost/utility/enable_if.hpp>
 #include <boost/type_traits/is_same.hpp>
 #include <boost/type_traits/is_base_of.hpp>
@@ -154,14 +152,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///                     of the predicate function should be equivalent to
     ///                     the following:
     ///                     \code
-    ///                     bool pred(const Type1 &a, const Type2 &b);
+    ///                     bool pred(const Type1 &a, const Type1 &b);
     ///                     \endcode \n
     ///                     The signature does not need to have const &, but
     ///                     the function must not modify the objects passed to
-    ///                     it. The types \a Type1 and \a Type2 must be such
-    ///                     that objects of types \a InIter1 and \a InIter2 can
+    ///                     it. The type \a Type1 must be such
+    ///                     that objects of type \a InIter can
     ///                     be dereferenced and then implicitly converted to
-    ///                     \a Type1 and \a Type2 respectively
+    ///                     \a Type1
     ///
     /// The application of function objects in parallel algorithm
     /// invoked with a sequential execution policy object execute in sequential
@@ -200,16 +198,16 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<OutIter>::iterator_category
             output_iterator_category;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::input_iterator_tag, input_iterator_category1>::value),
             "Requires at least input iterator.");
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::input_iterator_tag, input_iterator_category2>::value),
             "Requires at least input iterator.");
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::mpl::or_<
                 boost::is_base_of<
                     std::forward_iterator_tag, output_iterator_category>,
@@ -314,16 +312,16 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         typedef typename std::iterator_traits<OutIter>::iterator_category
             output_iterator_category;
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::input_iterator_tag, input_iterator_category1>::value),
             "Requires at least input iterator.");
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::is_base_of<
                 std::input_iterator_tag, input_iterator_category2>::value),
             "Requires at least input iterator.");
 
-        BOOST_STATIC_ASSERT_MSG(
+        static_assert(
             (boost::mpl::or_<
                 boost::is_base_of<
                     std::forward_iterator_tag, output_iterator_category>,

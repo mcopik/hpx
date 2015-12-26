@@ -8,9 +8,6 @@
 #if !defined(HPX_PARCELSET_PARCELHANDLER_MAY_18_2008_0935AM)
 #define HPX_PARCELSET_PARCELHANDLER_MAY_18_2008_0935AM
 
-#include <boost/noncopyable.hpp>
-#include <boost/bind.hpp>
-
 #include <hpx/hpx_fwd.hpp>
 #include <hpx/config/forceinline.hpp>
 #include <hpx/exception.hpp>
@@ -28,11 +25,17 @@
 
 #include <hpx/config/warnings_prefix.hpp>
 
+#include <boost/noncopyable.hpp>
+#include <boost/bind.hpp>
+
 #include <map>
 #include <algorithm>
 
 namespace hpx { namespace parcelset
 {
+    // default callback for put_parcel
+    void default_write_handler(boost::system::error_code const&,
+        parcel const& p);
 
     /// The \a parcelhandler is the representation of the parcelset inside a
     /// locality. It is built on top of a single parcelport. Several
@@ -40,10 +43,6 @@ namespace hpx { namespace parcelset
     class HPX_EXPORT parcelhandler : boost::noncopyable
     {
     private:
-        // default callback for put_parcel
-        static void default_write_handler(boost::system::error_code const&,
-            parcel const& p);
-
         void parcel_sink(parcel const& p);
 
         threads::thread_state_enum decode_parcel(
@@ -190,7 +189,7 @@ namespace hpx { namespace parcelset
         ///                 parcel \a p will be modified in place, as it will
         ///                 get set the resolved destination address and parcel
         ///                 id (if not already set).
-        BOOST_FORCEINLINE void put_parcel(parcel p)
+        HPX_FORCEINLINE void put_parcel(parcel p)
         {
             using util::placeholders::_1;
             using util::placeholders::_2;
@@ -214,17 +213,6 @@ namespace hpx { namespace parcelset
         /// parcelport
         std::string get_locality_name() const;
 
-        /// Temporarily enable/disable all parcel handling activities in the
-        /// parcel subsystem
-        ///
-        /// \param new_state    [in] The desired new state of the parcel
-        ///                     handling (true: enable parcel handling, false:
-        ///                     disable parcel handling)
-        ///
-        /// \returns            The previous state of the parcel handling
-        ///                     subsystem.
-        bool enable(bool new_state);
-
         ///////////////////////////////////////////////////////////////////////
         /// The function register_counter_types() is called during startup to
         /// allow the registration of all performance counter types for this
@@ -233,7 +221,8 @@ namespace hpx { namespace parcelset
 
         /// \brief Make sure the specified locality is not held by any
         /// connection caches anymore
-        void remove_from_connection_cache(endpoints_type const& endpoints);
+        void remove_from_connection_cache(naming::gid_type const& gid,
+            endpoints_type const& endpoints);
 
         /// \brief return the endpoints associated with this parcelhandler
         /// \returns all connection information for the enabled parcelports

@@ -6,8 +6,11 @@
 #if !defined(HPX_COMPONENTS_CLIENT_BASE_OCT_31_2008_0424PM)
 #define HPX_COMPONENTS_CLIENT_BASE_OCT_31_2008_0424PM
 
-#include <hpx/hpx_fwd.hpp>
-
+#include <hpx/config.hpp>
+#include <hpx/traits/is_client.hpp>
+#include <hpx/traits/is_future.hpp>
+#include <hpx/traits/future_access.hpp>
+#include <hpx/runtime/agas/interface.hpp>
 #include <hpx/runtime/naming/name.hpp>
 #include <hpx/runtime/components/component_type.hpp>
 #include <hpx/runtime/components/stubs/stub_base.hpp>
@@ -26,6 +29,7 @@
 
 #include <boost/utility/enable_if.hpp>
 #include <boost/mpl/bool.hpp>
+#include <boost/mpl/has_xxx.hpp>
 #include <boost/type_traits/is_base_of.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -39,11 +43,6 @@ namespace hpx { namespace components
 namespace hpx { namespace traits
 {
     ///////////////////////////////////////////////////////////////////////////
-    template <typename T, typename Enable = void>
-    struct is_client
-      : boost::mpl::false_
-    {};
-
     template <typename Derived>
     struct is_client<Derived,
         typename util::always_void<typename Derived::stub_argument_type>::type
@@ -52,21 +51,6 @@ namespace hpx { namespace traits
                 Derived, typename Derived::stub_argument_type
             >,
             Derived>
-    {};
-
-    template <typename T, typename Enable = void>
-    struct is_client_or_client_array
-      : is_client<T>
-    {};
-
-    template <typename T>
-    struct is_client_or_client_array<T[]>
-      : is_client<T>
-    {};
-
-    template <typename T, std::size_t N>
-    struct is_client_or_client_array<T[N]>
-      : is_client<T>
     {};
 
     ///////////////////////////////////////////////////////////////////////////
@@ -89,7 +73,7 @@ namespace hpx { namespace traits
     struct future_access<Derived,
         typename boost::enable_if_c<is_client<Derived>::value>::type>
     {
-        BOOST_FORCEINLINE static
+        HPX_FORCEINLINE static
         typename traits::detail::shared_state_ptr<naming::id_type>::type const&
         get_shared_state(Derived const& client)
         {
@@ -105,7 +89,7 @@ namespace hpx { namespace traits
         typedef Derived type;
 
         template <typename T_>
-        BOOST_FORCEINLINE
+        HPX_FORCEINLINE
         Derived operator()(T_ && value) const
         {
             return std::forward<T_>(value);
@@ -148,7 +132,7 @@ namespace hpx { namespace components
         {
             typedef shared_future<naming::id_type> result_type;
 
-            BOOST_FORCEINLINE result_type
+            HPX_FORCEINLINE result_type
             operator()(future<Derived> f) const
             {
                 return f.get().share();
@@ -380,15 +364,17 @@ namespace hpx { namespace components
 
     protected:
         template <typename F>
-        static typename lcos::detail::future_then_result<client_base, F>::cont_result
+        static typename lcos::detail::future_then_result<Derived, F>::cont_result
         on_ready(future_type && fut, F f)
         {
-            return f(client_base(std::move(fut)));
+            return f(Derived(std::move(fut)));
         }
 
     public:
         template <typename F>
-        typename lcos::detail::future_then_result<client_base, F>::type
+        typename lcos::detail::future_then_result<
+            Derived, typename util::decay<F>::type
+        >::type
         then(F && f)
         {
             typedef typename util::decay<F>::type func_type;

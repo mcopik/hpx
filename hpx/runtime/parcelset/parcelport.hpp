@@ -10,13 +10,18 @@
 #if !defined(HPX_PARCELSET_PARCELPORT_MAR_26_2008_1214PM)
 #define HPX_PARCELSET_PARCELPORT_MAR_26_2008_1214PM
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
+#include <hpx/util/runtime_configuration.hpp>
+#include <hpx/util/io_service_pool.hpp>
+#include <hpx/runtime/applier_fwd.hpp>
 #include <hpx/runtime/parcelset/locality.hpp>
 #include <hpx/runtime/parcelset/parcel.hpp>
 #include <hpx/performance_counters/parcels/data_point.hpp>
 #include <hpx/performance_counters/parcels/gatherer.hpp>
 #include <hpx/lcos/local/spinlock.hpp>
+#include <hpx/util/function.hpp>
 
+#include <boost/cstdint.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/thread/locks.hpp>
 
@@ -154,10 +159,6 @@ namespace hpx { namespace parcelset
 
         /// Return the thread pool if the name matches
         virtual util::io_service_pool* get_thread_pool(char const* name) = 0;
-
-        /// Temporarily enable/disable all parcel handling activities in the
-        /// parcelport
-        virtual void enable(bool new_state) = 0;
 
         /// Return the given connection cache statistic
         enum connection_cache_statistics_type
@@ -310,7 +311,7 @@ namespace hpx { namespace parcelset
             applier_ = applier;
         }
 
-        void add_received_parcel(parcel p);
+        void add_received_parcel(parcel p, std::size_t num_thread = -1);
 
         /// Update performance counter data
         void add_received_data(performance_counters::parcels::data_point const& data)
@@ -405,9 +406,6 @@ namespace hpx { namespace parcelset
 
         /// async serialization of parcels
         bool async_serialization_;
-
-        /// enable parcelport
-        boost::atomic<bool> enable_parcel_handling_;
 
         /// priority of the parcelport
         int priority_;

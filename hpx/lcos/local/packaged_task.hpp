@@ -6,11 +6,12 @@
 #if !defined(HPX_LCOS_LOCAL_PACKAGED_TASK_MAR_01_2012_0121PM)
 #define HPX_LCOS_LOCAL_PACKAGED_TASK_MAR_01_2012_0121PM
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/lcos/local/promise.hpp>
 #include <hpx/lcos/detail/future_data.hpp>
 #include <hpx/runtime/threads/thread_executor.hpp>
+#include <hpx/runtime/launch_policy.hpp>
 #include <hpx/traits/is_callable.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/deferred_call.hpp>
@@ -223,7 +224,7 @@ namespace hpx { namespace lcos { namespace local
             return future_access<future<Result> >::create(task_);
         }
 
-        bool valid() const BOOST_NOEXCEPT
+        bool valid() const HPX_NOEXCEPT
         {
             return !!task_;
         }
@@ -274,43 +275,45 @@ namespace hpx { namespace lcos { namespace local
                 return *this;
             }
 
-            void swap(packaged_task_base& other) BOOST_NOEXCEPT
+            void swap(packaged_task_base& other) HPX_NOEXCEPT
             {
                 function_.swap(other.function_);
                 promise_.swap(other.promise_);
             }
 
             // synchronous execution
-            template <typename F>
-            void invoke(F&& f, boost::mpl::false_, error_code& ec = throws)
+            template <typename ...Ts>
+            void invoke(boost::mpl::false_, Ts&&... vs)
             {
-                if (function_.empty()) {
-                    HPX_THROWS_IF(ec, no_state,
+                if (function_.empty())
+                {
+                    HPX_THROW_EXCEPTION(no_state,
                         "packaged_task_base<Signature>::get_future",
                         "this packaged_task has no valid shared state");
                     return;
                 }
 
                 try {
-                    promise_.set_value(f());
+                    promise_.set_value(function_(std::forward<Ts>(vs)...));
                 }
                 catch(...) {
                     promise_.set_exception(boost::current_exception());
                 }
             }
 
-            template <typename F>
-            void invoke(F&& f, boost::mpl::true_, error_code& ec = throws)
+            template <typename ...Ts>
+            void invoke(boost::mpl::true_, Ts&&... vs)
             {
-                if (function_.empty()) {
-                    HPX_THROWS_IF(ec, no_state,
+                if (function_.empty())
+                {
+                    HPX_THROW_EXCEPTION(no_state,
                         "packaged_task_base<Signature>::get_future",
                         "this packaged_task has no valid shared state");
                     return;
                 }
 
                 try {
-                    f();
+                    function_(std::forward<Ts>(vs)...);
                     promise_.set_value();
                 }
                 catch(...) {
@@ -330,7 +333,7 @@ namespace hpx { namespace lcos { namespace local
                 return promise_.get_future();
             }
 
-            bool valid() const BOOST_NOEXCEPT
+            bool valid() const HPX_NOEXCEPT
             {
                 return !function_.empty() && promise_.valid();
             }
@@ -341,7 +344,7 @@ namespace hpx { namespace lcos { namespace local
                     HPX_THROWS_IF(ec, no_state,
                         "packaged_task_base<Signature>::get_future",
                         "this packaged_task has no valid shared state");
-                    return lcos::future<Result>();
+                    return;
                 }
                 promise_ = local::promise<Result>();
             }
@@ -379,7 +382,7 @@ namespace hpx { namespace lcos { namespace local
         explicit packaged_task(F && f,
             typename boost::enable_if_c<
                 !boost::is_same<typename util::decay<F>::type, packaged_task>::value
-             && traits::is_callable<typename util::decay<F>::type(Ts...)>::value
+             && traits::is_callable<typename util::decay<F>::type(Ts...), R>::value
             >::type* = 0)
           : base_type(std::forward<F>(f))
         {}
@@ -394,16 +397,15 @@ namespace hpx { namespace lcos { namespace local
             return *this;
         }
 
-        void swap(packaged_task& other) BOOST_NOEXCEPT
+        void swap(packaged_task& other) HPX_NOEXCEPT
         {
             base_type::swap(other);
         }
 
-        void operator()(Ts... vs)
+        template <typename ... Vs>
+        void operator()(Vs&&... vs)
         {
-            base_type::invoke(
-                util::deferred_call(this->function_, std::forward<Ts>(vs)...),
-                boost::is_void<R>());
+            base_type::invoke(boost::is_void<R>(), std::forward<Vs>(vs)...);
         }
 
         // result retrieval

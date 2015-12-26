@@ -9,11 +9,8 @@
 #if !defined(HPX_EXCEPTION_MAR_24_2008_0929AM)
 #define HPX_EXCEPTION_MAR_24_2008_0929AM
 
-#include <exception>
-#include <string>
-#include <iosfwd>
-
 #include <hpx/config.hpp>
+#include <hpx/exception_fwd.hpp>
 #include <hpx/error.hpp>
 #include <hpx/util/assert.hpp>
 #include <hpx/util/logging.hpp>
@@ -27,21 +24,19 @@
 #include <boost/system/error_code.hpp>
 #include <boost/system/system_error.hpp>
 
+#include <exception>
+#include <string>
+#include <iosfwd>
+
 #include <hpx/config/warnings_prefix.hpp>
 
 #if !defined(BOOST_SYSTEM_NOEXCEPT)
-#define BOOST_SYSTEM_NOEXCEPT BOOST_NOEXCEPT
+#define BOOST_SYSTEM_NOEXCEPT HPX_NOEXCEPT
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx
 {
-    /// \cond NOINTERNAL
-    // forward declaration
-    class error_code;
-    class exception;
-    /// \endcond
-
     /// \cond NODETAIL
     namespace detail
     {
@@ -73,7 +68,7 @@ namespace hpx
                 return "";
             }
 
-            std::string message(int) const BOOST_NOEXCEPT
+            std::string message(int) const HPX_NOEXCEPT
             {
                 return "";
             }
@@ -342,28 +337,6 @@ namespace hpx
 
         boost::exception_ptr exception_;
     };
-
-    /// \brief Predefined error_code object used as "throw on error" tag.
-    ///
-    /// The predefined hpx::error_code object \a hpx::throws is supplied for use as
-    /// a "throw on error" tag.
-    ///
-    /// Functions that specify an argument in the form 'error_code& ec=throws'
-    /// (with appropriate namespace qualifiers), have the following error
-    /// handling semantics:
-    ///
-    /// If &ec != &throws and an error occurred: ec.value() returns the
-    /// implementation specific error number for the particular error that
-    /// occurred and ec.category() returns the error_category for ec.value().
-    ///
-    /// If &ec != &throws and an error did not occur, ec.clear().
-    ///
-    /// If an error occurs and &ec == &throws, the function throws an exception
-    /// of type \a hpx::exception or of a type derived from it. The exception's
-    /// \a get_errorcode() member function returns a reference to an
-    /// \a hpx::error_code object with the behavior as specified above.
-    ///
-    HPX_EXCEPTION_EXPORT extern error_code throws;
 
     /// @{
     /// \brief Returns a new error_code constructed from the given parameters.
@@ -644,7 +617,6 @@ namespace hpx
             }
         };
 
-#ifndef BOOST_NO_TYPEID
         struct HPX_EXCEPTION_EXPORT bad_cast : std::bad_cast
         {
           private:
@@ -680,7 +652,6 @@ namespace hpx
                 return what_.c_str();
             }
         };
-#endif
 
         ///////////////////////////////////////////////////////////////////////
         // types needed to add additional information to the thrown exceptions

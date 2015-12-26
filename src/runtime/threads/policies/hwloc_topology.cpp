@@ -68,7 +68,7 @@ namespace hpx { namespace threads
 
         std::size_t get_index(hwloc_obj_t obj)
         {
-            // on Windows os_index is always -1
+            // on Windows logical_index is always -1
             if (obj->logical_index == ~0x0u)
                 return static_cast<std::size_t>(obj->os_index);
 
@@ -207,10 +207,15 @@ namespace hpx { namespace threads
         scoped_lock lk(topo_mtx);
 
         int num_cores = hwloc_get_nbobjs_by_type(topo, HWLOC_OBJ_CORE);
-        if(num_cores < 0)
+
+        // If num_cores is smaller 0, we have an error, it should never be zero
+        // either to avoid division by zero, we should always have at least one
+        // core
+        if(num_cores <= 0)
         {
             HPX_THROWS_IF(ec, no_success, "hwloc_topology::hwloc_get_nobjs_by_type",
                 "Failed to get number of cores");
+            return std::size_t(-1);
         }
         num_core %= num_cores; //-V101 //-V104 //-V107
 
@@ -356,7 +361,22 @@ namespace hpx { namespace threads
         {
             if (test(mask, i))
             {
-                hwloc_bitmap_set(cpuset, static_cast<unsigned int>(i));
+                int const pu_depth =
+                    hwloc_get_type_or_below_depth(topo, HWLOC_OBJ_PU);
+                for (unsigned int j = 0; j != num_of_pus_; ++j)
+                {
+                    hwloc_obj_t const pu_obj =
+                        hwloc_get_obj_by_depth(topo, pu_depth, j);
+                    unsigned idx =
+                        static_cast<unsigned>(detail::get_index(pu_obj));
+
+                    if(idx == i)
+                    {
+                        hwloc_bitmap_set(cpuset,
+                            static_cast<unsigned int>(pu_obj->os_index));
+                        break;
+                    }
+                }
             }
         }
 
@@ -396,7 +416,7 @@ namespace hpx { namespace threads
     } // }}}
 
     ///////////////////////////////////////////////////////////////////////////
-    mask_cref_type hwloc_topology::get_thread_affinity_mask_from_lva(
+    mask_type hwloc_topology::get_thread_affinity_mask_from_lva(
         naming::address::address_type lva
       , error_code& ec
         ) const
@@ -404,36 +424,42 @@ namespace hpx { namespace threads
         if (&ec != &throws)
             ec = make_success_code();
 
-//        hwloc_membind_policy_t policy = HWLOC_MEMBIND_DEFAULT;
-//        hwloc_nodeset_t nodeset = hwloc_bitmap_alloc();
-//
-//        {
-//             scoped_lock lk(topo_mtx);
-//             int ret = hwloc_get_area_membind_nodeset(topo,
-//                 reinterpret_cast<void const*>(lva), 1, nodeset, &policy, 0);
-//
-//             if (-1 != ret)
-//             {
-//                 hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
-//                 hwloc_cpuset_from_nodeset(topo, cpuset, nodeset);
-//                 lk.unlock();
-//
-//                 hwloc_bitmap_free(nodeset);
-//
-//                 mask_type mask = mask_type();
-//                 resize(mask, get_number_of_pus());
-//
-//                 for (unsigned int i = 0; i != num_of_pus_; ++i)
-//                 {
-//                     set(mask, hwloc_bitmap_isset(cpuset, i) != 0);
-//                 }
-//
-//                 hwloc_bitmap_free(cpuset);
-//                 return mask;
-//             }
-//        }
-//
-//        hwloc_bitmap_free(nodeset);
+        hwloc_membind_policy_t policy = HWLOC_MEMBIND_DEFAULT;
+        hwloc_nodeset_t nodeset = hwloc_bitmap_alloc();
+
+        {
+            scoped_lock lk(topo_mtx);
+            int ret = hwloc_get_area_membind_nodeset(topo,
+                reinterpret_cast<void const*>(lva), 1, nodeset, &policy, 0);
+
+            if (-1 != ret)
+            {
+                hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
+                hwloc_cpuset_from_nodeset(topo, cpuset, nodeset);
+                lk.unlock();
+
+                hwloc_bitmap_free(nodeset);
+
+                mask_type mask = mask_type();
+                resize(mask, get_number_of_pus());
+
+                int const pu_depth =
+                    hwloc_get_type_or_below_depth(topo, HWLOC_OBJ_PU);
+                for (unsigned int i = 0; i != num_of_pus_; ++i)
+                {
+                    hwloc_obj_t const pu_obj =
+                        hwloc_get_obj_by_depth(topo, pu_depth, i);
+                    unsigned idx = static_cast<unsigned>(pu_obj->os_index);
+                    if (hwloc_bitmap_isset(cpuset, idx) != 0)
+                        set(mask, detail::get_index(pu_obj));
+                }
+
+                hwloc_bitmap_free(cpuset);
+                return mask;
+            }
+        }
+
+        hwloc_bitmap_free(nodeset);
         return empty_mask;
     } // }}}
 
@@ -572,7 +598,10 @@ namespace hpx { namespace threads
     std::size_t hwloc_topology::get_number_of_cores() const
     {
         int nobjs =  hwloc_get_nbobjs_by_type(topo, HWLOC_OBJ_CORE);
-        if(0 > nobjs)
+        // If num_cores is smaller 0, we have an error, it should never be zero
+        // either to avoid division by zero, we should always have at least one
+        // core
+        if(0 >= nobjs)
         {
             HPX_THROW_EXCEPTION(kernel_error
               , "hpx::threads::hwloc_topology::get_number_of_cores"
@@ -921,7 +950,10 @@ namespace hpx { namespace threads
         {
             scoped_lock lk(topo_mtx);
             int num_cores = hwloc_get_nbobjs_by_type(topo, HWLOC_OBJ_CORE);
-            if (num_cores < 0) {
+            // If num_cores is smaller 0, we have an error, it should never be zero
+            // either to avoid division by zero, we should always have at least one
+            // core
+            if (num_cores <= 0) {
                 HPX_THROW_EXCEPTION(kernel_error
                   , "hpx::threads::hwloc_topology::init_thread_affinity_mask"
                   , "hwloc_get_nbobjs_by_type failed");
@@ -998,7 +1030,7 @@ namespace hpx { namespace threads
             for (unsigned int i = 0; i != num_of_pus_; ++i) //-V104
             {
                 hwloc_obj_t const pu_obj = hwloc_get_obj_by_depth(topo, pu_depth, i);
-                unsigned idx = static_cast<unsigned>(detail::get_index(pu_obj));
+                unsigned idx = static_cast<unsigned>(pu_obj->os_index);
                 if (hwloc_bitmap_isset(cpuset, idx) != 0)
                     set(mask, detail::get_index(pu_obj));
             }
@@ -1036,7 +1068,7 @@ namespace hpx { namespace threads
             for (unsigned int i = 0; i != num_of_pus_; ++i) //-V104
             {
                 hwloc_obj_t const pu_obj = hwloc_get_obj_by_depth(topo, pu_depth, i);
-                unsigned idx = static_cast<unsigned>(detail::get_index(pu_obj));
+                unsigned idx = static_cast<unsigned>(pu_obj->os_index);
                 if (hwloc_bitmap_isset(cpuset, idx) != 0)
                     set(mask, detail::get_index(pu_obj));
             }
@@ -1048,6 +1080,19 @@ namespace hpx { namespace threads
             ec = make_success_code();
 
         return mask;
+    }
+
+    /// This is equivalent to malloc(), except that it tries to allocate
+    /// page-aligned memory from the OS.
+    void* hwloc_topology::allocate(std::size_t len)
+    {
+        return hwloc_alloc(topo, len);
+    }
+
+    /// Free memory that was previously allocated by allocate
+    void hwloc_topology::deallocate(void* addr, std::size_t len)
+    {
+        hwloc_free(topo, addr, len);
     }
 }}
 

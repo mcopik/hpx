@@ -6,7 +6,10 @@
 #ifndef HPX_COMPONENTS_SECURITY_SERVER_SECRET_KEY_HPP
 #define HPX_COMPONENTS_SECURITY_SERVER_SECRET_KEY_HPP
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
+
+#if defined(HPX_HAVE_SECURITY)
+
 #include <hpx/exception.hpp>
 
 #include <boost/array.hpp>
@@ -19,7 +22,7 @@
 
 namespace hpx { namespace components { namespace security
 {
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(push, 1)
 #endif
 
@@ -95,9 +98,11 @@ namespace hpx { namespace components { namespace security
         > bytes_;
     };
 
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(pop)
 #endif
 }}}
+
+#endif
 
 #endif

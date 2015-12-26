@@ -6,11 +6,12 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
 #include <hpx/util/integer/uint128.hpp>
+#include <hpx/runtime/serialization/serialize.hpp>
 
-#include <memory>
 #include <cmath>
+#include <cstring>
+#include <memory>
 #include <algorithm>
 
 // IMPLEMENTATION
@@ -22,7 +23,7 @@ namespace hpx { namespace util { namespace integer
         if (radix < 2 || radix > 37) return "(invalid radix)";
 
         static char sz [256];
-        memset (sz, 0, 256);
+        std::memset (sz, 0, 256);
 
         uint128 r;
         uint128 ii = *this;
@@ -114,13 +115,13 @@ namespace hpx { namespace util { namespace integer
             // number is 0, just return 0
             return *this;
 
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #pragma warning(push)
 #pragma warning(disable: 4146)
 #endif
         // non 0 number
         return uint128 (-this->lo, ~this->hi);
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #pragma warning(pop)
 #endif
     };

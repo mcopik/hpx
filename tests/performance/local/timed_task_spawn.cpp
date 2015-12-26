@@ -211,33 +211,6 @@ hpx::threads::thread_state_enum invoke_worker_timed_suspension(
 ///////////////////////////////////////////////////////////////////////////////
 typedef void (*stage_worker_function)(boost::uint64_t, bool);
 
-void stage_worker_static_balanced_stackless(
-    boost::uint64_t target_thread
-  , bool suspend
-    )
-{
-    if (suspend)
-        hpx::threads::register_thread_plain(
-            &invoke_worker_timed_suspension
-          , "invoke_worker_timed_suspension"
-          , hpx::threads::pending
-          , false
-          , hpx::threads::thread_priority_normal
-          , target_thread
-          , hpx::threads::thread_stacksize_nostack
-            );
-    else
-        hpx::threads::register_thread_plain(
-            &invoke_worker_timed_no_suspension
-          , "invoke_worker_timed_no_suspension"
-          , hpx::threads::pending
-          , false
-          , hpx::threads::thread_priority_normal
-          , target_thread
-          , hpx::threads::thread_stacksize_nostack
-            );
-}
-
 void stage_worker_static_balanced_stackbased(
     boost::uint64_t target_thread
   , bool suspend
@@ -370,9 +343,7 @@ int hpx_main(
         ///////////////////////////////////////////////////////////////////////
         stage_worker_function stage_worker;
 
-        if ("static-balanced-stackless" == distribution)
-            stage_worker = &stage_worker_static_balanced_stackless;
-        else if ("static-balanced-stackbased" == distribution)
+        if ("static-balanced-stackbased" == distribution)
             stage_worker = &stage_worker_static_balanced_stackbased;
         else if ("static-imbalanced" == distribution)
             stage_worker = &stage_worker_static_imbalanced;
@@ -402,14 +373,14 @@ int hpx_main(
                     "count\n");
 
             tasks_per_feeder = tasks / os_thread_count;
-            total_tasks      = tasks;
+            //total_tasks      = tasks;
             suspended_tasks_per_feeder = suspended_tasks / os_thread_count;
             total_suspended_tasks      = suspended_tasks;
         }
         else if ("weak" == scaling)
         {
             tasks_per_feeder = tasks;
-            total_tasks      = tasks * os_thread_count;
+            //total_tasks      = tasks * os_thread_count;
             suspended_tasks_per_feeder = suspended_tasks;
             total_suspended_tasks      = suspended_tasks * os_thread_count;
         }
@@ -532,7 +503,7 @@ int main(
           "\"weak\")")
 
         ( "distribution"
-        , value<std::string>(&distribution)->default_value("static-balanced-stackbased")
+        , value<std::string>(&distribution)->default_value("static-balanced")
         , "type of distribution to perform (valid options are "
           "\"static-balanced\", \"static-imbalanced\" or \"round-robin\")")
 

@@ -36,20 +36,20 @@ namespace hpx { namespace lcos { namespace local
     ///         synchronize a given number of \a threads.
     class latch
     {
-#if defined(BOOST_NO_CXX11_DELETED_FUNCTIONS)
-    private:
-        latch (latch const&);
-        latch (latch&&);
-
-        latch& operator= (latch const&);
-        latch& operator= (latch&&);
-#else
+#if defined(HPX_HAVE_CXX11_DELETED_FUNCTIONS)
     public:
         latch (latch const&) = delete;
         latch (latch&&) = delete;
 
         latch& operator= (latch const&) = delete;
         latch& operator= (latch&&) = delete;
+#else
+    private:
+        latch (latch const&);
+        latch (latch&&);
+
+        latch& operator= (latch const&);
+        latch& operator= (latch&&);
 #endif
 
     private:
@@ -127,7 +127,7 @@ namespace hpx { namespace lcos { namespace local
         ///
         /// \throws Nothing.
         ///
-        bool is_ready() const BOOST_NOEXCEPT
+        bool is_ready() const HPX_NOEXCEPT
         {
             boost::unique_lock<mutex_type> l(mtx_);
             return counter_ == 0;

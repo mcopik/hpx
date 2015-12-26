@@ -6,16 +6,20 @@
 #ifndef HPX_COMPONENTS_SECURITY_SERVER_SIGNED_TYPE_HPP
 #define HPX_COMPONENTS_SECURITY_SERVER_SIGNED_TYPE_HPP
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
+
+#if defined(HPX_HAVE_SECURITY)
 
 #include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/traits/is_bitwise_serializable.hpp>
 
 #include <hpx/components/security/signature.hpp>
 
+#include <boost/mpl/bool.hpp>
+
 namespace hpx { namespace components { namespace security
 {
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(push, 1)
 #endif
 
@@ -68,7 +72,7 @@ namespace hpx { namespace components { namespace security
             return reinterpret_cast<unsigned char const*>(this) + size();
         }
 
-        BOOST_CONSTEXPR static std::size_t size()
+        HPX_CONSTEXPR static std::size_t size()
         {
             return sizeof(signed_type);
         }
@@ -86,7 +90,7 @@ namespace hpx { namespace components { namespace security
         T type_;
     };
 
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(pop)
 #endif
 
@@ -101,8 +105,10 @@ namespace hpx { namespace traits
     template <typename T>
     struct is_bitwise_serializable<
             hpx::components::security::signed_type<T> >
-       : mpl::true_
+       : boost::mpl::true_
     {};
 }}
+
+#endif
 
 #endif

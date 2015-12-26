@@ -6,16 +6,17 @@
 #if !defined(HPX_PERFORMANCE_COUNTERS_MAR_01_2009_0134PM)
 #define HPX_PERFORMANCE_COUNTERS_MAR_01_2009_0134PM
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
 #include <hpx/exception.hpp>
 #include <hpx/runtime/naming/name.hpp>
 #include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/serialization/base_object.hpp>
-#include <hpx/lcos/base_lco_with_value.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/util/function.hpp>
 
 #include <boost/cstdint.hpp>
+
+#include <string>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace performance_counters
@@ -613,12 +614,13 @@ namespace hpx { namespace performance_counters
         //        (milliseconds).
         naming::gid_type create_statistics_counter(
             counter_info const& info, std::string const& base_counter_name,
-            std::vector<boost::int64_t> const& parameters, error_code& ec = throws);
+            std::vector<boost::int64_t> const& parameters,
+            error_code& ec = throws);
 
         // \brief Create a new arithmetics performance counter instance based on
         //        the given base counter names
-        naming::gid_type create_arithmetics_counter(
-            counter_info const& info, std::vector<std::string> const& base_counter_names,
+        naming::gid_type create_arithmetics_counter(counter_info const& info,
+            std::vector<std::string> const& base_counter_names,
             error_code& ec = throws);
 
         // \brief Create a new performance counter instance based on given

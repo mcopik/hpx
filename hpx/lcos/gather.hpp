@@ -23,12 +23,14 @@ namespace hpx { namespace lcos
 }}
 #else
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
 #include <hpx/runtime/naming/id_type.hpp>
 #include <hpx/runtime/components/server/simple_component_base.hpp>
+#include <hpx/runtime/components/new.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/lcos/local/spinlock.hpp>
-#include <hpx/lcos/local/dataflow.hpp>
+#include <hpx/dataflow.hpp>
+#include <hpx/lcos/local/and_gate.hpp>
 #include <hpx/util/unwrapped.hpp>
 
 #include <boost/preprocessor/cat.hpp>
@@ -168,7 +170,7 @@ namespace hpx { namespace lcos
         using util::placeholders::_1;
         using util::placeholders::_2;
 
-        return lcos::local::dataflow(
+        return dataflow(
                 util::bind(&detail::gather_data<T>, _1, this_site, _2),
                 std::move(id), std::move(result)
             );
@@ -201,7 +203,7 @@ namespace hpx { namespace lcos
         using util::placeholders::_1;
         using util::placeholders::_2;
 
-        return lcos::local::dataflow(
+        return dataflow(
                 util::bind(&detail::set_data<T>, _1, this_site, _2),
                 std::move(id), std::move(result)
             );

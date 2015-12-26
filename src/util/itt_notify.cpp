@@ -3,7 +3,6 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
 #include <hpx/util/itt_notify.hpp>
 
 #if HPX_HAVE_ITTNOTIFY != 0
@@ -160,10 +159,10 @@ bool use_ittnotify_api = false;
     /**/
 
 ///////////////////////////////////////////////////////////////////////////////
-#if defined(BOOST_MSVC) \
+#if defined(HPX_MSVC) \
     || defined(__BORLANDC__) \
     || (defined(__MWERKS__) && defined(_WIN32) && (__MWERKS__ >= 0x3000)) \
-    || (defined(__ICL) && defined(_MSC_EXTENSIONS) && (_MSC_VER >= 1200))
+    || (defined(__ICL) && defined(_MSC_EXTENSIONS) && (HPX_MSVC >= 1200))
 
 #pragma comment(lib, "libittnotify.lib")
 #endif

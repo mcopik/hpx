@@ -10,7 +10,11 @@
 #if !defined(HPX_079E367D_741C_4FA1_913F_EA33A192BDAD)
 #define HPX_079E367D_741C_4FA1_913F_EA33A192BDAD
 
+#include <hpx/config/defines.hpp>
+#if !defined(HPX_HAVE_HWLOC)
+
 #include <hpx/runtime/threads/topology.hpp>
+#include <hpx/runtime/naming/address.hpp>
 #include <hpx/exception.hpp>
 
 #if defined(__ANDROID__) && defined(ANDROID)
@@ -90,7 +94,7 @@ public:
 
     mask_cref_type get_thread_affinity_mask(
         std::size_t thread_num
-      , bool numa_sensitive
+      , bool numa_sensitive = false
       , error_code& ec = throws
         ) const
     {
@@ -119,7 +123,7 @@ public:
             ec = make_success_code();
     }
 
-    mask_cref_type get_thread_affinity_mask_from_lva(
+    mask_type get_thread_affinity_mask_from_lva(
         naming::address::address_type lva
       , error_code& ec = throws
         ) const
@@ -160,6 +164,16 @@ public:
 #endif
     }
 
+    std::size_t get_number_of_sockets() const
+    {
+        return 1;
+    }
+
+    std::size_t get_number_of_numa_nodes() const
+    {
+        return 1;
+    }
+
     std::size_t get_number_of_cores() const
     {
         return noop_topology::hardware_concurrency();
@@ -175,6 +189,21 @@ public:
         return ~std::size_t(0);
     }
 
+    std::size_t get_number_of_numa_node_cores(std::size_t numa) const
+    {
+        return noop_topology::hardware_concurrency();
+    }
+
+    std::size_t get_number_of_numa_node_pus(std::size_t numa) const
+    {
+        return noop_topology::hardware_concurrency();
+    }
+
+    std::size_t get_number_of_socket_pus(std::size_t socket) const
+    {
+        return noop_topology::hardware_concurrency();
+    }
+
     std::size_t get_core_number(std::size_t num_thread, error_code& ec = throws) const
     {
         return 0;
@@ -188,6 +217,19 @@ public:
     struct noop_topology_tag {};
 
     void write_to_log() const {}
+
+    /// This is equivalent to malloc(), except that it tries to allocate
+    /// page-aligned memory from the OS.
+    void* allocate(std::size_t len)
+    {
+        return ::operator new(len);
+    }
+
+    /// Free memory that was previously allocated by allocate
+    void deallocate(void* addr, std::size_t len)
+    {
+        ::operator delete(addr/*, len*/);
+    }
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -198,6 +240,8 @@ inline topology& create_topology()
 }
 
 }}
+
+#endif
 
 #endif // HPX_079E367D_741C_4FA1_913F_EA33A192BDAD
 

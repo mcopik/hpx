@@ -6,13 +6,15 @@
 #if !defined(HPX_UTIL_DETAIL_COLOCATED_HELPERS_FEB_04_2014_0828PM)
 #define HPX_UTIL_DETAIL_COLOCATED_HELPERS_FEB_04_2014_0828PM
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
+#include <hpx/exception.hpp>
 #include <hpx/runtime/naming/name.hpp>
 #include <hpx/runtime/agas/response.hpp>
 #include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/serialization/unique_ptr.hpp>
 #include <hpx/util/result_of.hpp>
 #include <hpx/util/decay.hpp>
+#include <hpx/util/move.hpp>
 
 #include <memory>
 
@@ -107,7 +109,7 @@ namespace hpx { namespace util { namespace functional
             friend class hpx::serialization::access;
 
             template <typename Archive>
-            BOOST_FORCEINLINE void save(Archive& ar, unsigned int const) const
+            HPX_FORCEINLINE void save(Archive& ar, unsigned int const) const
             {
                 bool has_continuation = cont_ ? true : false;
                 ar & bound_ & has_continuation;
@@ -118,7 +120,7 @@ namespace hpx { namespace util { namespace functional
             }
 
             template <typename Archive>
-            BOOST_FORCEINLINE void load(Archive& ar, unsigned int const)
+            HPX_FORCEINLINE void load(Archive& ar, unsigned int const)
             {
                 bool has_continuation = cont_ ? true : false;
                 ar & bound_ & has_continuation;
@@ -215,7 +217,7 @@ namespace hpx { namespace util { namespace functional
             friend class hpx::serialization::access;
 
             template <typename Archive>
-            BOOST_FORCEINLINE void save(Archive& ar, unsigned int const) const
+            HPX_FORCEINLINE void save(Archive& ar, unsigned int const) const
             {
                 bool has_continuation = cont_ ? true : false;
                 ar & bound_ & has_continuation;
@@ -226,7 +228,7 @@ namespace hpx { namespace util { namespace functional
             }
 
             template <typename Archive>
-            BOOST_FORCEINLINE void load(Archive& ar, unsigned int const)
+            HPX_FORCEINLINE void load(Archive& ar, unsigned int const)
             {
                 bool has_continuation = cont_ ? true : false;
                 ar & bound_ & has_continuation;

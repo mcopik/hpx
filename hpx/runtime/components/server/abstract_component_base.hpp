@@ -9,7 +9,15 @@
 #if !defined(HPX_B08244B4_3831_436F_9F72_3E82FFAF03E8)
 #define HPX_B08244B4_3831_436F_9F72_3E82FFAF03E8
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
+#include <hpx/traits/component_type_database.hpp>
+#include <hpx/traits/is_component.hpp>
+#include <hpx/runtime/naming/address.hpp>
+#include <hpx/runtime/naming/id_type.hpp>
+#include <hpx/runtime/threads/thread_init_data.hpp>
+#include <hpx/runtime/threads/thread_helpers.hpp>
+
+#include <utility>
 
 namespace hpx { namespace components
 {
@@ -19,7 +27,7 @@ namespace hpx { namespace components
 
     template <typename Component>
     class abstract_simple_component_base
-      : private detail::simple_component_tag
+      : private traits::detail::simple_component_tag
     {
     private:
         typedef simple_component<Component> outer_wrapping_type;
@@ -64,13 +72,18 @@ namespace hpx { namespace components
         }
     };
 
+    template <typename Component>
+    class abstract_component_base
+      : public abstract_simple_component_base<Component>
+    {};
+
     ///////////////////////////////////////////////////////////////////////////
     template <typename Component, typename Derived>
     class managed_component;
 
     template <typename Component, typename Wrapper>
     class abstract_managed_component_base
-      : private detail::managed_component_tag
+      : private traits::detail::managed_component_tag
     {
     public:
         typedef managed_component<Component, Wrapper> wrapping_type;
@@ -120,7 +133,7 @@ namespace hpx { namespace components
 
     template <typename Component>
     class abstract_fixed_component_base
-      : private detail::fixed_component_tag
+      : private traits::detail::fixed_component_tag
     {
     private:
         typedef fixed_component<Component> outer_wrapping_type;

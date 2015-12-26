@@ -9,7 +9,7 @@
 #if !defined(HPX_FB40C7A4_33B0_4C64_A16B_2A3FEEB237ED)
 #define HPX_FB40C7A4_33B0_4C64_A16B_2A3FEEB237ED
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config/export_definitions.hpp>
 #include <hpx/exception.hpp>
 #include <hpx/traits/get_remote_result.hpp>
 #include <hpx/runtime/agas/namespace_action_code.hpp>
@@ -23,6 +23,7 @@
 #include <boost/variant.hpp>
 #include <boost/mpl/at.hpp>
 
+#include <memory>
 #include <numeric>
 
 namespace hpx { namespace agas
@@ -112,6 +113,8 @@ struct HPX_EXPORT response
       , parcelset::endpoints_type const& endpoints_
       , error status_ = success
         );
+
+    ~response();
 
     ///////////////////////////////////////////////////////////////////////////
     // copy constructor
@@ -220,9 +223,7 @@ struct HPX_EXPORT response
 
     namespace_action_code mc; //-V707
     error status;
-
-    // FIXME: std::unique_ptr doesn't seem to work with incomplete types
-    boost::shared_ptr<response_data> data;
+    std::unique_ptr<response_data> data;
 };
 
 }

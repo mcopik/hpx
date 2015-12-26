@@ -6,7 +6,10 @@
 #ifndef HPX_COMPONENTS_SECURITY_SERVER_CERTIFICATE_SIGNING_REQUEST_HPP
 #define HPX_COMPONENTS_SECURITY_SERVER_CERTIFICATE_SIGNING_REQUEST_HPP
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
+
+#if defined(HPX_HAVE_SECURITY)
+
 #include <hpx/runtime/naming/name.hpp>
 #include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/serialization/array.hpp>
@@ -14,9 +17,11 @@
 #include <hpx/components/security/capability.hpp>
 #include <hpx/components/security/public_key.hpp>
 
+#include <boost/mpl/bool.hpp>
+
 namespace hpx { namespace components { namespace security
 {
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(push, 1)
 #endif
 
@@ -74,7 +79,7 @@ namespace hpx { namespace components { namespace security
             return reinterpret_cast<unsigned char const*>(this) + size();
         }
 
-        BOOST_CONSTEXPR static std::size_t size()
+        HPX_CONSTEXPR static std::size_t size()
         {
             return sizeof(certificate_signing_request);
         }
@@ -94,7 +99,7 @@ namespace hpx { namespace components { namespace security
         capability capability_;
     };
 
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(pop)
 #endif
 }}}
@@ -104,8 +109,10 @@ namespace hpx { namespace traits
     template <>
     struct is_bitwise_serializable<
             hpx::components::security::certificate_signing_request>
-       : mpl::true_
+       : boost::mpl::true_
     {};
 }}
+
+#endif
 
 #endif

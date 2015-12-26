@@ -7,7 +7,6 @@
 #define HPX_PARALLEL_SEGMENTED_ALGORITHM_COPY_JAN_05_2014_0125PM
 
 #include <hpx/hpx_fwd.hpp>
-#include <hpx/util/void_guard.hpp>
 #include <hpx/util/move.hpp>
 #include <hpx/traits/segmented_iterator_traits.hpp>
 
@@ -207,7 +206,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             HPX_ASSERT(!segments.empty());
 
             return util::detail::algorithm_result<ExPolicy, SegOutIter>::get(
-                lcos::local::dataflow(
+                dataflow(
                     [=](std::vector<shared_future<local_output_iterator_type> > && r)
                         ->  SegOutIter
                     {

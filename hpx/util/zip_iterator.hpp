@@ -12,12 +12,10 @@
 #include <hpx/util/detail/pack.hpp>
 #include <hpx/util/result_of.hpp>
 #include <hpx/util/functional/segmented_iterator_helpers.hpp>
-#include <hpx/runtime/serialization/serialize_sequence.hpp>
+#include <hpx/runtime/naming/id_type.hpp>
 
 #include <boost/fusion/algorithm/iteration/for_each.hpp>
 #include <boost/iterator/iterator_facade.hpp>
-
-#include <boost/mpl/assert.hpp>
 
 #include <iterator>
 #include <type_traits>
@@ -50,9 +48,9 @@ namespace hpx { namespace util
         template <typename T, typename U>
         struct zip_iterator_category_impl
         {
-            BOOST_MPL_ASSERT_MSG(false,
-                unknown_combination_of_iterator_categories,
-                (T, U));
+            static_assert(
+                sizeof(T) == 0 && sizeof(U) == 0,
+                "unknown combination of iterator categories");
         };
 
         // random_access_iterator_tag
@@ -362,7 +360,7 @@ namespace hpx { namespace util
             template <typename Archive>
             void serialize(Archive& ar, unsigned)
             {
-                serialization::serialize_sequence(ar, iterators_);
+                ar & iterators_;
             }
 
         private:
@@ -587,7 +585,7 @@ namespace hpx { namespace traits
 
         // Extract the base id for the segment referenced by the given segment
         // iterator.
-        static id_type get_id(segment_iterator const& iter)
+        static naming::id_type get_id(segment_iterator const& iter)
         {
             typedef typename util::tuple_element<
                     0, typename iterator::iterator_tuple_type

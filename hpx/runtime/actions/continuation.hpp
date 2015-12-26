@@ -11,11 +11,14 @@
 #include <hpx/util/bind.hpp>
 #include <hpx/exception.hpp>
 #include <hpx/runtime/actions/basic_action_fwd.hpp>
+#include <hpx/runtime/actions/continuation_fwd.hpp>
+#include <hpx/runtime/find_here.hpp>
 #include <hpx/runtime/trigger_lco.hpp>
+#include <hpx/runtime/naming/id_type.hpp>
 #include <hpx/runtime/naming/name.hpp>
-#include <hpx/runtime/serialization/output_archive.hpp>
-#include <hpx/runtime/serialization/input_archive.hpp>
+#include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/serialization/base_object.hpp>
+#include <hpx/util/bind.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/logging.hpp>
 #include <hpx/util/invoke.hpp>
@@ -67,7 +70,7 @@ namespace hpx
         >::set_value_action set_value_action;
         if (move_credits)
         {
-            naming::id_type target(id.get_gid(), id_type::managed_move_credit);
+            naming::id_type target(id.get_gid(), naming::id_type::managed_move_credit);
             id.make_unmanaged();
 
             apply<set_value_action>(target, util::detail::make_temporary<T>(t));
@@ -87,7 +90,7 @@ namespace hpx
         >::set_value_action set_value_action;
         if (move_credits)
         {
-            naming::id_type target(id.get_gid(), id_type::managed_move_credit);
+            naming::id_type target(id.get_gid(), naming::id_type::managed_move_credit);
             id.make_unmanaged();
 
             apply_c<set_value_action>(cont, target,
@@ -107,8 +110,6 @@ namespace hpx
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace actions
 {
-    class HPX_EXPORT continuation;
-
     namespace detail
     {
         template <typename Continuation>
@@ -121,11 +122,9 @@ namespace hpx { namespace actions
             // you have a HPX_REGISTER_TYPED_CONTINUATION macro somewhere in a
             // source file, but the header in which the continuation is defined
             // misses a HPX_REGISTER_TYPED_CONTINUATION_DECLARATION
-            BOOST_MPL_ASSERT_MSG(
-                traits::needs_automatic_registration<Continuation>::value
-              , HPX_REGISTER_TYPED_CONTINUATION_DECLARATION_MISSING
-              , (Continuation)
-            );
+            static_assert(
+                traits::needs_automatic_registration<Continuation>::value,
+                "HPX_REGISTER_TYPED_CONTINUATION_DECLARATION missing");
             return util::type_id<Continuation>::typeid_.type_id();
         }
 #endif
@@ -195,9 +194,8 @@ namespace hpx { namespace actions
         boost::is_void<typename util::result_of<F(Ts...)>::type>::value
     >::type trigger(continuation& cont, F&& f, Ts&&... vs)
     {
-        typedef typename util::result_of<F(Ts...)>::type result_type;
         try {
-            cont.trigger(util::invoke_r<result_type>(std::forward<F>(f),
+            cont.trigger(util::invoke(std::forward<F>(f),
                 std::forward<Ts>(vs)...));
         }
         catch (...) {
@@ -212,7 +210,7 @@ namespace hpx { namespace actions
     >::type trigger(continuation& cont, F&& f, Ts&&... vs)
     {
         try {
-            util::invoke_r<void>(std::forward<F>(f), std::forward<Ts>(vs)...);
+            util::invoke(std::forward<F>(f), std::forward<Ts>(vs)...);
             cont.trigger();
         }
         catch (...) {
@@ -234,7 +232,7 @@ namespace hpx { namespace actions
         };
 
         template <typename T>
-        BOOST_FORCEINLINE T operator()(id_type const& lco, T && t) const
+        HPX_FORCEINLINE T operator()(naming::id_type const& lco, T && t) const
         {
             hpx::set_lco_value(lco, std::forward<T>(t));
 
@@ -264,21 +262,21 @@ namespace hpx { namespace actions
         continuation_impl() {}
 
         template <typename Cont_>
-        continuation_impl(Cont_ && cont, hpx::id_type const& target)
+        continuation_impl(Cont_ && cont, hpx::naming::id_type const& target)
           : cont_(std::forward<Cont_>(cont)), target_(target)
         {}
 
         virtual ~continuation_impl() {}
 
         template <typename T>
-        typename result<continuation_impl(hpx::id_type, T)>::type
-        operator()(hpx::id_type const& lco, T && t) const
+        typename result<continuation_impl(hpx::naming::id_type, T)>::type
+        operator()(hpx::naming::id_type const& lco, T && t) const
         {
             hpx::apply_c(cont_, lco, target_, std::forward<T>(t));
 
             // Unfortunately we need to default construct the return value,
             // this possibly imposes an additional restriction of return types.
-            typedef typename result<continuation_impl(hpx::id_type, T)>::type
+            typedef typename result<continuation_impl(hpx::naming::id_type, T)>::type
                 result_type;
             return result_type();
         }
@@ -288,13 +286,13 @@ namespace hpx { namespace actions
         friend class hpx::serialization::access;
 
         template <typename Archive>
-        BOOST_FORCEINLINE void serialize(Archive& ar, unsigned int const)
+        HPX_FORCEINLINE void serialize(Archive& ar, unsigned int const)
         {
             ar & cont_ & target_;
         }
 
         cont_type cont_;
-        hpx::id_type target_;
+        hpx::naming::id_type target_;
     };
 
     ///////////////////////////////////////////////////////////////////////////
@@ -316,14 +314,14 @@ namespace hpx { namespace actions
                     cont_type(T1, T2)
                 >::type result_type;
             typedef typename util::result_of<
-                    function_type(hpx::id_type, result_type)
+                    function_type(hpx::naming::id_type, result_type)
                 >::type type;
         };
 
         continuation2_impl() {}
 
         template <typename Cont_, typename F_>
-        continuation2_impl(Cont_ && cont, hpx::id_type const& target,
+        continuation2_impl(Cont_ && cont, hpx::naming::id_type const& target,
                 F_ && f)
           : cont_(std::forward<Cont_>(cont)),
             target_(target),
@@ -333,8 +331,8 @@ namespace hpx { namespace actions
         virtual ~continuation2_impl() {}
 
         template <typename T>
-        typename result<continuation2_impl(hpx::id_type, T)>::type
-        operator()(hpx::id_type const& lco, T && t) const
+        typename result<continuation2_impl(hpx::naming::id_type, T)>::type
+        operator()(hpx::naming::id_type const& lco, T && t) const
         {
             using hpx::util::placeholders::_2;
             hpx::apply_continue(cont_, hpx::util::bind(f_, lco, _2),
@@ -342,7 +340,7 @@ namespace hpx { namespace actions
 
             // Unfortunately we need to default construct the return value,
             // this possibly imposes an additional restriction of return types.
-            typedef typename result<continuation2_impl(hpx::id_type, T)>::type
+            typedef typename result<continuation2_impl(hpx::naming::id_type, T)>::type
                 result_type;
             return result_type();
         }
@@ -352,13 +350,13 @@ namespace hpx { namespace actions
         friend class hpx::serialization::access;
 
         template <typename Archive>
-        BOOST_FORCEINLINE void serialize(Archive& ar, unsigned int const)
+        HPX_FORCEINLINE void serialize(Archive& ar, unsigned int const)
         {
             ar & cont_ & target_ & f_;
         }
 
         cont_type cont_;        // continuation type
-        hpx::id_type target_;
+        hpx::naming::id_type target_;
         function_type f_;
         // set_value action  (default: set_lco_value_continuation)
     };
@@ -439,30 +437,12 @@ namespace hpx { namespace actions
         /// serialization support
         friend class hpx::serialization::access;
 
-        void serialize(serialization::input_archive & ar)
-        {
-            // serialize function
-            bool have_function = false;
-            ar >> have_function;
-            if (have_function)
-                ar >> f_;
-        }
-
-        void serialize(serialization::output_archive & ar)
-        {
-            // serialize function
-            bool have_function = !f_.empty();
-            ar << have_function;
-            if (have_function)
-                ar << f_;
-        }
         template <typename Archive>
         void serialize(Archive & ar, unsigned)
         {
             // serialize base class
             ar & hpx::serialization::base_object<continuation>(*this);
-
-            serialize(ar);
+            ar & f_;
         }
         HPX_SERIALIZATION_POLYMORPHIC_WITH_NAME(
             typed_continuation
@@ -543,30 +523,13 @@ namespace hpx { namespace actions
         /// serialization support
         friend class hpx::serialization::access;
 
-        void serialize(serialization::input_archive & ar)
-        {
-            // serialize function
-            bool have_function = false;
-            ar >> have_function;
-            if (have_function)
-                ar >> f_;
-        }
-
-        void serialize(serialization::output_archive & ar)
-        {
-            // serialize function
-            bool have_function = !f_.empty();
-            ar << have_function;
-            if (have_function)
-                ar << f_;
-        }
         template <typename Archive>
         void serialize(Archive & ar, unsigned)
         {
             // serialize base class
             ar & hpx::serialization::base_object<continuation>(*this);
 
-            serialize(ar);
+            ar & f_;
         }
         HPX_SERIALIZATION_POLYMORPHIC_WITH_NAME(
             typed_continuation
@@ -611,7 +574,7 @@ namespace hpx
     inline hpx::actions::continuation_impl<
         typename util::decay<Cont>::type
     >
-    make_continuation(Cont && f, hpx::id_type const& target)
+    make_continuation(Cont && f, hpx::naming::id_type const& target)
     {
         typedef typename util::decay<Cont>::type cont_type;
         return hpx::actions::continuation_impl<cont_type>(
@@ -643,7 +606,7 @@ namespace hpx
         typename util::decay<Cont>::type,
         typename util::decay<F>::type
     >
-    make_continuation(Cont && cont, hpx::id_type const& target,
+    make_continuation(Cont && cont, hpx::naming::id_type const& target,
         F && f)
     {
         typedef typename util::decay<Cont>::type cont_type;

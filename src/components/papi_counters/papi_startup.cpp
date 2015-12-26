@@ -5,6 +5,9 @@
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include <hpx/config.hpp>
+
+#if defined(HPX_HAVE_PAPI)
+
 #include <cctype>
 #include <set>
 
@@ -23,7 +26,7 @@
 HPX_REGISTER_COMPONENT_MODULE_DYNAMIC();
 
 ///////////////////////////////////////////////////////////////////////////////
-typedef hpx::components::managed_component<
+typedef hpx::components::component<
     hpx::performance_counters::papi::server::papi_counter
 > papi_counter_type;
 
@@ -321,3 +324,5 @@ HPX_REGISTER_STARTUP_MODULE_DYNAMIC(
 // register related command line options
 HPX_REGISTER_COMMANDLINE_MODULE_DYNAMIC(
     hpx::performance_counters::papi::util::get_options_description);
+
+#endif

@@ -7,7 +7,6 @@
 #define HPX_PARALLEL_SEGMENTED_ALGORITHM_COUNT_DEC_25_2014_0207PM
 
 #include <hpx/hpx_fwd.hpp>
-#include <hpx/util/void_guard.hpp>
 #include <hpx/util/move.hpp>
 #include <hpx/traits/segmented_iterator_traits.hpp>
 
@@ -176,7 +175,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             }
 
             return result::get(
-                lcos::local::dataflow(
+                dataflow(
                     hpx::util::unwrapped([=](std::vector<value_type> && r)
                     {
                         return std::accumulate(r.begin(), r.end(), value_type());
@@ -378,7 +377,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             }
 
             return result::get(
-                lcos::local::dataflow(
+                dataflow(
                     [=](std::vector<shared_future<value_type> > && r) -> value_type
                     {
                         // handle any remote exceptions, will throw on error

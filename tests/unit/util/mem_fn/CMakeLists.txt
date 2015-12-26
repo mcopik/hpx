@@ -7,7 +7,6 @@ set(tests
     mem_fn_derived_test
     mem_fn_dm_test
 #    mem_fn_eq_test
-    mem_fn_ref_test
     mem_fn_rv_test
     mem_fn_test
     mem_fn_unary_addr_test
@@ -29,10 +28,6 @@ foreach(test ${tests})
                      FOLDER "Tests/Unit/Util/Mem_Fn")
 
   add_hpx_unit_test("util.mem_fn" ${test} ${${test}_PARAMETERS})
-
-  set_property(TARGET ${test}_test_exe APPEND
-               PROPERTY COMPILE_DEFINITIONS
-               "HPX_LIMIT=8")
 
   # add a custom target for this example
   add_hpx_pseudo_target(tests.unit.util.mem_fndir.${test})

@@ -10,7 +10,11 @@
 #ifndef HPX_PARCELSET_POLICIES_TCP_CONNECTION_HANDLER_HPP
 #define HPX_PARCELSET_POLICIES_TCP_CONNECTION_HANDLER_HPP
 
+#include <hpx/config/defines.hpp>
+#if defined(HPX_HAVE_PARCELPORT_TCP)
+
 #include <hpx/config/warnings_prefix.hpp>
+#include <hpx/config/asio.hpp>
 
 #include <hpx/runtime/parcelset/locality.hpp>
 #include <hpx/runtime/parcelset/parcelport_impl.hpp>
@@ -34,7 +38,6 @@ namespace hpx { namespace parcelset
         typedef policies::tcp::sender connection_type;
         typedef boost::mpl::true_  send_early_parcel;
         typedef boost::mpl::false_ do_background_work;
-        typedef boost::mpl::false_ do_enable_parcel_handling;
 
         static const char * type()
         {
@@ -120,5 +123,7 @@ namespace hpx { namespace parcelset
 }}
 
 #include <hpx/config/warnings_suffix.hpp>
+
+#endif
 
 #endif

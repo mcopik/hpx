@@ -6,6 +6,10 @@
 #ifndef HPX_COMPONENTS_SECURITY_SERVER_HASH_HPP
 #define HPX_COMPONENTS_SECURITY_SERVER_HASH_HPP
 
+#include <hpx/config.hpp>
+
+#if defined(HPX_HAVE_SECURITY)
+
 #include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/serialization/array.hpp>
 #include <hpx/traits/is_bitwise_serializable.hpp>
@@ -17,7 +21,7 @@
 
 namespace hpx { namespace components { namespace security
 {
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(push, 1)
 #endif
 
@@ -85,9 +89,11 @@ namespace hpx { namespace components { namespace security
         > bytes_;
     };
 
-#if defined(_MSC_VER)
+#if defined(HPX_MSVC)
 #  pragma pack(pop)
 #endif
 }}}
+
+#endif
 
 #endif

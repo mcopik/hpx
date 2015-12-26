@@ -16,9 +16,10 @@
 #include <hpx/runtime/components/stubs/stub_base.hpp>
 #include <hpx/runtime/naming/name.hpp>
 #include <hpx/runtime/naming/id_type.hpp>
+#include <hpx/runtime/launch_policy.hpp>
 #include <hpx/lcos/packaged_action.hpp>
 #include <hpx/lcos/future.hpp>
-#include <hpx/lcos/local/dataflow.hpp>
+#include <hpx/dataflow.hpp>
 #include <hpx/util/move.hpp>
 
 #include <algorithm>
@@ -30,7 +31,7 @@ namespace hpx { namespace components
     /// \cond NOINTERNAL
     namespace detail
     {
-        BOOST_FORCEINLINE std::size_t
+        HPX_FORCEINLINE std::size_t
         round_to_multiple(std::size_t n1, std::size_t n2, std::size_t n3)
         {
             return (n1 / n2) * n3;
@@ -138,7 +139,7 @@ namespace hpx { namespace components
                 }
 
                 // consolidate all results
-                return hpx::lcos::local::dataflow(hpx::launch::sync,
+                return hpx::dataflow(hpx::launch::sync,
                     [=](std::vector<hpx::future<std::vector<hpx::id_type> > > && v)
                         mutable -> std::vector<bulk_locality_result>
                     {

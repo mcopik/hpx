@@ -24,8 +24,8 @@ macro(kalmar_configure)
   set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${KALMAR_LD_FLAGS}")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${KALMAR_LD_FLAGS}")
   #other mallocs, i.e. tcmalloc or jemalloc cause a segfault with Kalmar
-  set(HPX_WITH_MALLOC custom)
+  set(HPX_WITH_MALLOC custom CACHE STRING "" FORCE)
   #native TLS is not supported by Kalmar (cross-compilation to 32-bit code on GPUs)
-  set(HPX_NATIVE_TLS OFF)
+  set(HPX_WITH_NATIVE_TLS OFF CACHE BOOL "" FORCE)
 
 endmacro()

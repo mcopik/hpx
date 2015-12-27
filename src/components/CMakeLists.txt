@@ -8,7 +8,7 @@
 set(subdirs
     component_storage
     containers
-    #iostreams
+    iostreams
     memory
     papi_counters
     security

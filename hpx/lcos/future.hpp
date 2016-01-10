@@ -1,4 +1,4 @@
-//  Copyright (c) 2007-2013 Hartmut Kaiser
+//  Copyright (c) 2007-2015 Hartmut Kaiser
 //  Copyright (c) 2013 Agustin Berge
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -11,18 +11,22 @@
 #include <hpx/lcos_fwd.hpp>
 #include <hpx/config/forceinline.hpp>
 #include <hpx/traits/acquire_shared_state.hpp>
+#include <hpx/traits/is_callable.hpp>
 #include <hpx/traits/is_future.hpp>
 #include <hpx/traits/future_access.hpp>
 #include <hpx/traits/future_traits.hpp>
 #include <hpx/traits/is_launch_policy.hpp>
 #include <hpx/traits/is_executor.hpp>
+#include <hpx/traits/concepts.hpp>
 #include <hpx/lcos/detail/future_data.hpp>
 #include <hpx/util/always_void.hpp>
 #include <hpx/util/bind.hpp>
 #include <hpx/util/date_time_chrono.hpp>
 #include <hpx/util/decay.hpp>
+#include <hpx/util/invoke.hpp>
 #include <hpx/util/move.hpp>
 #include <hpx/util/result_of.hpp>
+#include <hpx/util/void_guard.hpp>
 #include <hpx/runtime/actions/continuation.hpp>
 #include <hpx/runtime/launch_policy.hpp>
 
@@ -34,6 +38,7 @@
 #include <boost/utility/enable_if.hpp>
 
 #include <type_traits>
+#include <utility>
 
 namespace hpx { namespace lcos { namespace detail
 {
@@ -525,9 +530,9 @@ namespace hpx { namespace lcos { namespace detail
         //     returns.
         template <typename F>
         typename boost::lazy_disable_if_c<
-            hpx::traits::is_launch_policy<typename hpx::util::decay<F>::type>::value ||
-            hpx::traits::is_threads_executor<typename hpx::util::decay<F>::type>::value ||
-            hpx::traits::is_executor<typename hpx::util::decay<F>::type>::value
+            hpx::traits::is_launch_policy<F>::value ||
+            hpx::traits::is_threads_executor<F>::value ||
+            hpx::traits::is_executor<F>::value
           , future_then_result<Derived, F>
         >::type
         then(F && f, error_code& ec = throws) const
@@ -561,7 +566,8 @@ namespace hpx { namespace lcos { namespace detail
             shared_state_ptr p =
                 detail::make_continuation<continuation_result_type>(
                     *static_cast<Derived const*>(this), policy, std::forward<F>(f));
-            return hpx::traits::future_access<future<result_type> >::create(std::move(p));
+            return hpx::traits::future_access<future<result_type> >::create(
+                std::move(p));
         }
 
         template <typename F>
@@ -590,7 +596,8 @@ namespace hpx { namespace lcos { namespace detail
             shared_state_ptr p =
                 detail::make_continuation<continuation_result_type>(
                     *static_cast<Derived const*>(this), sched, std::forward<F>(f));
-            return hpx::traits::future_access<future<result_type> >::create(std::move(p));
+            return hpx::traits::future_access<future<result_type> >::create(
+                std::move(p));
         }
 
         template <typename Executor, typename F>
@@ -694,7 +701,7 @@ namespace hpx { namespace lcos
     template <typename R>
     class future : public detail::future_base<future<R>, R>
     {
-        HPX_MOVABLE_BUT_NOT_COPYABLE(future);
+        HPX_MOVABLE_BUT_NOT_COPYABLE(future)
 
         typedef detail::future_base<future<R>, R> base_type;
 
@@ -874,9 +881,9 @@ namespace hpx { namespace lcos
 
         template <typename F>
         typename boost::lazy_disable_if_c<
-            hpx::traits::is_launch_policy<typename hpx::util::decay<F>::type>::value ||
-            hpx::traits::is_threads_executor<typename hpx::util::decay<F>::type>::value ||
-            hpx::traits::is_executor<typename hpx::util::decay<F>::type>::value
+            hpx::traits::is_launch_policy<F>::value ||
+            hpx::traits::is_threads_executor<F>::value ||
+            hpx::traits::is_executor<F>::value
           , detail::future_then_result<future, F>
         >::type
         then(F && f, error_code& ec = throws)
@@ -918,11 +925,61 @@ namespace hpx { namespace lcos
     };
 
     ///////////////////////////////////////////////////////////////////////////
-    // allow to convert any future into a future<void>
-    template <typename R>
-    future<void> make_future_void(future<R>&& f)
+    namespace detail
     {
-        return std::move(f);
+        template <typename T, typename Future>
+        typename std::enable_if<
+            std::is_convertible<Future, hpx::future<T> >::value,
+            hpx::future<T>
+        >::type make_future_helper(Future && f)
+        {
+            return std::move(f);
+        };
+
+        template <typename T, typename Future>
+        typename std::enable_if<
+            !std::is_convertible<Future, hpx::future<T> >::value,
+            hpx::future<T>
+        >::type make_future_helper(Future && f)
+        {
+            return f.then(
+                [](Future && f) -> T
+                {
+                    return util::void_guard<T>(), f.get();
+                });
+        }
+    }
+
+    // Allow to convert any future<U> into any other future<R> based on an
+    // existing conversion path U --> R.
+    template <typename R, typename U>
+    hpx::future<R>
+    make_future(hpx::future<U> && f)
+    {
+        static_assert(
+            std::is_convertible<R, U>::value || std::is_void<R>::value,
+            "the argument type must be implicitly convertible to the requested "
+            "result type");
+
+        return detail::make_future_helper<R>(std::move(f));
+    }
+
+    // Allow to convert any future<U> into any other future<R> based on a given
+    // conversion function: R conv(U).
+    template <typename R, typename U, typename Conv>
+    hpx::future<R>
+    make_future(hpx::future<U> && f, Conv && conv)
+    {
+        static_assert(
+            hpx::traits::is_callable<Conv(U), R>::value,
+            "the argument type must be convertible to the requested "
+            "result type by using the supplied conversion function");
+
+        return f.then(
+            [conv](hpx::future<U> && f)
+            {
+                return hpx::util::invoke(conv, f.get());
+            });
     }
 }}
 
@@ -1110,11 +1167,36 @@ namespace hpx { namespace lcos
     };
 
     ///////////////////////////////////////////////////////////////////////////
-    // allow to convert any future into a future<void>
-    template <typename R>
-    shared_future<void> make_future_void(shared_future<R> const& f)
+    // Allow to convert any shared_future<U> into any other future<R> based on
+    // an existing conversion path U --> R.
+    template <typename R, typename U>
+    hpx::shared_future<R>
+    make_future(hpx::shared_future<U> f)
     {
-        return f;
+        static_assert(
+            std::is_convertible<R, U>::value || std::is_void<R>::value,
+            "the argument type must be implicitly convertible to the requested "
+            "result type");
+
+        return detail::make_future_helper<R>(std::move(f));
+    }
+
+    // Allow to convert any future<U> into any other future<R> based on a given
+    // conversion function: R conv(U).
+    template <typename R, typename U, typename Conv>
+    hpx::future<R>
+    make_future(hpx::shared_future<U> const& f, Conv && conv)
+    {
+        static_assert(
+            hpx::traits::is_callable<Conv(U), R>::value,
+            "the argument type must be convertible to the requested "
+            "result type by using the supplied conversion function");
+
+        return f.then(
+            [conv](hpx::shared_future<U> const& f)
+            {
+                return hpx::util::invoke(conv, f.get());
+            });
     }
 }}
 
@@ -1161,6 +1243,8 @@ namespace hpx { namespace lcos
         } catch (...) {
             return lcos::make_exceptional_future<T>(boost::current_exception());
         }
+
+        return future<T>();
     }
 
     // extension: create a pre-initialized future object which gets ready at
@@ -1329,7 +1413,7 @@ namespace hpx { namespace actions
         HPX_SERIALIZATION_POLYMORPHIC_WITH_NAME(
             typed_continuation
           , detail::get_continuation_name<typed_continuation>()
-        );
+        )
 
         function_type f_;
     };
@@ -1446,7 +1530,7 @@ namespace hpx { namespace actions
         HPX_SERIALIZATION_POLYMORPHIC_WITH_NAME(
             typed_continuation
           , "hpx_future_void_typed_continuation"
-        );
+        )
 
         function_type f_;
     };
@@ -1561,7 +1645,7 @@ namespace hpx { namespace actions
         HPX_SERIALIZATION_POLYMORPHIC_WITH_NAME(
             typed_continuation
           , detail::get_continuation_name<typed_continuation>()
-        );
+        )
 
         function_type f_;
     };
@@ -1678,7 +1762,7 @@ namespace hpx { namespace actions
         HPX_SERIALIZATION_POLYMORPHIC_WITH_NAME(
             typed_continuation
           , "hpx_shared_future_void_typed_continuation"
-        );
+        )
 
         function_type f_;
     };
@@ -1711,10 +1795,12 @@ namespace hpx
     using lcos::make_exceptional_future;
     using lcos::make_ready_future_at;
     using lcos::make_ready_future_after;
+
+    using lcos::make_future;
 }
 
-#define HPX_MAKE_EXCEPTIONAL_FUTURE(T, errorcode, f, msg)                    \
-    lcos::make_exceptional_future<T>(HPX_GET_EXCEPTION(errorcode, f, msg))   \
+#define HPX_MAKE_EXCEPTIONAL_FUTURE(T, errorcode, f, msg)                     \
+    hpx::make_exceptional_future<T>(HPX_GET_EXCEPTION(errorcode, f, msg))     \
     /**/
 
 #endif

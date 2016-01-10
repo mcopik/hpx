@@ -177,7 +177,7 @@ namespace detail
     template <typename F1, typename F2>
     class compose_cb_impl
     {
-        HPX_MOVABLE_BUT_NOT_COPYABLE(compose_cb_impl);
+        HPX_MOVABLE_BUT_NOT_COPYABLE(compose_cb_impl)
 
     public:
         template <typename A1, typename A2>
@@ -243,7 +243,7 @@ namespace detail
     template <typename Result>
     struct future_data : future_data_refcnt_base
     {
-        HPX_NON_COPYABLE(future_data);
+        HPX_NON_COPYABLE(future_data)
 
         typedef typename future_data_result<Result>::type result_type;
         typedef util::unique_function_nonser<void()> completed_callback_type;
@@ -689,12 +689,12 @@ namespace detail
     protected:
         typedef typename future_data<Result>::result_type result_type;
 
-        threads::thread_id_type get_id() const
+        threads::thread_id_type get_thread_id() const
         {
             boost::lock_guard<mutex_type> l(this->mtx_);
             return id_;
         }
-        void set_id(threads::thread_id_type id)
+        void set_thread_id(threads::thread_id_type id)
         {
             boost::lock_guard<mutex_type> l(this->mtx_);
             id_ = id;
@@ -729,8 +729,7 @@ namespace detail
         {
             if (!started_test_and_set())
                 this->do_run();
-            else
-                this->future_data<Result>::wait(ec);
+            this->future_data<Result>::wait(ec);
         }
 
         virtual BOOST_SCOPED_ENUM(future_status)
@@ -817,11 +816,11 @@ namespace detail
             reset_id(task_base& target)
               : target_(target)
             {
-                target.set_id(threads::get_self_id());
+                target.set_thread_id(threads::get_self_id());
             }
             ~reset_id()
             {
-                target_.set_id(threads::invalid_thread_id);
+                target_.set_thread_id(threads::invalid_thread_id);
             }
             task_base& target_;
         };
@@ -838,13 +837,11 @@ namespace detail
         template <typename T>
         void set_data(T && result)
         {
-            HPX_ASSERT(started_);
-            this->future_data<Result>::set_value(std::forward<T>(result));
+            this->future_data<Result>::set_data(std::forward<T>(result));
         }
 
         void set_exception(boost::exception_ptr const& e)
         {
-            HPX_ASSERT(started_);
             this->future_data<Result>::set_exception(e);
         }
 

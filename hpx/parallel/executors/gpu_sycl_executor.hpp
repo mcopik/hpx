@@ -8,6 +8,8 @@
 #if !defined(HPX_PARALLEL_EXECUTORS_GPU_SYCL_EXECUTOR)
 #define HPX_PARALLEL_EXECUTORS_GPU_SYCL_EXECUTOR
 
+#include <SYCL/sycl.hpp>
+
 #include <hpx/config.hpp>
 #include <hpx/parallel/config/inline_namespace.hpp>
 #include <hpx/parallel/exception_list.hpp>
@@ -25,7 +27,7 @@
 #include <boost/range/const_iterator.hpp>
 #include <boost/type_traits/is_void.hpp>
 
-#include <SYCL/sycl.hpp>
+//#include <SYCL/sycl.hpp>
 
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 {

@@ -1222,13 +1222,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     /// Default vector execution policy object.
     static parallel_vector_execution_policy const par_vec;
 
+#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+
     ///////////////////////////////////////////////////////////////////////////
     /// Extension: The class represents a policy of parallel execution on
     /// a GPU node which may be executed asynchronously.
     ///
     /// The algorithm returns a future representing the result of the
     /// corresponding algorithm when invoked with the gpu_execution_policy.
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
     struct gpu_task_execution_policy
     {
         /// The type of the executor associated with this execution policy

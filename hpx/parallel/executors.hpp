@@ -19,10 +19,10 @@
 
 #include <hpx/parallel/executors/parallel_executor.hpp>
 #include <hpx/parallel/executors/sequential_executor.hpp>
-#ifdef HPX_WITH_AMP
+#if defined(HPX_WITH_AMP)
   #include <hpx/parallel/executors/gpu_amp_executor.hpp>
 #endif
-#ifdef HPX_WITH_SYCL
+#if defined(HPX_WITH_SYCL)
   #include <hpx/parallel/executors/gpu_sycl_executor.hpp>
 #endif
 #include <hpx/parallel/executors/distribution_policy_executor.hpp>

@@ -5,8 +5,6 @@
  *      Author: mcopik
  */
 
-#include <SYCL/sycl.hpp>
-
 #include <hpx/hpx.hpp>
 #include <hpx/hpx_init.hpp>
 #include <hpx/include/parallel_for_each.hpp>

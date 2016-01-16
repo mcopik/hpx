@@ -11,9 +11,9 @@ find_package(HPX REQUIRED)
 #message("${HPX_LIBRARIES}")
 include_directories(${HPX_INCLUDE_DIRS})
 
-set(CMAKE_MODULE_PATH /opt/ComputeCpp-15.10-Linux/cmake/Modules/ ${CMAKE_MODULE_PATH})
-include(/opt/ComputeCpp-15.10-Linux/cmake/common.cmake)
 
+set(CMAKE_MODULE_PATH ${COMPUTECPP_LOCATION}/cmake/Modules/ ${CMAKE_MODULE_PATH})
+include(/opt/ComputeCpp-15.10-Linux/cmake/common.cmake)
 set(DEVICE_COMPILER_PATH "/opt/ComputeCpp-15.10-Linux/bin/")
 set(DEVICE_COMPILER_INCLUDE_PATH "/opt/ComputeCpp-15.10-Linux/include/device_compiler")
 set(DEVICE_COMPILER_NAME "compute++")
@@ -25,11 +25,7 @@ include_directories(${RUNTIME_INCLUDES})
 
 add_custom_target(${SYCL_LIB_NAME})
 set(SYCL_LIB_PATH "/opt/ComputeCpp-15.10-Linux/sample_code/../lib/${SYCL_LIB_FILE}")
-
-message("LIB_FILE: " ${SYCL_LIB_FILE})
-message("LIB_NAME: " ${SYCL_LIB_NAME})
-message("LIB_PATH: " ${SYCL_LIB_PATH})
 #set(SYCL_LIB_PATH "/opt/ComputeCpp-15.10-Linux/sample_code/../lib/libSYCL.so")
-build_sycl("temp" "SPIR" "temp" ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-#target_link_libraries(temp ${HPX_LIBRARIES} hpx)
-hpx_setup_target(temp)
+build_sycl("executor_test" "SPIR" "executor_test" ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+
+hpx_setup_target(executor_test)

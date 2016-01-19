@@ -78,6 +78,9 @@ int main(int argc, char* argv[])
 {
 	using boost::program_options::options_description;
 	using boost::program_options::value;
+	using boost::program_options::variables_map;
+	using boost::program_options::store;
+	using boost::program_options::parse_command_line;
 
 	// Configure application-specific options
 	options_description
@@ -90,5 +93,9 @@ int main(int argc, char* argv[])
 		;
 
 	// Initialize and run HPX
-	return hpx::init(desc_commandline, argc, argv);
+	//return hpx::init(desc_commandline, argc, argv);
+	variables_map vm;
+	store( parse_command_line(argc, argv, desc_commandline), vm );
+	hpx_main(vm);
+	return 0;
 }

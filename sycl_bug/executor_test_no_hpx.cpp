@@ -70,7 +70,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 			   % n  % elapsed);
 	}
 
-	return hpx::finalize();
+	return 0;
 }
 
 

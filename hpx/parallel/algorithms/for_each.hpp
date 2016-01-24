@@ -104,7 +104,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 				typedef typename gpu_execution_policy::executor_type::buffer_traits<Iter>::type gpu_buffer_type;
 	        	//auto gpu_buffer = buffer.buffer_view();
 				//gpu_buffer_type * buffer_type = nullptr;
-
+				std::cout << "SYCL" << std::endl;
 				if (count != 0)
 				{
 					//dont'return right now - we have to sync buffers after the call
@@ -118,7 +118,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 							for(std::size_t i = 0; i < part_size; ++i)
 								_f( _proj( (*gpu_buffer)[part_begin + i]) );
 						}), buffer);
-
 					// the data needs to be transferred from gpu back to original buffer
 					buffer.sync();
 

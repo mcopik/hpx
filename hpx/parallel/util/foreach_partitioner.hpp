@@ -187,12 +187,27 @@ namespace hpx { namespace parallel { namespace util
 					F1 _f1 = std::move(f1);				
 					auto f = [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
-						//_f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem) );
-						
+						/**
+						 *	Test 1 : Run 
+						 *	HPX - works
+						 *	No HPX - works
+						 */
+						_f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem) );
+
+						/**
+						 *	Test 2 : Each thread tries to write its ID into each element of the buffer (Writer After Write).
+						 *	HPX - works
+						 *	No HPX - works
+						 */
 						//for(std::size_t i = 0;i < 10;++i)
-							(*std::get<0>(elem))[ 0 ] = std::get<1>(elem);	
-							//for(std::size_t i = 0; i < 10; ++i)
-							//(*std::get<0>(elem))[i] = std::get<1>(elem);
+						//	(*std::get<0>(elem))[ i ] = std::get<1>(elem);
+
+						/**
+						 *	Test 3 : Each thread tries to write the array position into the element of array specified by index.
+						 *	HPX - doesn't work, the same random value
+						 *	No HPX - doesn't work, the same random value
+						 */
+						//(*std::get<0>(elem))[ std::get<1>(elem) ] = std::get<2>(elem);
 					};
 
 					//workitems.reserve(shape.size());

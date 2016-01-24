@@ -191,8 +191,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				const std::size_t y = std::get<2>(elem);
 				F _f( std::move(f) );
 
-				std::cout << x << " " << y << std::endl;
-
+				std::cout << "Start " << x << " " << y << std::endl;
 				sycl_buffer.queue.submit( [_f, &sycl_buffer, x, y](cl::sycl::handler & cgh) {
 
 					buffer_view_type buffer_view = 
@@ -201,19 +200,23 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 					cgh.parallel_for<class hpx_foreach>(cl::sycl::range<1>(y),
 						[=] (cl::sycl::id<1> index)
 						{	
-							// This works. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
-							//auto _x = std::make_tuple(&buffer_view, index[0], 1);
-							// This doesn't:
-							// This would show that x has an undefined value
-							auto x_copy = x;
-							//buffer_view[ index[0] ] = x;
-							//auto new_x = 
-							auto _x = std::make_tuple(&buffer_view, index[0], 1);
-							//std::tuple<const buffer_view_type *, size_t, size_t> _x(&buffer_view, index[0], 1);
-							//_f(_x);
+							if (false) {							
+								// This works. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
+								auto _x = std::make_tuple(&buffer_view, index[0], 1);
 
+								// This doesn't:
+								//auto _x = std::make_tuple(&buffer_view, index[0], x);
+
+								_f(_x);
+							} else {
+
+								// This would show that x has an undefined value
+								auto x_copy = x;
+								buffer_view[ index[0] ] = x_copy;
+							}
+							
 						});
-				});	
+				});
 			}
 			
 		}

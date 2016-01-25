@@ -102,8 +102,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 	        	auto buffer = policy.executor().create_buffers(first, count);
 				Proj _proj(std::move(proj));
 				typedef typename gpu_execution_policy::executor_type::buffer_traits<Iter>::type gpu_buffer_type;
-	        	//auto gpu_buffer = buffer.buffer_view();
-				//gpu_buffer_type * buffer_type = nullptr;
+
 				std::cout << "SYCL" << std::endl;
 				if (count != 0)
 				{
@@ -112,9 +111,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 						policy, first, count,
                         std::move([_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
 						{
-							//_f( (*gpu_buffer)[part_begin] );
-							//for(std::size_t i = 0; i < part_size; ++i)
-							//(*gpu_buffer)[i] = part_begin;
 							for(std::size_t i = 0; i < part_size; ++i)
 								_f( _proj( (*gpu_buffer)[part_begin + i]) );
 						}), buffer);

@@ -192,6 +192,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				F _f( std::move(f) );
 
 				std::cout << "Start " << x << " " << y << std::endl;
+
 				sycl_buffer.queue.submit( [_f, &sycl_buffer, x, y](cl::sycl::handler & cgh) {
 
 					buffer_view_type buffer_view = 
@@ -201,18 +202,24 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 						[=] (cl::sycl::id<1> index)
 						{	
 							if (false) {							
-								// This works. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
-								auto _x = std::make_tuple(&buffer_view, index[0], 1);
+								// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
+								// Test 3 shows that hardcoded '1' is passed correctly.
+								//auto _x = std::make_tuple(&buffer_view, index[0], 1);
 
-								// This doesn't:
-								//auto _x = std::make_tuple(&buffer_view, index[0], x);
+								// This doesn't. Obviously, x = 0 means that no work is done.
+								// Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
+								// auto _x = std::make_tuple(&buffer_view, index[0], x);
+
+								// This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
+								auto _x = std::make_tuple(&buffer_view, index[0] + x, 1);
 
 								_f(_x);
+
 							} else {
 
-								// This would show that x has an undefined value
-								auto x_copy = x;
-								buffer_view[ index[0] ] = x_copy;
+								// This would show that x has a inproper value here! 1 is written correctly
+								//buffer_view[ index[0] ] = 1;
+								buffer_view[ index[0] ] = x;
 							}
 							
 						});

@@ -188,24 +188,23 @@ namespace hpx { namespace parallel { namespace util
 					auto f = [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
 						/**
-						 *	Test 1 : Run 
-						 *	HPX - works
-						 *	No HPX - works
+						 *	Test 1 : Run function defined in parallel/algorithms/for_each
+						 *	HPX - doesn't work, segfault
+						 *	No HPX - doesn't work, segfault
 						 */
 						_f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem) );
 
 						/**
 						 *	Test 2 : Each thread tries to write its ID into each element of the buffer (Writer After Write).
-						 *	HPX - works
-						 *	No HPX - works
+						 *  Notice that the length of an array is hard-coded.
 						 */
 						//for(std::size_t i = 0;i < 10;++i)
 						//	(*std::get<0>(elem))[ i ] = std::get<1>(elem);
 
 						/**
 						 *	Test 3 : Each thread tries to write the array position into the element of array specified by index.
-						 *	HPX - doesn't work, the same random value
-						 *	No HPX - doesn't work, the same random value
+						 *	HPX - instead of array position shows the same random value
+						 *	No HPX - instead of array position shows the same random value
 						 */
 						//(*std::get<0>(elem))[ std::get<1>(elem) ] = std::get<2>(elem);
 					};

@@ -44,7 +44,7 @@ endif()
 # Kalmar compiler configuration
 # It has to be done before any call to project()!
 ################################################################################
-if(HPX_WITH_KALMAR OR HPX_WITH_HCC)
+if(HPX_WITH_KALMAR OR HPX_WITH_HCC OR HPX_WITH_HCC_STDCXX)
   #include(KalmarConfigure) works only after project()
   include(cmake/KalmarConfigure.cmake)
   kalmar_configure_cxx()
@@ -628,6 +628,10 @@ endif()
 # Kalmar compiler
 ################################################################################
 
+hpx_option(HPX_WITH_HCC_STDCXX STRING
+        "Use the HCC compiler as a standard C++ compiler for HPX. Requires the path to install directory"
+        "" ADVANCED)
+
 hpx_option(HPX_WITH_KALMAR STRING
 	"Use the HCC compiler in C++AMP compiler for HPX. Requires the path to install directory"
 	"" ADVANCED)
@@ -743,7 +747,7 @@ endif()
 ################################################################################
 # Kalmar configuration and flags
 ################################################################################
-if(HPX_WITH_KALMAR OR HPX_WITH_HCC)
+if(HPX_WITH_KALMAR OR HPX_WITH_HCC OR HPX_WITH_HCC_STDCXX)
   kalmar_configure()
 endif()
 

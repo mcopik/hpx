@@ -18,7 +18,7 @@ set(subdirs
     jacobi
     jacobi_smp
     nqueen
-    performance_counters
+    #performance_counters
     queue
     quickstart
     qt

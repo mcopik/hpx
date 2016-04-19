@@ -6,12 +6,12 @@
 
 set(example_programs
     allow_unknown_options
-    component_ctors
-    component_in_executable
-    component_inheritance
-    component_with_executor
-    composable_guard
-    customize_async
+    #component_ctors
+    #component_in_executable
+    #component_inheritance
+    #component_with_executor
+    #composable_guard
+    #customize_async
     data_actions
     error_handling
     event_synchronization

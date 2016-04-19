@@ -67,14 +67,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     			_buffer_view.reset( new buffer_view_type( *buffer.get() ) );
     		}
 
-    		buffer_view_type & buffer_view()
+    		buffer_view_type * buffer_view()
     		{
-    			return *_buffer_view.get();
+    			return _buffer_view.get();
     		}
 
     		void sync()
     		{
-				Concurrency::copy(*buffer.get(), cpu_buffer);
+			Concurrency::copy(*buffer.get(), cpu_buffer);
     		}
 
     		void print()
@@ -158,9 +158,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			return std::move(results);
 		}
 
-		template <typename F, typename Shape>
+		template <typename F, typename Shape, typename GPUBuffer>
 		static typename detail::bulk_execute_result<F, Shape>::type
-		bulk_execute(F && f, Shape const& shape)
+		bulk_execute(F && f, Shape const& shape, GPUBuffer & buffer)
 		{
 			/**
 			 * The elements of pair are:
@@ -170,7 +170,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				std::size_t x = elem.first;
 				std::size_t y = elem.second;
 				Concurrency::extent<1> e(y);
-				Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) 
+				Concurrency::parallel_for_each(e, [f,x,y](Concurrency::index<1> idx) restrict(amp) 
 				{
 					auto _x = std::make_pair(x + idx[0], 1);
 					f(_x);

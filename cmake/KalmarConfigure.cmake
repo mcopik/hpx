@@ -5,12 +5,22 @@
 
 macro(kalmar_configure_cxx)
 
-  execute_process(COMMAND find ${HPX_WITH_KALMAR} -name clang++ -print OUTPUT_VARIABLE KALMAR_CXX OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND find ${HPX_WITH_KALMAR} -name clang++ -print COMMAND head -n 1 OUTPUT_VARIABLE KALMAR_CXX OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND find ${HPX_WITH_KALMAR} -name clamp-config -print OUTPUT_VARIABLE KALMAR_CONFIG OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${KALMAR_CONFIG} --build --cxxflags OUTPUT_VARIABLE KALMAR_CXX_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${KALMAR_CONFIG} --build --ldflags OUTPUT_VARIABLE KALMAR_LD_FLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-  set(CMAKE_CXX_COMPILER ${KALMAR_CXX})
+  if("${KALMAR_CXX}" STREQUAL "")
+	message(FATAL_ERROR "Clang compiler in Kalmar directory could not be found!")
+  else()
+	message("${KALMAR_CXX}")
+  endif()
+  set(CMAKE_CXX_COMPILER "${KALMAR_CXX}")
+  if("${KALMAR_CONFIG}" STREQUAL "")
+        message(FATAL_ERROR "clamp-config in Kalmar directory could not be found!")
+  endif()
+
+  set(HPX_WITH_NATIVE_TLS OFF CACHE BOOL "" FORCE)	
 
 endmacro()
 

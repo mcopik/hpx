@@ -1232,8 +1232,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     struct gpu_task_execution_policy
     {
         /// The type of the executor associated with this execution policy
-		//typedef parallel::gpu_amp_executor executor_type;
+#if defined(HPX_WITH_AMP)
+		typedef parallel::gpu_amp_executor executor_type;
+#endif
+
+#if defined(HPX_WITH_SYCL)
 		typedef parallel::gpu_sycl_executor executor_type;
+#endif
 
         /// The category of the execution agents created by this execution
         /// policy.
@@ -1298,8 +1303,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 	struct gpu_execution_policy
 	{
 		/// The type of the default executor associated with this execution policy
-		//typedef parallel::gpu_amp_executor executor_type;
+#if defined(HPX_WITH_AMP)
+		typedef parallel::gpu_amp_executor executor_type;
+#endif
+
+#if defined(HPX_WITH_SYCL)
 		typedef parallel::gpu_sycl_executor executor_type;
+#endif
 
 		/// The category of the execution agents created by this execution
 		/// policy.

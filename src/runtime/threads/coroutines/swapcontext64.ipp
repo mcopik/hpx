@@ -46,6 +46,12 @@
 #define HPX_COROUTINE_TYPE_DIRECTIVE(name) ".type " #name ", @function\n\t"
 #endif
 
+
+#if defined(__HCC_ACCELERATOR__)
+// disable inline assembly in case when HCC is building kernel codes
+#define HPX_COROUTINE_SWAPCONTEXT(name)
+
+#else
 // Note: .align 4 below means alignment at 2^4 boundary (16 bytes
 
 #define HPX_COROUTINE_SWAPCONTEXT(name)                                       \
@@ -79,6 +85,8 @@
         "jmp   *%rcx\n\t"                                                     \
         "ud2\n\t"                                                             \
     )                                                                         \
+
+#endif // #ifdef __HCC_ACCELERATOR__
 /**/
 
 HPX_COROUTINE_SWAPCONTEXT(swapcontext_stack);

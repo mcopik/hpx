@@ -23,8 +23,6 @@ macro(kalmar_configure_cxx)
   
   if("${KALMAR_CXX}" STREQUAL "")
 	message(FATAL_ERROR "Clang compiler in Kalmar directory could not be found!")
-  else()
-	message("${KALMAR_CXX}")
   endif()
   set(CMAKE_CXX_COMPILER "${KALMAR_CXX}")
   if("${KALMAR_CONFIG}" STREQUAL "")

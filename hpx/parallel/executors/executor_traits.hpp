@@ -595,10 +595,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         {
             return detail::call_bulk_execute(exec, std::forward<F>(f), shape, buffer);
         }
-<<<<<<< HEAD
-
-=======
->>>>>>> 4668654ce94c82d4fe3a9df89741dbfe7aaf10af
     };
 
     ///////////////////////////////////////////////////////////////////////////

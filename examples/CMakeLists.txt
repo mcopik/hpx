@@ -15,7 +15,7 @@ set(subdirs
     future_reduce
     heartbeat
     interpolate1d
-    jacobi
+    #jacobi
     jacobi_smp
     nqueen
     #performance_counters

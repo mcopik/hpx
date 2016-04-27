@@ -24,9 +24,9 @@ set(subdirs
     qt
     random_mem_access
     spell_check
-    startup_shutdown
+    #startup_shutdown
     thread_aware_timer
-    throttle
+    #throttle
    )
 
 if(HPX_WITH_FORTRAN)

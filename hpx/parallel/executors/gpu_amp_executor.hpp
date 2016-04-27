@@ -9,6 +9,7 @@
 #define HPX_PARALLEL_EXECUTORS_GPU_AMP_EXECUTOR_JUNE_06_2015_0400AM
 
 #include <hpx/config.hpp>
+#include <hpx/traits/is_gpu_executor.hpp>
 #include <hpx/parallel/config/inline_namespace.hpp>
 #include <hpx/parallel/exception_list.hpp>
 #include <hpx/parallel/executors/executor_traits.hpp>
@@ -30,18 +31,19 @@
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 {
 
-
 	///////////////////////////////////////////////////////////////////////////
     /// A \a sequential_executor creates groups of sequential execution agents
     /// which execute in the calling thread. The sequential order is given by
     /// the lexicographical order of indices in the index space.
     ///
-    struct gpu_amp_executor
+    struct gpu_amp_executor : gpu_executor_tag
     {
 		#if defined(DOXYGEN)
 				/// Create a new sequential executor
 				gpu_amp_executor() {}
 		#endif
+
+        typedef gpu_execution_tag execution_category;
 
 		template<typename Iter>
     	struct gpu_amp_buffer : detail::gpu_executor_buffer<Iter,

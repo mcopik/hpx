@@ -1228,7 +1228,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///
     /// The algorithm returns a future representing the result of the
     /// corresponding algorithm when invoked with the gpu_execution_policy.
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
     struct gpu_task_execution_policy
     {
         /// The type of the executor associated with this execution policy
@@ -1237,26 +1237,32 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 	#else
 		typedef parallel::gpu_sycl_executor executor_type;
 	#endif
+
+        /// The type of the associated executor parameters object which is
+        /// associated with this execution policy
+        typedef v3::detail::extract_executor_parameters<
+                executor_type
+            >::type executor_parameters_type;
+
         /// The category of the execution agents created by this execution
         /// policy.
         typedef parallel::gpu_execution_tag execution_category;
 
-        /// \cond NOINTERNAL
-        gpu_task_execution_policy() : chunk_size_(1) {}
-        /// \endcond
-
-        /// Create a new gpu_task_execution_policy referencing a chunk size.
-        ///
-        /// \param chunk_size   [in] The chunk size controlling the number of
-        ///                     iterations scheduled to be executed on the same
-        ///                     GPU thread
-        ///
-        /// \returns The new gpu_task_execution_policy
-        ///
-        gpu_task_execution_policy operator()(std::size_t chunk_size) const
+        /// Rebind the type of executor used by this execution policy. The
+        /// execution category of Executor shall not be weaker than that of
+        /// this execution policy
+        template <typename Executor_, typename Parameters_>
+        struct rebind
         {
-            return gpu_task_execution_policy(chunk_size);
-        }
+            /// The type of the rebound execution policy
+            typedef gpu_task_execution_policy_shim<
+                    Executor_, Parameters_
+                > type;
+        };
+
+        /// \cond NOINTERNAL
+        gpu_task_execution_policy() {}
+        /// \endcond
 
         /// Create a new gpu_task_execution_policy from itself
         ///
@@ -1271,6 +1277,66 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             return *this;
         }
 
+        /// Create a new gpu_task_execution_policy from given executor
+        ///
+        /// \tparam Executor    The type of the executor to associate with this
+        ///                     execution policy.
+        ///
+        /// \param exec         [in] The executor to use for the
+        ///                     execution of the parallel algorithm the
+        ///                     returned execution policy is used with.
+        ///
+        /// \note Requires: is_gpu_executor<Executor>::value is true
+        ///
+        /// \returns The new gpu_task_execution_policy
+        ///
+        template <typename Executor>
+        typename rebind_executor<
+            gpu_task_execution_policy, Executor, executor_parameters_type
+        >::type
+        on(Executor && exec) const
+        {
+            static_assert(
+                hpx::traits::is_gpu_executor<Executor>::value,
+                "hpx::traits::is_gpu_executor<Executor>::value");
+
+            typedef typename rebind_executor<
+                gpu_task_execution_policy, Executor,
+                executor_parameters_type
+            >::type rebound_type;
+            return rebound_type(std::forward<Executor>(exec), parameters());
+        }
+
+        /// Create a new gpu_task_execution_policy from the given
+        /// execution parameters
+        ///
+        /// \tparam Parameters  The type of the executor parameters to
+        ///                     associate with this execution policy.
+        ///
+        /// \param params       [in] The executor parameters to use for the
+        ///                     execution of the parallel algorithm the
+        ///                     returned execution policy is used with.
+        ///
+        /// \note Requires: is_executor_parameters<Parameters>::value is true
+        ///
+        /// \returns The new gpu_task_execution_policy
+        ///
+        template <typename Parameters>
+        typename rebind_executor<
+            gpu_task_execution_policy, executor_type, Parameters
+        >::type
+        with(Parameters && params) const
+        {
+            static_assert(
+                is_executor_parameters<Parameters>::value,
+                "is_executor_parameters<Parameters>::value");
+
+            typedef typename rebind_executor<
+                gpu_task_execution_policy, executor_type, Parameters
+            >::type rebound_type;
+            return rebound_type(executor(), std::forward<Parameters>(params));
+        }
+
         /// Return the associated executor object.
         static executor_type& executor()
         {
@@ -1278,21 +1344,153 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             return exec;
         }
 
-        /// \cond NOINTERNAL
-        std::size_t get_chunk_size() const { return chunk_size_; }
-        /// \endcond
-    protected:
-        gpu_task_execution_policy(std::size_t chunk_size)
-          : chunk_size_(chunk_size)
-        {}
-
-    private:
-        std::size_t chunk_size_;
-        /// \endcond
+        /// Return the associated executor parameters object
+        static executor_parameters_type& parameters()
+        {
+            static executor_parameters_type params;
+            return params;
+        }
     };
 
     /// Default parallel task execution policy object.
     static gpu_task_execution_policy const gpu_task;
+
+    template <typename Executor, typename Parameters>
+    struct gpu_task_execution_policy_shim : gpu_task_execution_policy
+    {
+        /// The type of the executor associated with this execution policy
+        typedef Executor executor_type;
+
+        /// The type of the associated executor parameters object which is
+        /// associated with this execution policy
+        typedef Parameters executor_parameters_type;
+
+        /// The category of the execution agents created by this execution
+        /// policy.
+        typedef typename executor_traits<executor_type>::execution_category
+            execution_category;
+
+        /// Rebind the type of executor used by this execution policy. The
+        /// execution category of Executor shall not be weaker than that of
+        /// this execution policy
+        template <typename Executor_, typename Parameters_>
+        struct rebind
+        {
+            /// The type of the rebound execution policy
+            typedef gpu_task_execution_policy_shim<
+                    Executor_, Parameters_
+                > type;
+        };
+
+        /// Create a new gpu_task_execution_policy_shim from itself
+        ///
+        /// \param tag          [in] Specify that the corresponding asynchronous
+        ///                     execution policy should be used
+        ///
+        /// \returns The new gpu_task_execution_policy
+        ///
+        gpu_task_execution_policy_shim operator()(
+            task_execution_policy_tag tag) const
+        {
+            return *this;
+        }
+
+        /// Create a new gpu_task_execution_policy from the given
+        /// executor
+        ///
+        /// \tparam Executor    The type of the executor to associate with this
+        ///                     execution policy.
+        ///
+        /// \param exec         [in] The executor to use for the
+        ///                     execution of the parallel algorithm the
+        ///                     returned execution policy is used with.
+        ///
+        /// \note Requires: is_executor<Executor>::value is true
+        ///
+        /// \returns The new parallel_task_execution_policy
+        ///
+        template <typename Executor_>
+        typename rebind_executor<
+            gpu_task_execution_policy_shim, Executor_,
+            executor_parameters_type
+        >::type
+        on(Executor_ && exec) const
+        {
+            static_assert(
+                hpx::traits::is_gpu_executor<Executor_>::value ,
+                "hpx::traits::is_executor<Executor_>::value");
+
+            typedef typename rebind_executor<
+                gpu_task_execution_policy_shim, Executor_,
+                executor_parameters_type
+            >::type rebound_type;
+            return rebound_type(std::forward<Executor_>(exec), params_);
+        }
+
+        /// Create a new gpu_task_execution_policy from the given
+        /// execution parameters
+        ///
+        /// \tparam Parameters  The type of the executor parameters to
+        ///                     associate with this execution policy.
+        ///
+        /// \param params       [in] The executor parameters to use for the
+        ///                     execution of the parallel algorithm the
+        ///                     returned execution policy is used with.
+        ///
+        /// \note Requires: is_executor_parameters<Parameters>::value is true
+        ///
+        /// \returns The new gpu_task_execution_policy
+        ///
+        template <typename Parameters_>
+        typename rebind_executor<
+            gpu_task_execution_policy_shim, Executor, Parameters_
+        >::type
+        with(Parameters_ && params) const
+        {
+            static_assert(
+                is_executor_parameters<Parameters_>::value,
+                "is_executor_parameters<Parameters_>::value");
+
+            typedef typename rebind_executor<
+                gpu_task_execution_policy_shim, Executor, Parameters_
+            >::type rebound_type;
+            return rebound_type(exec_, std::forward<Parameters_>(params));
+        }
+
+        /// Return the associated executor object.
+        Executor& executor() { return exec_; }
+        /// Return the associated executor object.
+        Executor const& executor() const { return exec_; }
+
+        /// Return the associated executor parameters object.
+        Parameters& parameters() { return params_; }
+        /// Return the associated executor parameters object.
+        Parameters const& parameters() const { return params_; }
+
+        /// \cond NOINTERNAL
+        gpu_task_execution_policy_shim() {}
+
+        template <typename Executor_, typename Parameters_>
+        gpu_task_execution_policy_shim(
+                Executor_ && exec, Parameters_ && params)
+          : exec_(std::forward<Executor_>(exec)),
+            params_(std::forward<Parameters_>(params))
+        {}
+
+    private:
+        friend class hpx::serialization::access;
+
+        template <typename Archive>
+        void serialize(Archive & ar, const unsigned int version)
+        {
+            ar & exec_ & params_;
+        }
+
+    private:
+        Executor exec_;
+        Parameters params_;
+        /// \endcond
+    };
 
     ///////////////////////////////////////////////////////////////////////////
     /// The class gpu_execution_policy is an execution policy type used
@@ -1305,74 +1503,258 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 		#else
 			typedef parallel::gpu_sycl_executor executor_type;
 		#endif
-		/// The category of the execution agents created by this execution
-		/// policy.
-		typedef parallel::gpu_execution_tag execution_category;
 
-		/// \cond NOINTERNAL
-		gpu_execution_policy() : chunk_size_(1) {}
+        /// The type of the associated executor parameters object which is
+        /// associated with this execution policy
+        typedef v3::detail::extract_executor_parameters<
+                executor_type
+            >::type executor_parameters_type;
 
-		std::size_t get_chunk_size() const { return chunk_size_; }
-		/// \endcond
+        /// The category of the execution agents created by this execution
+        /// policy.
+        typedef parallel::gpu_execution_tag execution_category;
 
-		/// Create a new gpu_execution_policy referencing a chunk size.
-		///
-		/// \param chunk_size   [in] The chunk size controlling the number of
-		///                     iterations scheduled to be executed on the same
-		///                     GPU thread
-		///
-		/// \returns The new gpu_execution_policy
-		///
-		gpu_execution_policy operator()(std::size_t chunk_size) const
-		{
-			return gpu_execution_policy(chunk_size);
-		}
+        /// Rebind the type of executor used by this execution policy. The
+        /// execution category of Executor shall not be weaker than that of
+        /// this execution policy
+        template <typename Executor_, typename Parameters_>
+        struct rebind
+        {
+            /// The type of the rebound execution policy
+            typedef gpu_execution_policy_shim<
+                    Executor_, Parameters_
+                > type;
+        };
 
-		/// Create a new asynchronous gpu_execution_policy referencing a chunk size.
-		///
-		/// \param tag          [in] Specify that the corresponding asynchronous
-		///                     execution policy should be used
-		/// \param chunk_size   [in] The chunk size controlling the number of
-		///                     iterations scheduled to be executed on the same
-		///                     GPU thread
-		///
-		/// \returns The new gpu_task_execution_policy
-		///
-		gpu_task_execution_policy operator()(task_execution_policy_tag tag,
-			std::size_t chunk_size) const
-		{
-			return gpu_task(chunk_size);
-		}
+        /// \cond NOINTERNAL
+        gpu_execution_policy() {}
+        /// \endcond
 
-		/// Create a new asynchronous gpu_execution_policy.
-		///
-		/// \param tag          [in] Specify that the corresponding asynchronous
-		///                     execution policy should be used
-		///
-		/// \returns The new parallel_execution_policy
-		///
-		gpu_task_execution_policy operator()(
-			task_execution_policy_tag tag) const
-		{
-			return gpu_task( this->get_chunk_size() );
-		}
+        /// Create a new gpu_execution_policy referencing a chunk size.
+        ///
+        /// \param tag          [in] Specify that the corresponding asynchronous
+        ///                     execution policy should be used
+        ///
+        /// \returns The new gpu_execution_policy
+        ///
+        gpu_task_execution_policy operator()(
+            task_execution_policy_tag tag) const
+        {
+            return gpu_task_execution_policy();
+        }
 
-		/// Return the associated executor object.
-		static executor_type& executor()
-		{
-			static executor_type exec;
-			return exec;
-		}
-	protected:
-		gpu_execution_policy(std::size_t chunk_size) : chunk_size_(chunk_size)
-		{
+        /// Create a new gpu_execution_policy referencing an executor and
+        /// a chunk size.
+        ///
+        /// \param exec         [in] The executor to use for the execution of
+        ///                     the parallel algorithm the returned execution
+        ///                     policy is used with
+        ///
+        /// \returns The new gpu_execution_policy
+        ///
+        template <typename Executor>
+        typename rebind_executor<
+            gpu_execution_policy, Executor, executor_parameters_type
+        >::type
+        on(Executor && exec) const
+        {
+            static_assert(
+                hpx::traits::is_gpu_executor<Executor>::value,
+                "hpx::traits::is_gpu_executor<Executor>::value");
 
-		}
-	private:
-		std::size_t chunk_size_;
+            typedef typename rebind_executor<
+                gpu_execution_policy, Executor, executor_parameters_type
+            >::type rebound_type;
+            return rebound_type(std::forward<Executor>(exec), parameters());
+        }
+
+        /// Create a new gpu_execution_policy from the given
+        /// execution parameters
+        ///
+        /// \tparam Parameters  The type of the executor parameters to
+        ///                     associate with this execution policy.
+        ///
+        /// \param params       [in] The executor parameters to use for the
+        ///                     execution of the parallel algorithm the
+        ///                     returned execution policy is used with.
+        ///
+        /// \note Requires: is_executor_parameters<Parameters>::value is true
+        ///
+        /// \returns The new gpu_execution_policy
+        ///
+        template <typename Parameters>
+        typename rebind_executor<
+            gpu_execution_policy, executor_type, Parameters
+        >::type
+        with(Parameters && params) const
+        {
+            static_assert(
+                is_executor_parameters<Parameters>::value,
+                "is_executor_parameters<Parameters>::value");
+
+            typedef typename rebind_executor<
+                gpu_execution_policy, executor_type, Parameters
+            >::type rebound_type;
+            return rebound_type(executor(), std::forward<Parameters>(params));
+        }
+
+        /// Return the associated executor object.
+        static executor_type& executor()
+        {
+            static executor_type exec;
+            return exec;
+        }
+
+        /// Return the associated executor parameters object
+        static executor_parameters_type& parameters()
+        {
+            static executor_parameters_type params;
+            return params;
+        }
 	};
 
     static gpu_execution_policy const gpu;
+
+    /// The class gpu_execution_policy is an execution policy type used
+    /// as a unique type to disambiguate parallel algorithm overloading and
+    /// indicate that a parallel algorithm's execution may be parallelized.
+    template <typename Executor, typename Parameters>
+    struct gpu_execution_policy_shim : gpu_execution_policy
+    {
+        /// The type of the executor associated with this execution policy
+        typedef Executor executor_type;
+
+        /// The type of the associated executor parameters object which is
+        /// associated with this execution policy
+        typedef Parameters executor_parameters_type;
+
+        /// The category of the execution agents created by this execution
+        /// policy.
+        typedef typename executor_traits<executor_type>::execution_category
+            execution_category;
+
+        /// Rebind the type of executor used by this execution policy. The
+        /// execution category of Executor shall not be weaker than that of
+        /// this execution policy
+        template <typename Executor_, typename Parameters_>
+        struct rebind
+        {
+            /// The type of the rebound execution policy
+            typedef gpu_execution_policy_shim<
+                    Executor_, Parameters_
+                > type;
+        };
+
+        /// Create a new gpu_execution_policy referencing a chunk size.
+        ///
+        /// \param tag          [in] Specify that the corresponding asynchronous
+        ///                     execution policy should be used
+        ///
+        /// \returns The new gpu_execution_policy
+        ///
+        gpu_task_execution_policy_shim<Executor, Parameters>
+        operator()(task_execution_policy_tag tag) const
+        {
+            return gpu_task_execution_policy_shim<Executor, Parameters>(
+                exec_, params_);
+        }
+
+        /// Create a new gpu_execution_policy from the given
+        /// executor
+        ///
+        /// \tparam Executor    The type of the executor to associate with this
+        ///                     execution policy.
+        ///
+        /// \param exec         [in] The executor to use for the
+        ///                     execution of the parallel algorithm the
+        ///                     returned execution policy is used with.
+        ///
+        /// \note Requires: is_gpu_executor<Executor>::value is true
+        ///
+        /// \returns The new gpu_execution_policy
+        ///
+        template <typename Executor_>
+        typename rebind_executor<
+            gpu_execution_policy_shim, Executor_,
+            executor_parameters_type
+        >::type
+        on(Executor_ && exec) const
+        {
+            static_assert(
+                hpx::traits::is_gpu_executor<Executor_>::value,
+                "hpx::traits::is_gpu_executor<Executor_>::value");
+
+            typedef typename rebind_executor<
+                gpu_execution_policy_shim, Executor_,
+                executor_parameters_type
+            >::type rebound_type;
+            return rebound_type(std::forward<Executor_>(exec), params_);
+        }
+
+        /// Create a new gpu_execution_policy from the given
+        /// execution parameters
+        ///
+        /// \tparam Parameters  The type of the executor parameters to
+        ///                     associate with this execution policy.
+        ///
+        /// \param params       [in] The executor parameters to use for the
+        ///                     execution of the parallel algorithm the
+        ///                     returned execution policy is used with.
+        ///
+        /// \note Requires: is_executor_parameters<Parameters>::value is true
+        ///
+        /// \returns The new gpu_execution_policy
+        ///
+        template <typename Parameters_>
+        typename rebind_executor<
+            gpu_execution_policy_shim, Executor, Parameters_
+        >::type
+        with(Parameters_ && params) const
+        {
+            static_assert(
+                is_executor_parameters<Parameters_>::value,
+                "is_executor_parameters<Parameters_>::value");
+
+            typedef typename rebind_executor<
+                gpu_execution_policy_shim, Executor, Parameters_
+            >::type rebound_type;
+            return rebound_type(exec_, std::forward<Parameters_>(params));
+        }
+
+        /// Return the associated executor object.
+        Executor& executor() { return exec_; }
+        /// Return the associated executor object.
+        Executor const& executor() const { return exec_; }
+
+        /// Return the associated executor parameters object.
+        Parameters& parameters() { return params_; }
+        /// Return the associated executor parameters object.
+        Parameters const& parameters() const { return params_; }
+
+        /// \cond NOINTERNAL
+        gpu_execution_policy_shim() {}
+
+        template <typename Executor_, typename Parameters_>
+        gpu_execution_policy_shim(
+                Executor_ && exec, Parameters_ && params)
+          : exec_(std::forward<Executor_>(exec)),
+            params_(std::forward<Parameters_>(params))
+        {}
+
+    private:
+        friend class hpx::serialization::access;
+
+        template <typename Archive>
+        void serialize(Archive & ar, const unsigned int version)
+        {
+            ar & exec_ & params_;
+        }
+
+    private:
+        Executor exec_;
+        Parameters params_;
+        /// \endcond
+    };
 #endif
     ///////////////////////////////////////////////////////////////////////////
     // Allow to detect execution policies which were created as a result
@@ -1409,7 +1791,21 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 parallel_task_execution_policy_shim<Executor, Parameters> >
           : std::true_type
         {};
+
+#if defined(HPX_WITH_GPU_EXECUTOR)
+        template <typename Executor, typename Parameters>
+        struct is_rebound_execution_policy<
+                gpu_task_execution_policy_shim<Executor, Parameters> >
+          : std::true_type
+        {};
+
+        template <typename Executor, typename Parameters>
+        struct is_rebound_execution_policy<
+                gpu_execution_policy_shim<Executor, Parameters> >
+          : std::true_type
+        {};
     }
+#endif
 
     template <typename T>
     struct is_rebound_execution_policy
@@ -1500,7 +1896,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
           : boost::mpl::true_
         {};
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
         template <>
         struct is_execution_policy<gpu_execution_policy>
           : boost::mpl::true_
@@ -1508,6 +1904,18 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
         template <>
         struct is_execution_policy<gpu_task_execution_policy>
+          : boost::mpl::true_
+        {};
+
+        template <typename Executor, typename Parameters>
+        struct is_execution_policy<
+                gpu_execution_policy_shim<Executor, Parameters> >
+          : boost::mpl::true_
+        {};
+
+        template <typename Executor, typename Parameters>
+        struct is_execution_policy<
+                gpu_task_execution_policy_shim<Executor, Parameters> >
           : boost::mpl::true_
         {};
 #endif
@@ -1587,18 +1995,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         struct is_parallel_execution_policy<parallel_vector_execution_policy>
           : boost::mpl::true_
         {};
-
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
-        template <>
-        struct is_parallel_execution_policy<gpu_execution_policy>
-          : boost::mpl::true_
-        {};
-
-        template <>
-        struct is_parallel_execution_policy<gpu_task_execution_policy>
-          : boost::mpl::true_
-        {};
-#endif
 
         template <>
         struct is_parallel_execution_policy<parallel_task_execution_policy>
@@ -1680,6 +2076,57 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     {};
 
     ///////////////////////////////////////////////////////////////////////////
+#if defined(HPX_WITH_GPU_EXECUTOR)
+    namespace detail
+    {
+        /// \cond NOINTERNAL
+        template <typename T>
+        struct is_gpu_execution_policy
+          : std::false_type
+        {};
+
+        template <>
+        struct is_gpu_execution_policy<gpu_execution_policy>
+          : std::true_type
+        {};
+
+        template <typename Executor, typename Parameters>
+        struct is_gpu_execution_policy<gpu_execution_policy_shim<Executor, Parameters>>
+          : std::true_type
+        {};
+
+        template <>
+        struct is_gpu_execution_policy<gpu_task_execution_policy>
+          : std::true_type
+        {};
+
+        template <typename Executor, typename Parameters>
+        struct is_gpu_execution_policy<gpu_task_execution_policy_shim<Executor, Parameters>>
+          : std::true_type
+        {};
+        /// \endcond
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// Extension: Detect whether given execution policy enables GPU parallelization
+    ///
+    /// 1. The type is_gpu_execution_policy can be used to detect GPU parallel
+    ///    execution policies for the purpose of excluding function signatures
+    ///    from otherwise ambiguous overload resolution participation.
+    /// 2. If T is the type of a standard or implementation-defined execution
+    ///    policy, is_gpu_execution_policy<T> shall be publicly derived
+    ///    from integral_constant<bool, true>, otherwise from
+    ///    integral_constant<bool, false>.
+    /// 3. The behavior of a program that adds specializations for
+    ///    is_gpu_execution_policy is undefined.
+    ///
+    template <typename T>
+    struct is_gpu_execution_policy
+      : detail::is_gpu_execution_policy<typename hpx::util::decay<T>::type>
+    {};
+#endif
+
+    ///////////////////////////////////////////////////////////////////////////
     namespace detail
     {
         /// \cond NOINTERNAL
@@ -1698,7 +2145,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
           : boost::mpl::true_
         {};
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
         template <>
         struct is_async_execution_policy<gpu_task_execution_policy>
           : boost::mpl::true_

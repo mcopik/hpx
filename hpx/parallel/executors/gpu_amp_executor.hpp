@@ -124,28 +124,28 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			typedef typename
 				    detail::bulk_async_execute_result<F, Shape>::type
 				result_type;
-			std::vector<hpx::future<result_type> > results;
+			std::vector< hpx::future<result_type> > results;
 
-			try {
+			try {	
 				for (auto const& elem: shape) {
-					std::size_t x = elem.first;
-					std::size_t y = elem.second;
+					std::size_t data_count = elem.first;
+					std::size_t chunk_size = elem.second;
+
+					std::size_t threads_to_run = data_count / chunk_size;
+					std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
+
 					results.push_back(hpx::async(launch::async,
 						/**
 						 * Lambda calling the AMP parallel execution.
 						 */
-						[=](std::size_t x, std::size_t y) {
-							Concurrency::extent<1> e(y);
+						[=]() {
+							Concurrency::extent<1> e(threads_to_run);
 							Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp)
 							{
-								auto _x = std::make_pair(x + idx[0], 1);
+								auto _x = std::make_pair(idx[0] * chunk_size, idx[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
 								f(_x);
 							});
-						},
-						/**
-						 * Args of lambda - start position and size
-						 */
-						x, y));
+						}));
 				}
 			}
 			catch (std::bad_alloc const& ba) {
@@ -169,12 +169,17 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			 * begin at array, # of elements to process
 			 */
 			for(auto const & elem : shape) {
-				std::size_t x = elem.first;
-				std::size_t y = elem.second;
-				Concurrency::extent<1> e(y);
-				Concurrency::parallel_for_each(e, [f,x,y](Concurrency::index<1> idx) restrict(amp) 
+				std::size_t data_count = elem.first;
+				std::size_t chunk_size = elem.second;
+				
+				std::size_t threads_to_run = data_count / chunk_size;
+				std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
+				std::cout << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
+
+				Concurrency::extent<1> e(threads_to_run);
+				Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) 
 				{
-					auto _x = std::make_pair(x + idx[0], 1);
+					auto _x = std::make_pair(idx[0] * chunk_size, idx[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
 					f(_x);
 				});
 			}

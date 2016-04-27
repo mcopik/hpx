@@ -34,6 +34,19 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     struct parallel_task_execution_policy_shim;
 
     struct parallel_vector_execution_policy;
+
+#if defined(HPX_WITH_GPU_EXECUTOR)
+    struct gpu_execution_policy;
+
+    template <typename Executor, typename Parameters>
+    struct gpu_execution_policy_shim;
+
+    struct gpu_task_execution_policy;
+
+    template <typename Executor, typename Parameters>
+    struct gpu_task_execution_policy_shim;
+#endif
+
 }}}
 
 #endif

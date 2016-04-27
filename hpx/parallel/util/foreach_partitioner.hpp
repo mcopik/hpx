@@ -19,6 +19,7 @@
 #include <hpx/util/tuple.hpp>
 
 #include <hpx/parallel/executors/executor_traits.hpp>
+#include <hpx/parallel/executors/executor_parameter_traits.hpp>
 #include <hpx/parallel/execution_policy.hpp>
 #include <hpx/parallel/util/detail/chunk_size.hpp>
 #include <hpx/parallel/util/detail/handle_local_exceptions.hpp>
@@ -148,6 +149,13 @@ namespace hpx { namespace parallel { namespace util
             }
         };
 
+        template <typename Executor, typename Parameters, typename Result>
+        struct foreach_n_static_partitioner<
+                parallel_task_execution_policy_shim<Executor, Parameters>,
+                Result>
+          : foreach_n_static_partitioner<parallel_task_execution_policy, Result>
+        {};
+
 #if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
         ///////////////////////////////////////////////////////////////////////
 		template <typename Result>
@@ -169,7 +177,7 @@ namespace hpx { namespace parallel { namespace util
 				std::list<boost::exception_ptr> errors;
 
 				try {
-
+					std::cout << "Chunk size: " << chunk_size << std::endl;
 					// TODO: extend for more GPUs
 					// right now it sends whole computation on one device
 					std::vector<int> positions = {0};
@@ -216,6 +224,13 @@ namespace hpx { namespace parallel { namespace util
 			}
 		};
 
+        template <typename Executor, typename Parameters, typename Result>
+        struct foreach_n_static_partitioner<
+                gpu_execution_policy_shim<Executor, Parameters>,
+                Result>
+          : foreach_n_static_partitioner<gpu_execution_policy, Result>
+        {};
+
 		template <typename Result>
 		struct foreach_n_static_partitioner<gpu_task_execution_policy, Result>
 		{
@@ -228,6 +243,8 @@ namespace hpx { namespace parallel { namespace util
 				typedef typename hpx::parallel::executor_traits<executor_type>
 					executor_traits;
 				typedef typename hpx::util::tuple<FwdIter, std::size_t> tuple;
+                typedef typename ExPolicy::executor_parameters_type parameters_type;
+                typedef executor_parameter_traits<parameters_type> traits;
 
 				FwdIter last = first;
 				std::advance(last, count);
@@ -236,6 +253,8 @@ namespace hpx { namespace parallel { namespace util
 				std::list<boost::exception_ptr> errors;
 
 				try {
+					std::cout << "Chunk size: " << chunk_size << " " << traits::get_chunk_size(policy.parameters(), policy.executor(), 
+                        [](){ return 0; }, count) << std::endl;
 					std::vector<int> positions = {0};
 					std::vector< std::pair<std::size_t, std::size_t> > shape{ {0, count} };
 
@@ -276,14 +295,14 @@ namespace hpx { namespace parallel { namespace util
 					std::move(inititems), std::move(workitems));
 			}
 		};
-#endif
 
         template <typename Executor, typename Parameters, typename Result>
         struct foreach_n_static_partitioner<
-                parallel_task_execution_policy_shim<Executor, Parameters>,
+                gpu_task_execution_policy_shim<Executor, Parameters>,
                 Result>
-          : foreach_n_static_partitioner<parallel_task_execution_policy, Result>
+          : foreach_n_static_partitioner<gpu_task_execution_policy, Result>
         {};
+#endif
 
         ///////////////////////////////////////////////////////////////////////
         // ExPolicy: execution policy
@@ -320,36 +339,6 @@ namespace hpx { namespace parallel { namespace util
             }
         };
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
-		template <typename Result>
-		struct foreach_n_partitioner<gpu_execution_policy, Result,
-				parallel::traits::static_partitioner_tag>
-		{
-			template <typename ExPolicy, typename FwdIter, typename F1, typename GPUBuffer>
-			static FwdIter call(ExPolicy policy,
-				FwdIter first, std::size_t count, F1 && f1, GPUBuffer & buffer,
-				std::size_t chunk_size = 0)
-			{
-				return foreach_n_static_partitioner<gpu_execution_policy, Result>::call(
-					policy, first, count, std::forward<F1>(f1), buffer, chunk_size);
-			}
-		};
-
-		template <typename Result>
-		struct foreach_n_partitioner<gpu_task_execution_policy, Result,
-				parallel::traits::static_partitioner_tag>
-		{
-			template <typename ExPolicy, typename FwdIter, typename F1>
-			static hpx::future<FwdIter> call(ExPolicy policy,
-				FwdIter first, std::size_t count, F1 && f1,
-				std::size_t chunk_size = 0)
-			{
-				return foreach_n_static_partitioner<gpu_task_execution_policy, Result>::call(
-					policy, first, count, std::forward<F1>(f1), chunk_size);
-			}
-		};
-#endif
-
         template <typename Executor, typename Parameters, typename Result>
         struct foreach_n_partitioner<
                 parallel_task_execution_policy_shim<Executor, Parameters>,
@@ -373,6 +362,84 @@ namespace hpx { namespace parallel { namespace util
           : foreach_n_partitioner<parallel_task_execution_policy, Result,
                 parallel::traits::static_partitioner_tag>
         {};
+
+#if defined(HPX_WITH_GPU_EXECUTOR)
+		template <typename Result>
+		struct foreach_n_partitioner<gpu_execution_policy, Result,
+				parallel::traits::static_partitioner_tag>
+		{
+			template <typename ExPolicy, typename FwdIter, typename F1, typename GPUBuffer>
+			static FwdIter call(ExPolicy policy,
+				FwdIter first, std::size_t count, F1 && f1, GPUBuffer & buffer,
+				std::size_t chunk_size = 0)
+			{
+				return foreach_n_static_partitioner<ExPolicy, Result>::call(
+					policy, first, count, std::forward<F1>(f1), buffer, chunk_size);
+			}
+		};        
+
+        template <typename Executor, typename Parameters, typename Result>
+        struct foreach_n_partitioner<
+                gpu_execution_policy_shim<Executor, Parameters>,
+                Result, parallel::traits::static_partitioner_tag>
+          : foreach_n_partitioner<gpu_execution_policy, Result,
+                parallel::traits::static_partitioner_tag>
+        {};
+
+        template <typename Executor, typename Parameters, typename Result>
+        struct foreach_n_partitioner<
+                gpu_execution_policy_shim<Executor, Parameters>,
+                Result, parallel::traits::auto_partitioner_tag>
+          : foreach_n_partitioner<gpu_execution_policy, Result,
+                parallel::traits::auto_partitioner_tag>
+        {};
+
+        template <typename Executor, typename Parameters, typename Result>
+        struct foreach_n_partitioner<
+                gpu_execution_policy_shim<Executor, Parameters>,
+                Result, parallel::traits::default_partitioner_tag>
+          : foreach_n_partitioner<gpu_execution_policy, Result,
+                parallel::traits::static_partitioner_tag>
+        {};
+
+		template <typename Result>
+		struct foreach_n_partitioner<gpu_task_execution_policy, Result,
+				parallel::traits::static_partitioner_tag>
+		{
+			template <typename ExPolicy, typename FwdIter, typename F1>
+			static hpx::future<FwdIter> call(ExPolicy policy,
+				FwdIter first, std::size_t count, F1 && f1,
+				std::size_t chunk_size = 0)
+			{
+				return foreach_n_static_partitioner<ExPolicy, Result>::call(
+					policy, first, count, std::forward<F1>(f1), chunk_size);
+			}
+		};
+
+        template <typename Executor, typename Parameters, typename Result>
+        struct foreach_n_partitioner<
+                gpu_task_execution_policy_shim<Executor, Parameters>,
+                Result, parallel::traits::static_partitioner_tag>
+          : foreach_n_partitioner<gpu_task_execution_policy, Result,
+                parallel::traits::static_partitioner_tag>
+        {};
+
+        template <typename Executor, typename Parameters, typename Result>
+        struct foreach_n_partitioner<
+                gpu_task_execution_policy_shim<Executor, Parameters>,
+                Result, parallel::traits::auto_partitioner_tag>
+          : foreach_n_partitioner<gpu_task_execution_policy, Result,
+                parallel::traits::auto_partitioner_tag>
+        {};
+
+        template <typename Executor, typename Parameters, typename Result>
+        struct foreach_n_partitioner<
+                gpu_task_execution_policy_shim<Executor, Parameters>,
+                Result, parallel::traits::default_partitioner_tag>
+          : foreach_n_partitioner<gpu_task_execution_policy, Result,
+                parallel::traits::static_partitioner_tag>
+        {};
+#endif
 
         ///////////////////////////////////////////////////////////////////////
         template <typename ExPolicy, typename Result>

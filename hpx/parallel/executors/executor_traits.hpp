@@ -15,6 +15,7 @@
 #include <hpx/exception_list.hpp>
 #include <hpx/async.hpp>
 #include <hpx/traits/is_executor.hpp>
+#include <hpx/traits/is_gpu_executor.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/always_void.hpp>
 #include <hpx/util/result_of.hpp>
@@ -611,6 +612,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     template <typename T>
     struct is_executor;         // defined in hpx/traits/is_executor.hpp
 
+#if defined(HPX_WITH_GPU_EXECUTOR)
     ///////////////////////////////////////////////////////////////////////////
 	namespace detail
 	{
@@ -625,6 +627,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			virtual void sync() = 0;
 		};
 	}
+#endif
+
 }}}
 
 #undef HPX_ENABLE_WORKAROUND_FOR_GCC46

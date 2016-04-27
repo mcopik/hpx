@@ -179,6 +179,11 @@ namespace hpx { namespace traits
 
     template <typename T, typename Enable = void>
     struct is_executor_parameters;
+
+#if defined(HPX_WITH_GPU_EXECUTOR)
+    template <typename T, typename Enable = void>
+    struct is_gpu_executor;
+#endif
 }}
 
 #endif

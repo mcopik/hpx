@@ -76,7 +76,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
     		void sync()
     		{
-			Concurrency::copy(*buffer.get(), cpu_buffer);
+			    Concurrency::copy(*buffer.get(), cpu_buffer);
     		}
 
     		void print()

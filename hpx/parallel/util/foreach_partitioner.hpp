@@ -156,7 +156,7 @@ namespace hpx { namespace parallel { namespace util
           : foreach_n_static_partitioner<parallel_task_execution_policy, Result>
         {};
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
         ///////////////////////////////////////////////////////////////////////
 		template <typename Result>
 		struct foreach_n_static_partitioner<gpu_execution_policy, Result>

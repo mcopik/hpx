@@ -169,6 +169,8 @@ namespace hpx { namespace parallel { namespace util
 				typedef typename ExPolicy::executor_type executor_type;
 				typedef typename hpx::parallel::executor_traits<executor_type>
 					executor_traits;
+                typedef typename ExPolicy::executor_parameters_type parameters_type;
+                typedef executor_parameter_traits<parameters_type> traits;
 
 				FwdIter last = first;
 				std::advance(last, count);
@@ -177,11 +179,16 @@ namespace hpx { namespace parallel { namespace util
 				std::list<boost::exception_ptr> errors;
 
 				try {
-					std::cout << "Chunk size: " << chunk_size << std::endl;
+					std::size_t chunk_size = traits::get_chunk_size(policy.parameters(), policy.executor(), 
+                        [](){ return 0; }, count);
+					std::cout << chunk_size << std::endl;
 					// TODO: extend for more GPUs
 					// right now it sends whole computation on one device
 					std::vector<int> positions = {0};
-					std::vector< std::pair<std::size_t, std::size_t> > shape{ {0, count} };
+					// Tuple: accelerator number, position to start, data count, chunk size for thread
+					// std::vector< std::tuple<std::size_t, std::size_t, std::size_t, std::size_t> > shape{ {0, 0, count, chunk_size} };
+					std::vector< std::pair<std::size_t, std::size_t> > shape{ {count, chunk_size} };
+					std::cout << "Task: " << count << " " << chunk_size << std::endl;
 
 					/**
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
@@ -242,7 +249,6 @@ namespace hpx { namespace parallel { namespace util
 				typedef typename ExPolicy::executor_type executor_type;
 				typedef typename hpx::parallel::executor_traits<executor_type>
 					executor_traits;
-				typedef typename hpx::util::tuple<FwdIter, std::size_t> tuple;
                 typedef typename ExPolicy::executor_parameters_type parameters_type;
                 typedef executor_parameter_traits<parameters_type> traits;
 
@@ -253,10 +259,11 @@ namespace hpx { namespace parallel { namespace util
 				std::list<boost::exception_ptr> errors;
 
 				try {
-					std::cout << "Chunk size: " << chunk_size << " " << traits::get_chunk_size(policy.parameters(), policy.executor(), 
-                        [](){ return 0; }, count) << std::endl;
+					std::size_t chunk_size = traits::get_chunk_size(policy.parameters(), policy.executor(), 
+                        [](){ return 0; }, count);
 					std::vector<int> positions = {0};
-					std::vector< std::pair<std::size_t, std::size_t> > shape{ {0, count} };
+					std::vector< std::pair<std::size_t, std::size_t> > shape{ {count, chunk_size} };
+					std::cout << "Task: " << count << " " << chunk_size << std::endl;
 
 					/**
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,

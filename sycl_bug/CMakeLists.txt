@@ -27,5 +27,7 @@ set(SYCL_LIB_PATH "${COMPUTECPP_LOCATION}/lib/${SYCL_LIB_FILE}")
 
 build_sycl("executor_test" "SPIR" "executor_test" ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 build_sycl("executor_test_no_hpx" "SPIR" "executor_test_no_hpx" ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+build_sycl("async_execution" "SPIR" "async_execution" ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 hpx_setup_target(executor_test)
 hpx_setup_target(executor_test_no_hpx)
+hpx_setup_target(async_execution)

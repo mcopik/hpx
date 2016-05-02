@@ -399,13 +399,13 @@ namespace hpx { namespace parallel { namespace util
 		struct foreach_n_partitioner<gpu_task_execution_policy, Result,
 				parallel::traits::static_partitioner_tag>
 		{
-			template <typename ExPolicy, typename FwdIter, typename F1>
+			template <typename ExPolicy, typename FwdIter, typename F1, typename GPUBuffer>
 			static hpx::future<FwdIter> call(ExPolicy policy,
-				FwdIter first, std::size_t count, F1 && f1,
+				FwdIter first, std::size_t count, F1 && f1, GPUBuffer & buffer,
 				std::size_t chunk_size = 0)
 			{
 				return foreach_n_static_partitioner<ExPolicy, Result>::call(
-					policy, first, count, std::forward<F1>(f1), chunk_size);
+					policy, first, count, std::forward<F1>(f1), buffer, chunk_size);
 			}
 		};
 

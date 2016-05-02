@@ -2152,12 +2152,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         /// \cond NOINTERNAL
         template <typename T>
         struct is_async_execution_policy
-          : boost::mpl::false_
+          : std::false_type
         {};
 
         template <>
         struct is_async_execution_policy<sequential_task_execution_policy>
-          : boost::mpl::true_
+          : std::true_type
         {};
 
         template <typename Executor, typename Parameters>
@@ -2168,7 +2168,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
         template <>
         struct is_async_execution_policy<parallel_task_execution_policy>
-          : boost::mpl::true_
+          : std::true_type
         {};
 
         template <typename Executor, typename Parameters>

@@ -230,7 +230,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1) { namespace detail
                     boost::mpl::false_(), std::forward<Args>(args)...);
             }
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
             if (t == typeid(gpu_execution_policy))
             {
                 return call(*policy.get<gpu_execution_policy>(),

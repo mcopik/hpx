@@ -65,7 +65,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 typename Proj = util::projection_identity>
             static typename util::detail::algorithm_result<ExPolicy, Iter>::type
             parallel(ExPolicy policy, Iter first, std::size_t count,
-                F && f, Proj && proj = Proj())
+                F && f, Proj && proj, std::false_type, std::false_type)
             {
                 if (count != 0)
                 {
@@ -89,11 +89,21 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                     std::move(first));
             }
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
+
+            template <typename ExPolicy, typename F, typename Proj = util::projection_identity>
+            static typename util::detail::algorithm_result<ExPolicy, Iter>::type
+			parallel(ExPolicy policy, Iter first, std::size_t count,
+	    	F && f, Proj && proj, std::true_type)
+			{
+				return parallel(std::forward<ExPolicy>(policy), first, std::size_t(count), std::forward<F>(f),
+				    std::forward<Proj>(proj), typename is_async_execution_policy<ExPolicy>::type());
+			}
+
             template <typename F, typename Proj = util::projection_identity>
-            static typename util::detail::algorithm_result<gpu_execution_policy, Iter>::type
-			parallel(gpu_execution_policy policy, Iter first, std::size_t count,
-	    	F && f, Proj && proj = Proj())
+            static typename util::detail::algorithm_result<ExPolicy, Iter>::type
+			parallel(ExPolicy policy, Iter first, std::size_t count,
+	    	F && f, Proj && proj, std::true_type, std::false_type)
 			{
 
 	        	Iter end = first;
@@ -123,10 +133,10 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					std::move(first));
 			}
 
-            template <typename F, typename Proj = util::projection_identity>
-			static typename util::detail::algorithm_result<gpu_task_execution_policy, Iter>::type
-			parallel(gpu_task_execution_policy policy, Iter first, std::size_t count,
-			F && f, Proj && proj = Proj())
+		    template <typename ExPolicy, typename Iter, typename F, typename Proj = util::projection_identity>
+			static typename util::detail::algorithm_result<ExPolicy, Iter>::type
+			parallel(ExPolicy policy, Iter first, std::size_t count,
+			F && f, Proj && proj, std::true_type, std::true_type)
 			{
 				typedef typename gpu_execution_policy::executor_type::buffer_traits<Iter>::type gpu_buffer_type;
 
@@ -142,8 +152,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					 * Allocate data on the GPU.
 					 */
 					auto buffer = policy.executor().create_buffers_shared(first, count);
-					//auto buffer = policy.executor().create_buffers(first, count);
-					//auto * gpu_buffer = buffer.get()->buffer_view();
+
 					hpx::future<Iter> x = util::foreach_n_partitioner<gpu_task_execution_policy>::call(
 							policy, first, count,
 							[_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
@@ -277,7 +286,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         return detail::for_each_n<InIter>().call(
             std::forward<ExPolicy>(policy), is_seq(),
             first, std::size_t(count), std::forward<F>(f),
-            std::forward<Proj>(proj));
+            std::forward<Proj>(proj), typename is_gpu_execution_policy<ExPolicy>::type());
     }
 
     ///////////////////////////////////////////////////////////////////////////

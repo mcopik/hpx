@@ -41,24 +41,48 @@ int hpx_main(boost::program_options::variables_map& vm)
 			});
 		HPX_TEST_EQ(count, c.size());
 
+		hpx::parallel::for_each(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(4),
+			boost::begin(c), boost::end(c),
+			[](std::size_t& v) {
+
+				v = 401;
+			});
+		std::for_each(boost::begin(c), boost::end(c),
+			[&count](std::size_t v) -> void {
+				HPX_TEST_EQ(v, std::size_t(401));
+				++count;
+			});
+		HPX_TEST_EQ(count, c.size());
+
 		/**
 		 * Second attempt
 		 */
 		std::iota(boost::begin(c), boost::end(c), std::rand());
 		std::iota(boost::begin(d), boost::end(d), std::rand());
 		std::vector< hpx::future<std::vector<std::size_t>::iterator> > tasks;
-		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task),
+		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task).with(hpx::parallel::static_chunk_size(4)),
 			boost::begin(c), n,
 			[](std::size_t& v) {
 				v = 42;
 			}) );
-		std::cout << "Wait" << std::endl;
+		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task)),
+			boost::begin(d), n,
+			[](std::size_t& v) {
+				v = 43;
+			}) );
 		hpx::wait_all(tasks);
 		// verify values
 		count = 0;
 		std::for_each(boost::begin(c), boost::end(c),
 			[&count](std::size_t v) -> void {
 				HPX_TEST_EQ(v, std::size_t(42));
+				++count;
+			});
+		HPX_TEST_EQ(count, c.size());
+		count = 0;
+		std::for_each(boost::begin(d), boost::end(d),
+			[&count](std::size_t v) -> void {
+				HPX_TEST_EQ(v, std::size_t(43));
 				++count;
 			});
 		HPX_TEST_EQ(count, c.size());

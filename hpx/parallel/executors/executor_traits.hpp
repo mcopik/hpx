@@ -15,6 +15,7 @@
 #include <hpx/exception_list.hpp>
 #include <hpx/async.hpp>
 #include <hpx/traits/is_executor.hpp>
+#include <hpx/traits/is_gpu_executor.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/always_void.hpp>
 #include <hpx/util/result_of.hpp>

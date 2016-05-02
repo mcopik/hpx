@@ -56,7 +56,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				typename _buffer_view_type =  decltype( std::declval< buffer_type >().template get_access<cl::sycl::access::mode::read_write>( std::declval<cl::sycl::handler &>() ) )>
     	struct gpu_sycl_buffer : detail::gpu_executor_buffer<Iter, _buffer_view_type>
 		{
-			cl::sycl::default_selector selector;
+			cl::sycl::host_selector selector;
 			cl::sycl::queue queue;
     		Iter cpu_buffer;
     		std::shared_ptr<buffer_type> buffer;
@@ -142,6 +142,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			typedef typename detail::bulk_async_execute_result<F, Shape>::type result_type;
 			std::vector<hpx::future<result_type> > results;
 			typedef typename GPUBuffer::buffer_view_type buffer_view_type;
+			using lambda_type = typename hpx::util::decay<decltype(f)>::type;
 
 			try {
 				for (auto const& elem: shape) {
@@ -149,7 +150,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 					std::size_t chunk_size = std::get<2>(elem);
 
 					F _f( std::move(f) );
-
+					//const std::size_t x = 0;
 					auto kernelSubmit = [_f, &sycl_buffer, data_count]() {
 						sycl_buffer.queue.submit( [_f, &sycl_buffer, data_count](cl::sycl::handler & cgh) {
 							
@@ -166,7 +167,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 									// auto _x = std::make_tuple(&buffer_view, index[0], x);
 
 									// This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
-									//auto _x = std::make_tuple(&buffer_view, index[0] + x, 1);
+									// auto _x = std::make_tuple(&buffer_view, index[0] + x, 1);
 
 									_f(_x);
 									//for(int i = 0; i < 10; ++i)
@@ -178,7 +179,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 									//buffer_view[ index[0] ] = x;
 								}
 							};
-							cgh.parallel_for<class kernel_name>(cl::sycl::range<1>(data_count), syclKernel);
+							cgh.parallel_for<class llambda_type>(cl::sycl::range<1>(data_count), syclKernel);
 
 						});
 					};
@@ -227,14 +228,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 							if (true) {
 								// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
 								// Test 3 shows that hardcoded '1' is passed correctly.
-								auto _x = std::make_tuple(&buffer_view, index[0], 1);
+								//auto _x = std::make_tuple(&buffer_view, index[0], 1);
 
 								// This doesn't. Obviously, x = 0 means that no work is done.
 								// Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
 								// auto _x = std::make_tuple(&buffer_view, index[0], x);
 
 								// This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
-								//auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
+								auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
 
 								_f(_x);
 

@@ -5,6 +5,7 @@
 #include <hpx/util/lightweight_test.hpp>
 
 #include <iostream>
+#include <future>
 
 #include <boost/cstdint.hpp>
 #include <boost/format.hpp>

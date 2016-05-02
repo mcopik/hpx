@@ -58,7 +58,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     ///       \a parallel_execution_tag.
     struct vector_execution_tag {};
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
     ///////////////////////////////////////////////////////////////////////////
     /// Function invocations executed by a specialized GPU executor.
     struct gpu_execution_tag {};
@@ -92,7 +92,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
           : std::true_type
         {};
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
         template <>
         struct is_not_weaker<sequential_execution_tag, gpu_execution_tag>
           : std::true_type
@@ -261,6 +261,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             {
                 return exec.bulk_async_execute(std::forward<F>(f), shape);
             }
+
+            template <typename Executor, typename F, typename S, typename Buffer>
+            static auto call(int, Executor& exec, F && f, S const& shape, Buffer & buffer)
+            ->  decltype(exec.bulk_async_execute(std::forward<F>(f), shape, buffer))
+            {
+                return exec.bulk_async_execute(std::forward<F>(f), shape, buffer);
+            }
         };
 
         template <typename Executor, typename F, typename S>
@@ -278,6 +285,23 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         {
             return bulk_async_execute_helper::call(
                 0, exec, std::forward<F>(f), shape);
+        }
+
+        template <typename Executor, typename F, typename S, typename Buffer>
+        auto call_bulk_async_execute(Executor& exec, F && f, S const& shape, Buffer & buffer)
+#if defined(HPX_ENABLE_WORKAROUND_FOR_GCC46)
+        ->  std::vector<typename future_type<
+                Executor, typename bulk_async_execute_result<F, S>::type
+            >::type>
+#else
+        ->  decltype(
+                bulk_async_execute_helper::call(0, exec, std::forward<F>(f),
+                    shape, buffer)
+            )
+#endif
+        {
+            return bulk_async_execute_helper::call(
+                0, exec, std::forward<F>(f), shape, buffer);
         }
 
         ///////////////////////////////////////////////////////////////////////
@@ -556,6 +580,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 exec, std::forward<F>(f), shape);
         }
 
+        template <typename F, typename Shape, typename GPUBuffer>
+        static auto async_execute(executor_type& exec, F && f, Shape const& shape, GPUBuffer & buffer)
+        ->  decltype( detail::call_bulk_async_execute(exec, std::forward<F>(f), shape, buffer))
+        {
+            return detail::call_bulk_async_execute(
+                exec, std::forward<F>(f), shape, buffer);
+        }
+
         /// \brief Bulk form of synchronous execution agent creation
         ///
         /// This synchronously creates a group of function invocations f(i)
@@ -617,7 +649,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     struct is_executor;         // defined in hpx/traits/is_executor.hpp
 
     ///////////////////////////////////////////////////////////////////////////
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
 	namespace detail
 	{
 		///////////////////////////////////////////////////////////////////////////

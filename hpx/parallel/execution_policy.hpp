@@ -1222,7 +1222,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     /// Default vector execution policy object.
     static parallel_vector_execution_policy const par_vec;
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
 
     ///////////////////////////////////////////////////////////////////////////
     /// Extension: The class represents a policy of parallel execution on
@@ -1497,7 +1497,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
           : boost::mpl::true_
         {};
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
         template <>
         struct is_execution_policy<gpu_execution_policy>
           : boost::mpl::true_
@@ -1585,7 +1585,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
           : boost::mpl::true_
         {};
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
         template <>
         struct is_parallel_execution_policy<gpu_execution_policy>
           : boost::mpl::true_
@@ -1695,7 +1695,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
           : boost::mpl::true_
         {};
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
         template <>
         struct is_async_execution_policy<gpu_task_execution_policy>
           : boost::mpl::true_

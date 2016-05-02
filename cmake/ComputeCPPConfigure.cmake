@@ -14,6 +14,7 @@ macro(computecpp_configure)
   set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${HPX_WITH_COMPUTECPP}/cmake/Modules/")
   include(${HPX_WITH_COMPUTECPP}/cmake/common.cmake)
   hpx_add_config_define(HPX_WITH_SYCL)
+  hpx_add_config_define(HPX_WITH_GPU_EXECUTOR)
 
   #temporary workaround to enable compilation
   hpx_add_compile_flag(-I${HPX_WITH_COMPUTECPP}/include)

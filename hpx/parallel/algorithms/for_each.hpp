@@ -103,7 +103,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 				Proj _proj(std::move(proj));
 				typedef typename gpu_execution_policy::executor_type::buffer_traits<Iter>::type gpu_buffer_type;
 
-				std::cout << "SYCL" << std::endl;
 				if (count != 0)
 				{
 					//dont'return right now - we have to sync buffers after the call
@@ -129,31 +128,34 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 			parallel(gpu_task_execution_policy policy, Iter first, std::size_t count,
 			F && f, Proj && proj = Proj())
 			{
+				typedef typename gpu_execution_policy::executor_type::buffer_traits<Iter>::type gpu_buffer_type;
 
 				if (count != 0)
 				{
 
 					Iter end = first;
 					std::advance(end, count);
+					F _f = std::move(f);
+					Proj _proj(std::move(proj));
 
 					/**
 					 * Allocate data on the GPU.
 					 */
 					auto buffer = policy.executor().create_buffers_shared(first, count);
-					auto * gpu_buffer = buffer.get()->buffer_view();
-					
+					//auto buffer = policy.executor().create_buffers(first, count);
+					//auto * gpu_buffer = buffer.get()->buffer_view();
 					hpx::future<Iter> x = util::foreach_n_partitioner<gpu_task_execution_policy>::call(
 							policy, first, count,
-							[f, proj, gpu_buffer](std::size_t part_begin, std::size_t part_size)
+							[_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
 							{
 								for(std::size_t i = 0; i < part_size; ++i)
-									f( proj( (*gpu_buffer)[part_begin + i]) );
-							});
+									_f( _proj( (*gpu_buffer)[part_begin + i]) );
+							}, *buffer.get());
 					/**
 					 * Sync the data after finishing GPU computation.
 					 */
 					hpx::future<Iter> s = x.then( [=](hpx::future<Iter> it)
-								{ it.wait(); buffer.get()->sync(); return it.get(); });
+								{ buffer.get()->sync(); return it.get(); });
 					return s;
 				}
 				return util::detail::algorithm_result<gpu_task_execution_policy, Iter>::get(

@@ -175,7 +175,7 @@ namespace hpx { namespace parallel { namespace util
 					// TODO: extend for more GPUs
 					// right now it sends whole computation on one device
 					std::vector<int> positions = {0};
-					std::vector< std::tuple<const buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, 0, count) };
+					std::vector< std::tuple<const buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, count, 1) };
 
 					/**
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
@@ -240,15 +240,15 @@ namespace hpx { namespace parallel { namespace util
 		template <typename Result>
 		struct foreach_n_static_partitioner<gpu_task_execution_policy, Result>
 		{
-			template <typename ExPolicy, typename FwdIter, typename F1>
+			template <typename ExPolicy, typename FwdIter, typename F1, typename GPUBuffer>
 			static hpx::future<FwdIter> call(ExPolicy policy,
-				FwdIter first, std::size_t count, F1 && f1,
+				FwdIter first, std::size_t count, F1 && f1, GPUBuffer & buffer,
 				std::size_t chunk_size)
 			{
 				typedef typename ExPolicy::executor_type executor_type;
 				typedef typename hpx::parallel::executor_traits<executor_type>
 					executor_traits;
-				typedef typename hpx::util::tuple<FwdIter, std::size_t> tuple;
+				typedef typename GPUBuffer::buffer_view_type buffer_view;
 
 				FwdIter last = first;
 				std::advance(last, count);
@@ -258,15 +258,16 @@ namespace hpx { namespace parallel { namespace util
 
 				try {
 					std::vector<int> positions = {0};
-					std::vector< std::pair<std::size_t, std::size_t> > shape{ {0, count} };
+					std::vector< std::tuple<const buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, count, 1) };
 
 					/**
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
 					 * one of them will point to the starting index and the second one will give the size.
 					 */
-					auto f = [f1](std::pair<std::size_t, std::size_t> const& elem)
+					F1 _f1 = std::move(f1);	
+					auto f = [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
-						return f1(elem.first, elem.second);
+						return _f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem));
 					};
 
 					workitems.reserve(shape.size());
@@ -274,7 +275,7 @@ namespace hpx { namespace parallel { namespace util
 					workitems = executor_traits::async_execute(
 						policy.executor(),
 						std::forward<decltype(f)>(f),
-						shape);
+						shape, buffer);
 				}
 				catch (std::bad_alloc const&) {
 					return hpx::make_exceptional_future<FwdIter>(
@@ -341,7 +342,7 @@ namespace hpx { namespace parallel { namespace util
             }
         };
 
-#if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
+#if defined(HPX_WITH_GPU_EXECUTOR)
 		template <typename Result>
 		struct foreach_n_partitioner<gpu_execution_policy, Result,
 				parallel::traits::static_partitioner_tag>
@@ -360,13 +361,13 @@ namespace hpx { namespace parallel { namespace util
 		struct foreach_n_partitioner<gpu_task_execution_policy, Result,
 				parallel::traits::static_partitioner_tag>
 		{
-			template <typename ExPolicy, typename FwdIter, typename F1>
+			template <typename ExPolicy, typename FwdIter, typename F1, typename GPUBuffer>
 			static hpx::future<FwdIter> call(ExPolicy policy,
-				FwdIter first, std::size_t count, F1 && f1,
+				FwdIter first, std::size_t count, F1 && f1, GPUBuffer & buffer,
 				std::size_t chunk_size = 0)
 			{
 				return foreach_n_static_partitioner<gpu_task_execution_policy, Result>::call(
-					policy, first, count, std::forward<F1>(f1), chunk_size);
+					policy, first, count, std::forward<F1>(f1), buffer, chunk_size);
 			}
 		};
 #endif

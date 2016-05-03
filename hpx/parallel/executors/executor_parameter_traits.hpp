@@ -101,6 +101,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             static std::size_t
             call(wrap_int, Parameters&, Executor&, F &&, std::size_t num_tasks)
             {
+				std::cout << "seq" << std::endl;
                 return num_tasks;       // assume sequential execution
             }
 
@@ -111,6 +112,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     params.get_chunk_size(exec, std::forward<F>(f), num_tasks)
                 )
             {
+				std::cout << "call" << std::endl;
                 return params.get_chunk_size(exec, std::forward<F>(f), num_tasks);
             }
         };

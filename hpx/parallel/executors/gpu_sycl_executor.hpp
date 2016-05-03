@@ -14,6 +14,7 @@
 #include <hpx/parallel/config/inline_namespace.hpp>
 #include <hpx/parallel/exception_list.hpp>
 #include <hpx/parallel/executors/executor_traits.hpp>
+#include <hpx/parallel/executors/dynamic_chunk_size.hpp>
 #include <hpx/runtime/threads/thread_executor.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/result_of.hpp>
@@ -39,6 +40,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     ///
     struct gpu_sycl_executor
     {
+		/// Returns always 1 if user doesn't provide a chunk size
+		typedef hpx::parallel::dynamic_chunk_size executor_parameters_type;
+
 		#if defined(DOXYGEN)
 				/// Create a new sequential executor
 				gpu_sycl_executor() {}
@@ -56,7 +60,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				typename _buffer_view_type =  decltype( std::declval< buffer_type >().template get_access<cl::sycl::access::mode::read_write>( std::declval<cl::sycl::handler &>() ) )>
     	struct gpu_sycl_buffer : detail::gpu_executor_buffer<Iter, _buffer_view_type>
 		{
-			cl::sycl::host_selector selector;
+			cl::sycl::default_selector selector;
 			cl::sycl::queue queue;
     		Iter cpu_buffer;
     		std::shared_ptr<buffer_type> buffer;
@@ -148,11 +152,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				for (auto const& elem: shape) {
 					std::size_t data_count = std::get<1>(elem);
 					std::size_t chunk_size = std::get<2>(elem);
+					std::size_t threads_to_run = data_count / chunk_size;
+					std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
 
 					F _f( std::move(f) );
 					//const std::size_t x = 0;
-					auto kernelSubmit = [_f, &sycl_buffer, data_count]() {
-						sycl_buffer.queue.submit( [_f, &sycl_buffer, data_count](cl::sycl::handler & cgh) {
+					auto kernelSubmit = [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk]() {
+						sycl_buffer.queue.submit( [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk](cl::sycl::handler & cgh) {
 							
 							buffer_view_type buffer_view = 
 								(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
@@ -168,6 +174,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
 									// This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
 									// auto _x = std::make_tuple(&buffer_view, index[0] + x, 1);
+									//auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
 
 									_f(_x);
 									//for(int i = 0; i < 10; ++i)
@@ -216,7 +223,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				
 				std::size_t threads_to_run = data_count / chunk_size;
 				std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
-
+				std::cout << data_count << " " << chunk_size << " " << threads_to_run << " " << last_thread_chunk << std::endl;
 				sycl_buffer.queue.submit( [_f, &sycl_buffer, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
 
 					buffer_view_type buffer_view = 
@@ -228,14 +235,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 							if (true) {
 								// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
 								// Test 3 shows that hardcoded '1' is passed correctly.
-								//auto _x = std::make_tuple(&buffer_view, index[0], 1);
+								auto _x = std::make_tuple(&buffer_view, index[0], 1);
 
 								// This doesn't. Obviously, x = 0 means that no work is done.
 								// Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
 								// auto _x = std::make_tuple(&buffer_view, index[0], x);
 
 								// This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
-								auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
+								//auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
 
 								_f(_x);
 

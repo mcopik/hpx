@@ -123,6 +123,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 							for(std::size_t i = 0; i < part_size; ++i)
 								_f( _proj( (*gpu_buffer)[part_begin + i]) );
 						}), buffer);
+					std::cout << "Sync buffer" << std::endl;
 					// the data needs to be transferred from gpu back to original buffer
 					buffer.sync();
 

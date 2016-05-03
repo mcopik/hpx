@@ -176,6 +176,9 @@ namespace hpx { namespace parallel { namespace util
 
 					std::size_t chunk_size = traits::get_chunk_size(policy.parameters(), policy.executor(), 
                         [](){ return 0; }, count);
+					std::cout << chunk_size << std::endl;
+					// 0 when no parameter is specified
+					chunk_size = chunk_size == 0 ? 1 : chunk_size;
                     chunk_size = std::min(chunk_size, count);
 					std::vector< std::tuple<const buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, count, chunk_size) };
 

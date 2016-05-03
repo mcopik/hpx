@@ -3,6 +3,7 @@
 #include <hpx/include/parallel_for_each.hpp>
 #include <hpx/parallel/executors/parallel_executor.hpp>
 #include <hpx/util/lightweight_test.hpp>
+#include <hpx/parallel/kernel.hpp>
 
 #include <iostream>
 
@@ -63,9 +64,9 @@ int hpx_main(boost::program_options::variables_map& vm)
 		std::vector< hpx::future<std::vector<std::size_t>::iterator> > tasks;
 		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task).with(hpx::parallel::static_chunk_size(4)),
 			boost::begin(c), n,
-			[](std::size_t& v) {
+			hpx::parallel::make_kernel<class MyKernel>([](std::size_t& v) {
 				v = 42;
-			}) );
+			}) ) );
 
 /*		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task),
 			boost::begin(d), n,

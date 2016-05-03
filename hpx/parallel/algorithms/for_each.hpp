@@ -25,6 +25,7 @@
 #include <hpx/parallel/util/loop.hpp>
 #include <hpx/parallel/util/projection_identity.hpp>
 #include <hpx/parallel/traits/projected.hpp>
+#include <hpx/parallel/kernel.hpp>
 
 #include <algorithm>
 #include <iterator>
@@ -112,18 +113,18 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 	        	auto buffer = policy.executor().create_buffers(first, count);
 				Proj _proj(std::move(proj));
 				typedef typename gpu_execution_policy::executor_type::buffer_traits<Iter>::type gpu_buffer_type;
+				using kernel_name = typename hpx::parallel::get_kernel_name<F>::kernel_name;
 
 				if (count != 0)
 				{
 					//dont'return right now - we have to sync buffers after the call
 					util::foreach_n_partitioner<gpu_execution_policy>::call(
 						policy, first, count,
-                        std::move([_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
+                       	hpx::parallel::make_kernel<kernel_name>([_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
 						{
 							for(std::size_t i = 0; i < part_size; ++i)
 								_f( _proj( (*gpu_buffer)[part_begin + i]) );
 						}), buffer);
-					std::cout << "Sync buffer" << std::endl;
 					// the data needs to be transferred from gpu back to original buffer
 					buffer.sync();
 
@@ -140,6 +141,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 			F && f, Proj && proj, std::true_type, std::true_type)
 			{
 				typedef typename gpu_execution_policy::executor_type::buffer_traits<Iter>::type gpu_buffer_type;
+				using kernel_name = typename hpx::parallel::get_kernel_name<F>::kernel_name;
 
 				if (count != 0)
 				{
@@ -156,11 +158,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
 					hpx::future<Iter> x = util::foreach_n_partitioner<gpu_task_execution_policy>::call(
 							policy, first, count,
-							[_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
+							hpx::parallel::make_kernel<kernel_name>([_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
 							{
 								for(std::size_t i = 0; i < part_size; ++i)
 									_f( _proj( (*gpu_buffer)[part_begin + i]) );
-							}, *buffer.get());
+							}), *buffer.get());
 					/**
 					 * Sync the data after finishing GPU computation.
 					 */

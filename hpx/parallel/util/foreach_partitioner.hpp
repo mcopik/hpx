@@ -165,6 +165,7 @@ namespace hpx { namespace parallel { namespace util
 				typedef typename GPUBuffer::buffer_view_type buffer_view;
                 typedef typename ExPolicy::executor_parameters_type parameters_type;
                 typedef executor_parameter_traits<parameters_type> traits;
+				using kernel_name = typename hpx::parallel::get_kernel_name<F1>::kernel_name;
 
 				FwdIter last = first;
 				std::advance(last, count);
@@ -190,7 +191,7 @@ namespace hpx { namespace parallel { namespace util
 					 * correcly detect the return type of this lambda
 					 */
 					F1 _f1 = std::move(f1);				
-					auto f = [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
+					auto f = hpx::parallel::make_kernel<kernel_name>([_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
 						/**
 						 *	Test 1 : Run function defined in parallel/algorithms/for_each
@@ -212,7 +213,7 @@ namespace hpx { namespace parallel { namespace util
 						 *	No HPX - instead of array position shows the same random value
 						 */
 						//(*std::get<0>(elem))[ std::get<1>(elem) ] = std::get<2>(elem);
-					};
+					});
 
 					//workitems.reserve(shape.size());
 					//workitems = executor_traits::async_execute(
@@ -263,6 +264,7 @@ namespace hpx { namespace parallel { namespace util
 				typedef typename GPUBuffer::buffer_view_type buffer_view;
 				typedef typename ExPolicy::executor_parameters_type parameters_type;
 				typedef executor_parameter_traits<parameters_type> traits;
+				using kernel_name = typename hpx::parallel::get_kernel_name<F1>::kernel_name;
 
 				FwdIter last = first;
 				std::advance(last, count);
@@ -281,10 +283,10 @@ namespace hpx { namespace parallel { namespace util
 					 * one of them will point to the starting index and the second one will give the size.
 					 */
 					F1 _f1 = std::move(f1);	
-					auto f = [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
+					auto f = hpx::parallel::make_kernel<kernel_name>([_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
 						return _f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem));
-					};
+					});
 
 					workitems.reserve(shape.size());
 

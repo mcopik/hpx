@@ -11,6 +11,7 @@
 #include <SYCL/sycl.hpp>
 
 #include <hpx/config.hpp>
+#include <hpx/parallel/kernel.hpp>
 #include <hpx/parallel/config/inline_namespace.hpp>
 #include <hpx/parallel/exception_list.hpp>
 #include <hpx/parallel/executors/executor_traits.hpp>
@@ -144,10 +145,10 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		bulk_async_execute(F && f, Shape const& shape, GPUBuffer & sycl_buffer)
 		{
 			typedef typename detail::bulk_async_execute_result<F, Shape>::type result_type;
-			std::vector<hpx::future<result_type> > results;
 			typedef typename GPUBuffer::buffer_view_type buffer_view_type;
-			using lambda_type = typename hpx::util::decay<decltype(f)>::type;
+			using kernel_name = typename hpx::parallel::get_kernel_name<F>::kernel_name;
 
+			std::vector<hpx::future<result_type> > results;
 			try {
 				for (auto const& elem: shape) {
 					std::size_t data_count = std::get<1>(elem);
@@ -186,7 +187,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 									//buffer_view[ index[0] ] = x;
 								}
 							};
-							cgh.parallel_for<class llambda_type>(cl::sycl::range<1>(data_count), syclKernel);
+							cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count), syclKernel);
 
 						});
 					};
@@ -211,6 +212,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		bulk_execute(F && f, Shape const& shape, GPUBuffer & sycl_buffer)
 		{
 			typedef typename GPUBuffer::buffer_view_type buffer_view_type;
+			using kernel_name = typename hpx::parallel::get_kernel_name<F>::kernel_name;
 			/**
 			 * The elements of pair are:
 			 * begin at array, # of elements to process
@@ -229,7 +231,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 					buffer_view_type buffer_view = 
 						(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
 
-					cgh.parallel_for<class hpx_foreach>(cl::sycl::range<1>(threads_to_run),
+					cgh.parallel_for<kernel_name>(cl::sycl::range<1>(threads_to_run),
 						[=] (cl::sycl::id<1> index)
 						{	
 							if (true) {

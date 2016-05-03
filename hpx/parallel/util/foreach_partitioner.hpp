@@ -19,6 +19,7 @@
 #include <hpx/util/tuple.hpp>
 
 #include <hpx/parallel/executors/executor_traits.hpp>
+#include <hpx/parallel/executors/executor_parameter_traits.hpp>
 #include <hpx/parallel/execution_policy.hpp>
 #include <hpx/parallel/util/detail/chunk_size.hpp>
 #include <hpx/parallel/util/detail/handle_local_exceptions.hpp>
@@ -161,8 +162,9 @@ namespace hpx { namespace parallel { namespace util
 				typedef typename ExPolicy::executor_type executor_type;
 				typedef typename hpx::parallel::executor_traits<executor_type>
 					executor_traits;
-
 				typedef typename GPUBuffer::buffer_view_type buffer_view;
+                typedef typename ExPolicy::executor_parameters_type parameters_type;
+                typedef executor_parameter_traits<parameters_type> traits;
 
 				FwdIter last = first;
 				std::advance(last, count);
@@ -172,10 +174,10 @@ namespace hpx { namespace parallel { namespace util
 
 				try {
 
-					// TODO: extend for more GPUs
-					// right now it sends whole computation on one device
-					std::vector<int> positions = {0};
-					std::vector< std::tuple<const buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, count, 5) };
+					std::size_t chunk_size = traits::get_chunk_size(policy.parameters(), policy.executor(), 
+                        [](){ return 0; }, count);
+                    chunk_size = std::min(chunk_size, count);
+					std::vector< std::tuple<const buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, count, chunk_size) };
 
 					/**
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
@@ -256,6 +258,8 @@ namespace hpx { namespace parallel { namespace util
 				typedef typename hpx::parallel::executor_traits<executor_type>
 					executor_traits;
 				typedef typename GPUBuffer::buffer_view_type buffer_view;
+				typedef typename ExPolicy::executor_parameters_type parameters_type;
+				typedef executor_parameter_traits<parameters_type> traits;
 
 				FwdIter last = first;
 				std::advance(last, count);
@@ -264,8 +268,10 @@ namespace hpx { namespace parallel { namespace util
 				std::list<boost::exception_ptr> errors;
 
 				try {
-					std::vector<int> positions = {0};
-					std::vector< std::tuple<const buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, count, 1) };
+					std::size_t chunk_size = traits::get_chunk_size(policy.parameters(), policy.executor(), 
+						[](){ return 0; }, count);
+                    chunk_size = std::min(chunk_size, count);
+					std::vector< std::tuple<const buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, count, chunk_size) };
 
 					/**
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,

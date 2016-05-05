@@ -25,7 +25,7 @@ namespace detail{
 	{
 		using functor_type = F;
 		using kernel_name = KernelName;
-		
+
 		kernel(const F & f) : f(f) {}
 
 
@@ -33,7 +33,7 @@ namespace detail{
 		typename std::result_of<F(Args...)>::type operator()(Args &&... args) const
 		{
 			return f( std::forward<Args>(args)... );
-		}		
+		}
 
 	private:
 		//F && f;
@@ -98,14 +98,17 @@ template<typename Range, typename Kernel, typename OrigKernel>
 void call_kernel(handler& cgh, const Range & range, Kernel kernel, OrigKernel &)
 {
 	using kernel_name = typename hpx::parallel::get_kernel_name<OrigKernel>::kernel_name;
+	std::cout << typeid(kernel_name).name() << std::endl;
 	cgh.parallel_for< kernel_name >(range, kernel);
 }
 
-int hpx_main(boost::program_options::variables_map& vm)
+	
+int hpx_main(/*boost::program_options::variables_map& vm*/)
 {
 
 	hpx::util::high_resolution_timer t;
-	boost::uint64_t n = vm["n-value"].as<boost::uint64_t>();
+	//boost::uint64_t n = vm["n-value"].as<boost::uint64_t>();
+	int n = 10;
 	int * data = new int[n];
   	for (int i = 0; i < n; i++) {
 		data[i] = 0;
@@ -129,29 +132,28 @@ int hpx_main(boost::program_options::variables_map& vm)
 	//DefaultKernelName
 	//auto my_kernel = hpx::parallel::make_kernel( Functor() );
 
-	auto my_kernel2 = hpx::parallel::make_kernel( [](int & x) { x += 1; } );
-	int x = 0;	
-	my_kernel2(x);
+//	auto my_kernel2 = hpx::parallel::make_kernel( [](int & x) { x += 1; } );
+//	int x = 0;
+//	my_kernel2(x);
 	try
 	{
 		queue myQueue;
 		buffer<int, 1> buf(data, range<1>(n));
-		if(true) {
+		//if(true) {
 
 			myQueue.submit([&](handler& cgh) {
 				// Ok !
-				using kernel_name = hpx::parallel::DefaultKernelName;//hpx::parallel::get_kernel_name<decltype(my_kernel)>::kernel_name;
-				
+				using kernel_name = hpx::parallel::get_kernel_name<decltype(my_kernel)>::kernel_name;
 
 				auto ptr = buf.get_access<access::mode::read_write>(cgh);
 				auto myKernel = (range<1>(n), [=](id<1> idx) {
 					ptr[idx[0]] = my_kernel(static_cast<int>(idx[0]));
 				});
-				call_kernel(cgh, range<1>(n), myKernel, my_kernel);
-				//cgh.parallel_for< kernel_name >(range<1>(n), myKernel);
+				//call_kernel(cgh, range<1>(n), myKernel, my_kernel);
+				cgh.parallel_for< class Functor /*kernel_name*/ >(range<1>(n), myKernel);
 			});
 
-		} else {
+		/*} else {
 
 			auto future_obj = hpx::async(hpx::launch::async, [&] ()
 				{
@@ -164,7 +166,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 					});
 				});
 			future_obj.wait();
-		}
+		}*/
 
 	} catch (exception e) {
 		std::cout << "SYCL exception caught: " << e.what();
@@ -180,8 +182,8 @@ int hpx_main(boost::program_options::variables_map& vm)
 	double elapsed = t.elapsed();
 	std::cout << ( boost::format("elapsed time == %2% [s]\n") % n  % elapsed);
 	delete[] data;
-
-	return hpx::finalize();
+	return 0;
+	//return hpx::finalize();
 }
 
 
@@ -204,5 +206,6 @@ int main(int argc, char* argv[])
 		;
 
 	// Initialize and run HPX
-	return hpx::init(desc_commandline, argc, argv);
+	//return hpx::init(desc_commandline, argc, argv);
+	hpx_main();
 }

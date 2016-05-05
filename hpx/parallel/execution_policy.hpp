@@ -1983,22 +1983,44 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         /// \cond NOINTERNAL
         template <typename T>
         struct is_parallel_execution_policy
-          : boost::mpl::false_
+          : std::true_type
         {};
 
         template <>
         struct is_parallel_execution_policy<parallel_execution_policy>
-          : boost::mpl::true_
+          : std::true_type
+        {};
+
+        template <typename Executor, typename Parameters>
+        struct is_parallel_execution_policy<parallel_execution_policy_shim<Executor, Parameters>>
+          : std::true_type
         {};
 
         template <>
         struct is_parallel_execution_policy<parallel_vector_execution_policy>
-          : boost::mpl::true_
+          : std::true_type
+        {};
+
+#if defined(HPX_WITH_GPU_EXECUTOR)
+        template <>
+        struct is_parallel_execution_policy<gpu_execution_policy>
+          : std::true_type
         {};
 
         template <>
+        struct is_parallel_execution_policy<gpu_task_execution_policy>
+          : std::true_type
+        {};
+#endif
+
+        template <>
         struct is_parallel_execution_policy<parallel_task_execution_policy>
-          : boost::mpl::true_
+          : std::true_type
+        {};        
+
+        template <typename Executor, typename Parameters>
+        struct is_parallel_execution_policy<parallel_task_execution_policy_shim<Executor, Parameters>>
+          : std::true_type
         {};
         /// \endcond
     }
@@ -2132,23 +2154,41 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         /// \cond NOINTERNAL
         template <typename T>
         struct is_async_execution_policy
-          : boost::mpl::false_
+          : std::false_type
         {};
 
         template <>
         struct is_async_execution_policy<sequential_task_execution_policy>
-          : boost::mpl::true_
+          : std::true_type
+        {};
+
+        template <typename Executor, typename Parameters>
+        struct is_async_execution_policy<
+                sequential_execution_policy_shim<Executor, Parameters> >
+          : std::true_type
         {};
 
         template <>
         struct is_async_execution_policy<parallel_task_execution_policy>
-          : boost::mpl::true_
+          : std::true_type
+        {};
+
+        template <typename Executor, typename Parameters>
+        struct is_async_execution_policy<
+                parallel_execution_policy_shim<Executor, Parameters> >
+          : std::true_type
         {};
 
 #if defined(HPX_WITH_GPU_EXECUTOR)
         template <>
         struct is_async_execution_policy<gpu_task_execution_policy>
-          : boost::mpl::true_
+          : std::true_type
+        {};
+
+        template <typename Executor, typename Parameters>
+        struct is_async_execution_policy<
+                gpu_task_execution_policy_shim<Executor, Parameters> >
+          : std::true_type
         {};
 #endif
 

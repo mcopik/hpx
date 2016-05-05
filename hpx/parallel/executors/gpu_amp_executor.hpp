@@ -134,6 +134,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 					std::size_t threads_to_run = data_count / chunk_size;
 					std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
 
+					std::cout << "Async: " << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
 					results.push_back(hpx::async(launch::async,
 						/**
 						 * Lambda calling the AMP parallel execution.
@@ -160,9 +161,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			return std::move(results);
 		}
 
-		template <typename F, typename Shape, typename GPUBuffer>
+		template <typename F, typename Shape>
 		static typename detail::bulk_execute_result<F, Shape>::type
-		bulk_execute(F && f, Shape const& shape, GPUBuffer & buffer)
+		bulk_execute(F && f, Shape const& shape)
 		{
 			/**
 			 * The elements of pair are:
@@ -174,7 +175,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				
 				std::size_t threads_to_run = data_count / chunk_size;
 				std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
-				std::cout << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
+				std::cout << "Sync: " << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
 
 				Concurrency::extent<1> e(threads_to_run);
 				Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) 

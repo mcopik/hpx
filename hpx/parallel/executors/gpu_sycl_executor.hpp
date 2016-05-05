@@ -157,8 +157,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 					std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
 
 					F _f( std::move(f) );
-					//const std::size_t x = 0;
-					std::cout << typeid(F).name() << " " << typeid(Parameters).name() << " "  << std::endl;
+
 					auto kernelSubmit = [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk]() {
 						sycl_buffer.queue.submit( [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk](cl::sycl::handler & cgh) {
 							
@@ -213,8 +212,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		bulk_execute(Parameters & params, F && f, Shape const& shape, GPUBuffer & sycl_buffer)
 		{
 			typedef typename GPUBuffer::buffer_view_type buffer_view_type;
-
-//			using kernel_name = typename hpx::parallel::get_kernel_name<F>::kernel_name;
 			using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
 
 			/**
@@ -229,7 +226,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				
 				std::size_t threads_to_run = data_count / chunk_size;
 				std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
-				std::cout << data_count << " " << chunk_size << " " << threads_to_run << " " << last_thread_chunk << std::endl;
+
 				sycl_buffer.queue.submit( [_f, &sycl_buffer, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
 
 					buffer_view_type buffer_view = 

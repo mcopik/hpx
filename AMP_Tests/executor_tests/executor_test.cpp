@@ -58,7 +58,7 @@ int hpx_main(boost::program_options::variables_map& vm)
                                 //printf("%lu \n", v);
                                 return v1 + v2 + 300;
                         });
-		std::cout << *boost::begin(c) << " " << *boost::begin(d) << std::endl;
+		std::cout << *boost::begin(c) << " " << *boost::begin(d) << " " << *boost::begin(e) << std::endl;
 
 
 		// verify values
@@ -89,27 +89,33 @@ int hpx_main(boost::program_options::variables_map& vm)
 		/**
 		 * First, size
 		 */
-		std::iota(boost::begin(c), boost::end(c), std::rand());
-		std::iota(boost::begin(d), boost::end(d), std::rand());
+		std::iota(boost::begin(c), boost::end(c), 0);//std::rand());
+		std::iota(boost::begin(d), boost::end(d), 0);//std::rand());
 		std::vector< hpx::future<std::vector<std::size_t>::iterator> > tasks;
 		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task).with(hpx::parallel::static_chunk_size(32)),
 			boost::begin(c), n,
 			[](std::size_t& v) {
-				v = 42;
+				v += 42;
 			}) );
 
 		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task),
                         boost::begin(d), n,
                         [](std::size_t& v) {
-                                v = 43;
+                                v += 43;
                         }) );
 
 		hpx::wait_all(tasks);
+		auto future_result = hpx::parallel::transform(hpx::parallel::gpu_task.with(hpx::parallel::static_chunk_size(32)),
+                        boost::begin(c), boost::end(c), boost::begin(d), boost::begin(e),
+                        [](std::size_t v1, std::size_t v2) {
+                                //printf("%lu \n", v);
+                                return v1 + v2 + 100;
+                        });
 		// verify values
 		count = 0;
 		std::for_each(boost::begin(c), boost::end(c),
 			[&count](std::size_t v) -> void {
-				HPX_TEST_EQ(v, std::size_t(42));
+				HPX_TEST_EQ(v, std::size_t(42+count));
 				++count;
 			});
 		HPX_TEST_EQ(count, c.size());
@@ -117,12 +123,19 @@ int hpx_main(boost::program_options::variables_map& vm)
 		count = 0;
 		std::for_each(boost::begin(d), boost::end(d),
 				[&count](std::size_t v) -> void {
-				        HPX_TEST_EQ(v, std::size_t(43));
+				        HPX_TEST_EQ(v, std::size_t(43+count));
 				        ++count;
 				});
 		HPX_TEST_EQ(count, d.size());
-
-
+		count = 0;
+		future_result.wait();
+		std::for_each(boost::begin(e), boost::end(e),
+                                [&count](std::size_t v) -> void {
+                                        HPX_TEST_EQ(v, std::size_t(185+2*count));
+                                        ++count;
+                                });
+                HPX_TEST_EQ(count, d.size());
+		std::cout << *boost::begin(e) << std::endl;
 		double elapsed = t.elapsed();
 		std::cout
 			<< ( boost::format("elapsed time == %2% [s]\n")

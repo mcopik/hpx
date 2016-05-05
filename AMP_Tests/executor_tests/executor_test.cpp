@@ -8,6 +8,7 @@
 #include <hpx/hpx.hpp>
 #include <hpx/hpx_init.hpp>
 #include <hpx/include/parallel_for_each.hpp>
+#include <hpx/parallel/algorithms/transform.hpp>
 #include <hpx/parallel/executors/parallel_executor.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
@@ -28,12 +29,12 @@ int hpx_main(boost::program_options::variables_map& vm)
 		hpx::util::high_resolution_timer t;
 
 		std::vector<std::size_t> c(n);
-		std::vector<std::size_t> e(1000);
+		std::vector<std::size_t> e(n);
 		std::vector<std::size_t> d(n);
 		/**
 		 * First, last
 		 */
-		std::iota(boost::begin(c), boost::end(c), std::rand());
+		std::iota(boost::begin(c), boost::end(c),  std::rand());
 		std::iota(boost::begin(d), boost::end(d), std::rand());
 		hpx::parallel::for_each(hpx::parallel::gpu,//hpx::parallel::gpu,
 			boost::begin(c), boost::end(c),
@@ -50,6 +51,14 @@ int hpx_main(boost::program_options::variables_map& vm)
 				v = 43;
 			});
 
+		std::cout << *boost::begin(c) << " " << *boost::begin(d) << std::endl;
+		hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32)),
+                        boost::begin(c), boost::end(c), boost::begin(d), boost::begin(e),
+                        [](std::size_t v1, std::size_t v2) {
+                                //printf("%lu \n", v);
+                                return v1 + v2 + 300;
+                        });
+		std::cout << *boost::begin(c) << " " << *boost::begin(d) << std::endl;
 
 
 		// verify values
@@ -68,6 +77,14 @@ int hpx_main(boost::program_options::variables_map& vm)
 				++count;
 			});
 		HPX_TEST_EQ(count, d.size());
+		count = 0;
+                std::for_each(boost::begin(e), boost::end(e),
+                        [&count](std::size_t v) -> void {
+                                HPX_TEST_EQ(v, std::size_t(400+43+300));
+                                ++count;
+                        });
+                HPX_TEST_EQ(count, e.size());
+
 
 		/**
 		 * First, size

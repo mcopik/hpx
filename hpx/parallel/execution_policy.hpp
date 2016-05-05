@@ -1334,7 +1334,27 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             typedef typename rebind_executor<
                 gpu_task_execution_policy, executor_type, Parameters
             >::type rebound_type;
+			std::cout << typeid(rebound_type).name() << std::endl;
             return rebound_type(executor(), std::forward<Parameters>(params));
+        }
+		
+		/// TODO: document
+		template <typename... Parameters, 
+			typename ParametersType = typename hpx::parallel::join_parameters<Parameters...>::type>
+        typename rebind_executor<
+            gpu_task_execution_policy, executor_type, ParametersType
+        >::type
+        with(Parameters &&... params) const
+        {
+            /*static_assert(
+                is_executor_parameters<Parameters>::value,
+                "is_executor_parameters<Parameters>::value");*/
+
+            typedef typename rebind_executor<
+                gpu_task_execution_policy, executor_type, ParametersType
+            >::type rebound_type;
+            return rebound_type(executor(), 
+				hpx::parallel::join_parameters<Parameters...>::join(std::forward<Parameters>(params)...));
         }
 
         /// Return the associated executor object.
@@ -1596,6 +1616,25 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 gpu_execution_policy, executor_type, Parameters
             >::type rebound_type;
             return rebound_type(executor(), std::forward<Parameters>(params));
+        }
+		
+		/// TODO: document
+		template <typename... Parameters, 
+			typename ParametersType = typename hpx::parallel::join_parameters<Parameters...>::type>
+        typename rebind_executor<
+            gpu_execution_policy, executor_type, ParametersType
+        >::type
+        with(Parameters &&... params) const
+        {
+            /*static_assert(
+                is_executor_parameters<Parameters>::value,
+                "is_executor_parameters<Parameters>::value");*/
+
+            typedef typename rebind_executor<
+                gpu_execution_policy, executor_type, ParametersType
+            >::type rebound_type;
+            return rebound_type(executor(), 
+				hpx::parallel::join_parameters<Parameters...>::join(std::forward<Parameters>(params)...));
         }
 
         /// Return the associated executor object.

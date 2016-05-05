@@ -4,6 +4,7 @@
 #include <hpx/parallel/executors/parallel_executor.hpp>
 #include <hpx/util/lightweight_test.hpp>
 #include <hpx/parallel/kernel.hpp>
+#include <hpx/parallel/executors/kernel_name.hpp>
 
 #include <iostream>
 
@@ -27,7 +28,11 @@ int hpx_main(boost::program_options::variables_map& vm)
 		 */
 		std::iota(boost::begin(c), boost::end(c), std::rand());
 		std::iota(boost::begin(d), boost::end(d), std::rand());
-/*		hpx::parallel::for_each(hpx::parallel::gpu,
+		
+		/**
+			Default
+		**/
+		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(c), boost::end(c),
 			[](std::size_t& v) {
 
@@ -41,13 +46,18 @@ int hpx_main(boost::program_options::variables_map& vm)
 				++count;
 			});
 		HPX_TEST_EQ(count, c.size());
-*/
-		hpx::parallel::for_each(hpx::parallel::gpu,
+
+		count = 0;
+		std::iota(boost::begin(c), boost::end(c), std::rand());		
+		/**
+			Kernel overrides parameter
+		**/
+		hpx::parallel::for_each(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(4), hpx::parallel::kernel_name<class FalseName_2>()),
 			boost::begin(c), boost::end(c),
-			[](std::size_t& v) {
+			hpx::parallel::make_kernel<class CorrectName_2>([](std::size_t& v) {
 
 				v = 401;
-			});
+			}));
 		std::for_each(boost::begin(c), boost::end(c),
 			[&count](std::size_t v) -> void {
 				HPX_TEST_EQ(v, std::size_t(401));
@@ -62,17 +72,22 @@ int hpx_main(boost::program_options::variables_map& vm)
 		std::iota(boost::begin(c), boost::end(c), std::rand());
 		std::iota(boost::begin(d), boost::end(d), std::rand());
 		std::vector< hpx::future<std::vector<std::size_t>::iterator> > tasks;
-		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task).with(hpx::parallel::static_chunk_size(4)),
+		/**
+			Just parameter
+		**/
+		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task).with(hpx::parallel::static_chunk_size(4), hpx::parallel::kernel_name<class CorrectName_3>()),
 			boost::begin(c), n,
-			hpx::parallel::make_kernel<class MyKernel>([](std::size_t& v) {
-				v = 42;
-			}) ) );
-
-/*		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task),
-			boost::begin(d), n,
 			[](std::size_t& v) {
+				v = 42;
+			} ) );
+		/**
+			Just kernel
+		**/
+		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task),
+			boost::begin(d), n,
+			hpx::parallel::make_kernel<class CorrectName_4>([](std::size_t& v) {
 				v = 43;
-			}) );*/
+			})) );
 
 		hpx::wait_all(tasks);
 		// verify values
@@ -84,13 +99,13 @@ int hpx_main(boost::program_options::variables_map& vm)
 			});
 		HPX_TEST_EQ(count, c.size());
 
-		/*count = 0;
+		count = 0;
 		std::for_each(boost::begin(d), boost::end(d),
 			[&count](std::size_t v) -> void {
 				HPX_TEST_EQ(v, std::size_t(43));
 				++count;
 			});
-		HPX_TEST_EQ(count, c.size());*/
+		HPX_TEST_EQ(count, c.size());
 
 
 		double elapsed = t.elapsed();

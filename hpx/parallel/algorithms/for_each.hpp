@@ -26,6 +26,7 @@
 #include <hpx/parallel/util/projection_identity.hpp>
 #include <hpx/parallel/traits/projected.hpp>
 #include <hpx/parallel/kernel.hpp>
+#include <hpx/parallel/executors/executor_parameter_traits.hpp>
 
 #include <algorithm>
 #include <iterator>
@@ -97,6 +98,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 			parallel(ExPolicy policy, Iter first, std::size_t count,
 	    	F && f, Proj && proj, std::true_type is_gpu_execution)
 			{
+				std::cout << typeid(ExPolicy).name() << std::endl;
 				return parallel(std::forward<ExPolicy>(policy), first, std::size_t(count), std::forward<F>(f),
 				    std::forward<Proj>(proj), is_gpu_execution, typename is_async_execution_policy<ExPolicy>::type());
 			}
@@ -113,10 +115,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 	        	auto buffer = policy.executor().create_buffers(first, count);
 				Proj _proj(std::move(proj));
 				typedef typename gpu_execution_policy::executor_type::buffer_traits<Iter>::type gpu_buffer_type;
-				using kernel_name = typename hpx::parallel::get_kernel_name<F>::kernel_name;
+				using kernel_name = typename hpx::parallel::kernel_extract_name<F>::kernel_name;
 
 				if (count != 0)
 				{
+					std::cout << "Sync" << std::endl;
 					//dont'return right now - we have to sync buffers after the call
 					util::foreach_n_partitioner<gpu_execution_policy>::call(
 						policy, first, count,
@@ -141,7 +144,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 			F && f, Proj && proj, std::true_type, std::true_type)
 			{
 				typedef typename gpu_execution_policy::executor_type::buffer_traits<Iter>::type gpu_buffer_type;
-				using kernel_name = typename hpx::parallel::get_kernel_name<F>::kernel_name;
+				//using kernel_name = typename hpx::parallel::kernel_extract_name<F>::kernel_name;
 
 				if (count != 0)
 				{
@@ -154,11 +157,26 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					/**
 					 * Allocate data on the GPU.
 					 */
+					std::cout << "Async" << std::endl;
 					auto buffer = policy.executor().create_buffers_shared(first, count);
 
+					std::cout << typeid(F).name() << " "  << std::endl;
+
+					auto l = [_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
+							{
+								for(std::size_t i = 0; i < part_size; ++i)
+									_f( _proj( (*gpu_buffer)[part_begin + i]) );
+							};
+					//v3::detail::kernel<decltype(l), class MyAsyncKernel> t = hpx::parallel::wrap_kernel(f, l);
+					auto t1 = hpx::parallel::wrap_kernel(f, l);
+					//std::cout << "SPEcIAL: " << typeid(t).name() << std::endl;
+					std::cout << "SPECIAL2: " << typeid(t1).name() << std::endl;
+					//using kernel_name = typename hpx::parallel::get_kernel_name<decltype(t), typename ExPolicy::executor_parameters_type>::kernel_name;
+					//std::cout << typeid(  typename hpx::parallel::get_kernel_name<decltype(t), typename ExPolicy::executor_parameters_type>::kernel_name  ).name() << std::endl;
+					//std::cout << typeid(  typename hpx::parallel::get_kernel_name<typename std::decay<decltype(t1)>::type, typename ExPolicy::executor_parameters_type>::kernel_name  ).name() << std::endl;
 					hpx::future<Iter> x = util::foreach_n_partitioner<gpu_task_execution_policy>::call(
 							policy, first, count,
-							hpx::parallel::make_kernel<kernel_name>([_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
+							hpx::parallel::wrap_kernel(f, [_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
 							{
 								for(std::size_t i = 0; i < part_size; ++i)
 									_f( _proj( (*gpu_buffer)[part_begin + i]) );

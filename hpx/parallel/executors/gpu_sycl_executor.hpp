@@ -138,15 +138,15 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
 		}
 
-		template <typename F, typename Shape, typename GPUBuffer>
+		template <typename F, typename Parameters,typename Shape, typename GPUBuffer>
 		static std::vector<hpx::future<
 			typename detail::bulk_async_execute_result<F, Shape>::type
 		> >
-		bulk_async_execute(F && f, Shape const& shape, GPUBuffer & sycl_buffer)
+		bulk_async_execute(Parameters & params, F && f, Shape const& shape, GPUBuffer & sycl_buffer)
 		{
 			typedef typename detail::bulk_async_execute_result<F, Shape>::type result_type;
 			typedef typename GPUBuffer::buffer_view_type buffer_view_type;
-			using kernel_name = typename hpx::parallel::get_kernel_name<F>::kernel_name;
+			using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
 
 			std::vector<hpx::future<result_type> > results;
 			try {
@@ -158,6 +158,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
 					F _f( std::move(f) );
 					//const std::size_t x = 0;
+					std::cout << typeid(F).name() << " " << typeid(Parameters).name() << " "  << std::endl;
 					auto kernelSubmit = [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk]() {
 						sycl_buffer.queue.submit( [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk](cl::sycl::handler & cgh) {
 							
@@ -207,12 +208,15 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			return std::move(results);
 		}
 
-		template <typename F, typename Shape, typename GPUBuffer>
+		template <typename F, typename Parameters, typename Shape, typename GPUBuffer>
 		static typename detail::bulk_execute_result<F, Shape>::type
-		bulk_execute(F && f, Shape const& shape, GPUBuffer & sycl_buffer)
+		bulk_execute(Parameters & params, F && f, Shape const& shape, GPUBuffer & sycl_buffer)
 		{
 			typedef typename GPUBuffer::buffer_view_type buffer_view_type;
-			using kernel_name = typename hpx::parallel::get_kernel_name<F>::kernel_name;
+
+//			using kernel_name = typename hpx::parallel::get_kernel_name<F>::kernel_name;
+			using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
+
 			/**
 			 * The elements of pair are:
 			 * begin at array, # of elements to process
@@ -231,7 +235,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 					buffer_view_type buffer_view = 
 						(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
 
-					cgh.parallel_for<kernel_name>(cl::sycl::range<1>(threads_to_run),
+					cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count),
 						[=] (cl::sycl::id<1> index)
 						{	
 							if (true) {

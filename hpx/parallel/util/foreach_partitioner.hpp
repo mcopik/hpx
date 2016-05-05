@@ -165,7 +165,7 @@ namespace hpx { namespace parallel { namespace util
 				typedef typename GPUBuffer::buffer_view_type buffer_view;
                 typedef typename ExPolicy::executor_parameters_type parameters_type;
                 typedef executor_parameter_traits<parameters_type> traits;
-				using kernel_name = typename hpx::parallel::get_kernel_name<F1>::kernel_name;
+				using kernel_name = typename hpx::parallel::kernel_extract_name<F1>::kernel_name;
 
 				FwdIter last = first;
 				std::advance(last, count);
@@ -221,6 +221,7 @@ namespace hpx { namespace parallel { namespace util
 
 					executor_traits::execute(policy.executor(),
 							//std::forward<decltype(f)>(f),
+							policy.parameters(),
 							std::move(f),
 							shape, buffer);
 				}
@@ -264,7 +265,7 @@ namespace hpx { namespace parallel { namespace util
 				typedef typename GPUBuffer::buffer_view_type buffer_view;
 				typedef typename ExPolicy::executor_parameters_type parameters_type;
 				typedef executor_parameter_traits<parameters_type> traits;
-				using kernel_name = typename hpx::parallel::get_kernel_name<F1>::kernel_name;
+				using kernel_name = typename hpx::parallel::kernel_extract_name<F1>::kernel_name;
 
 				FwdIter last = first;
 				std::advance(last, count);
@@ -273,6 +274,7 @@ namespace hpx { namespace parallel { namespace util
 				std::list<boost::exception_ptr> errors;
 
 				try {
+					std::cout << "Partitioner: " << typeid(f1).name() << std::endl;
 					std::size_t chunk_size = traits::get_chunk_size(policy.parameters(), policy.executor(), 
 						[](){ return 0; }, count);
                     chunk_size = std::min(chunk_size, count);
@@ -283,15 +285,16 @@ namespace hpx { namespace parallel { namespace util
 					 * one of them will point to the starting index and the second one will give the size.
 					 */
 					F1 _f1 = std::move(f1);	
-					auto f = hpx::parallel::make_kernel<kernel_name>([_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
+					auto f = hpx::parallel::wrap_kernel(f1, [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
 						return _f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem));
 					});
+					std::cout << "Partitioner new lambda: " << typeid(f).name() << std::endl;
 
 					workitems.reserve(shape.size());
 
 					workitems = executor_traits::async_execute(
-						policy.executor(),
+						policy.executor(), policy.parameters(),
 						std::forward<decltype(f)>(f),
 						shape, buffer);
 				}

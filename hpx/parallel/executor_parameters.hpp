@@ -12,6 +12,6 @@
 #include <hpx/parallel/executors/dynamic_chunk_size.hpp>
 #include <hpx/parallel/executors/auto_chunk_size.hpp>
 #include <hpx/parallel/executors/guided_chunk_size.hpp>
-#include <hpx/parallel/executors/default_chunk_size.hpp>
+#include <hpx/parallel/executors/kernel_name.hpp>
 
 #endif

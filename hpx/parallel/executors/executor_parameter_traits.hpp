@@ -13,6 +13,7 @@
 #include <hpx/parallel/config/inline_namespace.hpp>
 #include <hpx/parallel/executors/executor_traits.hpp>
 #include <hpx/util/always_void.hpp>
+#include <hpx/parallel/kernel.hpp>
 
 #include <type_traits>
 #include <utility>
@@ -101,7 +102,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             static std::size_t
             call(wrap_int, Parameters&, Executor&, F &&, std::size_t num_tasks)
             {
-				std::cout << "seq" << std::endl;
                 return num_tasks;       // assume sequential execution
             }
 
@@ -112,7 +112,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     params.get_chunk_size(exec, std::forward<F>(f), num_tasks)
                 )
             {
-				std::cout << "call" << std::endl;
                 return params.get_chunk_size(exec, std::forward<F>(f), num_tasks);
             }
         };
@@ -252,6 +251,86 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     ///
     template <typename T>
     struct is_executor_parameters;
+
+	namespace detail
+	{
+		/*template<typename X>
+		struct kernel_name;*/
+		// If there is a kernel wrapper - take that name
+		// If not, take the parameter type
+		// If none - take default
+
+		// Look for parameter type
+		template<typename Kernel, typename Params, typename Enable = void>
+		struct get_kernel_name_params
+		{
+			typedef GenericKernelName kernel_name;
+		};
+		template<typename> struct void_ { typedef void type; };
+		template<typename Kernel, typename Params>
+		struct get_kernel_name_params<Kernel, Params, typename void_<typename Params::name>::type>
+		{
+			typedef typename Params::name kernel_name;
+		};
+
+		// Specialize for a kernel wrapper
+		/*template<typename F, typename KernelName, typename Params>
+		struct get_kernel_name<kernel<F, KernelName>, Params, 
+			typename std::enable_if<std::is_same<KernelName, DefaultKernelName>::value>::type>
+		{
+			typedef typename kernel<F, KernelName>::functor_type kernel_name;
+		};
+		ambigous:
+		template<typename F, typename KernelName, typename Params>
+		struct get_kernel_name<kernel<F, KernelName>, Params, 
+			typename std::enable_if<!std::is_same<KernelName, DefaultKernelName>::value>::type>
+		{
+			typedef typename kernel<F, KernelName>::kernel_name kernel_name;
+		};*/
+
+		template<typename Kernel, typename Params>
+		struct get_kernel_name : get_kernel_name_params<Kernel,Params> {};
+
+		template<typename F, typename KernelName, typename Params>
+		struct get_kernel_name<v3::detail::kernel<F, KernelName>, Params>
+		{
+			typedef typename kernel_extract_name< kernel<F, KernelName> >::kernel_name kernel_name;
+		};
+	}
+
+	template<typename... Params>
+	struct executor_parameters : public Params...{
+	public:
+    	executor_parameters(Params&&... params) : Params(params)... {}
+	};
+
+	template<typename... Params>
+	struct join_parameters
+	{
+		typedef executor_parameters<Params...> type;
+
+		static type join(Params &&... params)
+		{
+			return executor_parameters<Params...>(std::forward<Params>(params)...);
+		}
+	};
+
+    template <typename Kernel, typename Params>
+    struct get_kernel_name
+      : v3::detail::get_kernel_name<
+			typename hpx::util::decay<Kernel>::type, 
+			typename hpx::util::decay<Params>::type
+		>
+    {};
+	/*
+    template <typename F, typename KernelName, typename Params>
+    struct get_kernel_name<v3::detail::kernel<F, KernelName>, Params>
+      : v3::detail::get_kernel_name<
+			v3::detail::kernel<F, KernelName>, Params
+		>
+    {
+			//typedef  DefaultKernelName kernel_name;
+	};*/
 }}}
 
 #endif

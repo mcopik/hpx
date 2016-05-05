@@ -263,11 +263,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 return exec.bulk_async_execute(std::forward<F>(f), shape);
             }
 
-            template <typename Executor, typename F, typename S, typename Buffer>
-            static auto call(int, Executor& exec, F && f, S const& shape, Buffer & buffer)
-            ->  decltype(exec.bulk_async_execute(std::forward<F>(f), shape, buffer))
+            template <typename Executor, typename Parameters, typename F, typename S, typename Buffer>
+            static auto call(int, Executor& exec, Parameters & params, F && f, S const& shape, Buffer & buffer)
+            ->  decltype(exec.bulk_async_execute(params, std::forward<F>(f), shape, buffer))
             {
-                return exec.bulk_async_execute(std::forward<F>(f), shape, buffer);
+                return exec.bulk_async_execute(params, std::forward<F>(f), shape, buffer);
             }
         };
 
@@ -288,21 +288,21 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 0, exec, std::forward<F>(f), shape);
         }
 
-        template <typename Executor, typename F, typename S, typename Buffer>
-        auto call_bulk_async_execute(Executor& exec, F && f, S const& shape, Buffer & buffer)
+        template <typename Executor, typename Parameters, typename F, typename S, typename Buffer>
+        auto call_bulk_async_execute(Executor& exec, Parameters & params, F && f, S const& shape, Buffer & buffer)
 #if defined(HPX_ENABLE_WORKAROUND_FOR_GCC46)
         ->  std::vector<typename future_type<
                 Executor, typename bulk_async_execute_result<F, S>::type
             >::type>
 #else
         ->  decltype(
-                bulk_async_execute_helper::call(0, exec, std::forward<F>(f),
+                bulk_async_execute_helper::call(0, exec, params, std::forward<F>(f),
                     shape, buffer)
             )
 #endif
         {
             return bulk_async_execute_helper::call(
-                0, exec, std::forward<F>(f), shape, buffer);
+                0, exec, params, std::forward<F>(f), shape, buffer);
         }
 
         ///////////////////////////////////////////////////////////////////////
@@ -381,17 +381,17 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 return exec.bulk_execute(std::forward<F>(f), shape);
             }
 
-            template <typename Executor, typename F, typename S, typename Buffer>
-            static auto call(int, Executor& exec, F && f, S const& shape, Buffer & buffer)
-            ->  decltype(exec.bulk_execute(std::forward<F>(f), shape, buffer))
+            template <typename Executor, typename Parameters, typename F,  typename S, typename Buffer>
+            static auto call(int, Executor& exec, Parameters & params,F && f,  S const& shape, Buffer & buffer)
+            ->  decltype(exec.bulk_execute(params, std::forward<F>(f), shape, buffer))
             {
-                return exec.bulk_execute(std::forward<F>(f), shape, buffer);
+                return exec.bulk_execute(params, std::forward<F>(f), shape, buffer);
             }
         };
 
         template <typename Executor, typename F, typename S>
         auto call_bulk_execute(Executor& exec, F && f, S const& shape)
-#if defined(HPX_ENABLE_WORKAROUND_FOR_GCC46)
+#if defined(HPX_ENABLE_WORKAROUND_FOR_GCC46)	
         ->  typename detail::bulk_execute_result<F, S>::type
 #else
         ->  decltype(bulk_execute_helper::call(0, exec, std::forward<F>(f), shape))
@@ -400,11 +400,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             return bulk_execute_helper::call(0, exec, std::forward<F>(f), shape);
         }
 
-        template <typename Executor, typename F, typename S, typename Buffer>
-        auto call_bulk_execute(Executor& exec, F && f, S const& shape, Buffer & buffer)
-        ->  decltype(bulk_execute_helper::call(0, exec, std::forward<F>(f), shape, buffer))
+        template <typename Executor, typename Parameters, typename F, typename S, typename Buffer>
+        auto call_bulk_execute(Executor& exec, Parameters & params, F && f, S const& shape, Buffer & buffer)
+        ->  decltype(bulk_execute_helper::call(0, exec, params, std::forward<F>(f), shape, buffer))
         {
-            return bulk_execute_helper::call(0, exec, std::forward<F>(f), shape, buffer);
+            return bulk_execute_helper::call(0, exec, params, std::forward<F>(f), shape, buffer);
         }
 
         /// \endcond
@@ -581,12 +581,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 exec, std::forward<F>(f), shape);
         }
 
-        template <typename F, typename Shape, typename GPUBuffer>
-        static auto async_execute(executor_type& exec, F && f, Shape const& shape, GPUBuffer & buffer)
-        ->  decltype( detail::call_bulk_async_execute(exec, std::forward<F>(f), shape, buffer))
+        template <typename Parameters, typename F, typename Shape, typename GPUBuffer>
+        static auto async_execute(executor_type& exec, Parameters & params, F && f, Shape const& shape, GPUBuffer & buffer)
+        ->  decltype( detail::call_bulk_async_execute(exec, params, std::forward<F>(f), shape, buffer))
         {
             return detail::call_bulk_async_execute(
-                exec, std::forward<F>(f), shape, buffer);
+                exec, params, std::forward<F>(f), shape, buffer);
         }
 
         /// \brief Bulk form of synchronous execution agent creation
@@ -627,11 +627,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             return detail::call_bulk_execute(exec, std::forward<F>(f), shape);
         }
 
-        template <typename F, typename Shape, typename Buffer>
-        static auto execute(executor_type& exec, F && f, Shape const& shape, Buffer & buffer)
-        ->  decltype(detail::call_bulk_execute(exec, std::forward<F>(f), shape, buffer))
+        template <typename Parameters, typename F, typename Shape, typename Buffer>
+        static auto execute(executor_type& exec, Parameters & params, F && f, Shape const& shape, Buffer & buffer)
+        ->  decltype(detail::call_bulk_execute(exec, params, std::forward<F>(f), shape, buffer))
         {
-            return detail::call_bulk_execute(exec, std::forward<F>(f), shape, buffer);
+            return detail::call_bulk_execute(exec, params, std::forward<F>(f), shape, buffer);
         }
     };
 

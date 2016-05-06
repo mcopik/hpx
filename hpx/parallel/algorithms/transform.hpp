@@ -248,7 +248,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                     std::forward<Proj2>(proj2));
             }
 
-            template <typename ExPolicy, typename FwdIter1, typename FwdIter2,
+           /* template <typename ExPolicy, typename FwdIter1, typename FwdIter2,
                 typename OutIter, typename F, typename Proj1, typename Proj2>
             static typename util::detail::algorithm_result<
                 ExPolicy, hpx::util::tuple<FwdIter1, FwdIter2, OutIter>
@@ -267,7 +267,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                         policy, boost::mpl::false_(),
                         hpx::util::make_zip_iterator(first1, first2, dest),
                         std::distance(first1, last1),
-                        [f, proj1, proj2](reference t)
+                        //[f, proj1, proj2](reference t)
+                        [f, proj1, proj2](reference hpx::util::tuple<std::size_t,std::size_t,std::size_t>& t)
                         {
                             using hpx::util::get;
                             using hpx::util::invoke;
@@ -276,6 +277,72 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                                     invoke(proj1, get<0>(t)),
                                     invoke(proj2, get<1>(t)));
                         }));
+            }*/
+
+            template <typename ExPolicy, typename FwdIter1, typename FwdIter2,
+            typename OutIter, typename F, typename Proj1, typename Proj2>
+            static typename util::detail::algorithm_result<
+                ExPolicy, hpx::util::tuple<FwdIter1, FwdIter2, OutIter>
+            >::type
+            parallel(ExPolicy policy, FwdIter1 first1, FwdIter1 last1,
+                FwdIter2 first2, OutIter dest, F && f,
+                Proj1 && proj1, Proj2 && proj2)
+            {
+                typedef hpx::util::zip_iterator<
+                        FwdIter1, FwdIter2, OutIter
+                    > zip_iterator;
+                typedef typename zip_iterator::reference reference;
+
+                /*return get_iter_tuple(
+                    for_each_n<zip_iterator>().call(
+                        policy, boost::mpl::false_(),
+                        hpx::util::make_zip_iterator(first1, first2, dest),
+                        std::distance(first1, last1),
+                        [f, proj1, proj2](hpx::util::tuple<std::size_t,std::size_t,std::size_t>& t)
+                        {
+                            using hpx::util::get;
+                            using hpx::util::invoke;
+                            get<2>(t) =
+                                invoke(f,
+                                    invoke(proj1, get<0>(t)),
+                                    invoke(proj2, get<1>(t)));
+                        }));*/
+	        	std::size_t count = std::distance(first1, last1);
+                std::cout << count << std::endl;
+				F _f = std::move(f);
+	        	auto buffer = policy.executor().create_buffers(first1, count);
+	        	auto buffer2 = policy.executor().create_buffers(first2, count);
+	        	auto buffer3 = policy.executor().create_buffers(dest, count);
+                
+				typedef typename gpu_execution_policy::executor_type::buffer_traits<FwdIter1>::type gpu_buffer_type;
+				using kernel_name = typename hpx::parallel::kernel_extract_name<F>::kernel_name;
+
+				///if (count != 0)
+				//{
+                   // auto _f2 = [](hpx::util::tuple<std::size_t,std::size_t,std::size_t   > & tup) {};
+					//dont'return right now - we have to sync buffers after the call
+		            //bulk_execute(Parameters & params, F && f, std::size_t data_count, std::size_t chunk_size, GPUBuffer & sycl_buffer,GPUBuffer2 & sycl_buffer2,GPUBuffer3 & sycl_buffer3)
+					policy.executor().bulk_execute(
+						policy.parameters(),
+                       	hpx::parallel::make_kernel<kernel_name>([_f](std::size_t part_begin, std::size_t part_size,
+                            const gpu_buffer_type * gpu_buffer, const gpu_buffer_type * gpu_buffer2, const gpu_buffer_type * gpu_buffer3)
+						{
+							for(std::size_t i = 0; i < part_size; ++i)
+								(*gpu_buffer3)[part_begin + i] = _f( (*gpu_buffer)[part_begin + i], (*gpu_buffer2)[part_begin + i] );
+						}), count, 1, buffer, buffer2, buffer3);
+					// the data needs to be transferred from gpu back to original buffer
+					buffer.sync();
+					buffer2.sync();
+					buffer3.sync();
+                    return get_iter_tuple( hpx::util::make_zip_iterator(first1, first2, dest) );
+					//return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
+						//std::move(end));
+				//}
+                
+				//return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
+					//std::move(first));
+
+
             }
         };
         /// \endcond

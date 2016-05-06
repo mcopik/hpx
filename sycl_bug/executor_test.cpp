@@ -5,6 +5,7 @@
 #include <hpx/util/lightweight_test.hpp>
 #include <hpx/parallel/kernel.hpp>
 #include <hpx/parallel/executors/kernel_name.hpp>
+#include <hpx/parallel/algorithms/transform.hpp>
 
 #include <iostream>
 
@@ -21,6 +22,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 		hpx::util::high_resolution_timer t;
 		std::vector<std::size_t> c(n);
 		std::vector<std::size_t> d(n);
+		std::vector<std::size_t> e(n);
 		std::size_t count = 0;
 
 		/**
@@ -34,10 +36,10 @@ int hpx_main(boost::program_options::variables_map& vm)
 		**/
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(c), boost::end(c),
-			[](std::size_t& v) {
+			hpx::parallel::make_kernel<class CorrectName_1>([](std::size_t& v) {
 
 				v = 400;
-			});
+			}));
 
 		// verify values
 		std::for_each(boost::begin(c), boost::end(c),
@@ -48,22 +50,37 @@ int hpx_main(boost::program_options::variables_map& vm)
 		HPX_TEST_EQ(count, c.size());
 
 		count = 0;
-		std::iota(boost::begin(c), boost::end(c), std::rand());		
 		/**
 			Kernel overrides parameter
 		**/
 		hpx::parallel::for_each(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(4), hpx::parallel::kernel_name<class FalseName_2>()),
-			boost::begin(c), boost::end(c),
+			boost::begin(d), boost::end(d),
 			hpx::parallel::make_kernel<class CorrectName_2>([](std::size_t& v) {
 
 				v = 401;
 			}));
-		std::for_each(boost::begin(c), boost::end(c),
+		hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32), hpx::parallel::kernel_name<class TransformKernel>()),
+                        boost::begin(c), boost::end(c), boost::begin(d), boost::begin(e),
+                        [](std::size_t v1, std::size_t v2) {
+                                //printf("%lu \n", v);
+                                return v1 + v2 + 300;
+                        });
+
+
+		std::for_each(boost::begin(d), boost::end(d),
 			[&count](std::size_t v) -> void {
 				HPX_TEST_EQ(v, std::size_t(401));
 				++count;
 			});
 		HPX_TEST_EQ(count, c.size());
+        count = 0;
+		std::for_each(boost::begin(e), boost::end(e),
+			[&count](std::size_t v) -> void {
+				HPX_TEST_EQ(v, std::size_t(401 + 400 + 300));
+				++count;
+			});
+		HPX_TEST_EQ(count, c.size());
+
 
 
 		/**

@@ -344,8 +344,121 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
 
             }
+
         };
         /// \endcond
+    }
+
+    template <typename ExPolicy, typename FwdIter1, typename FwdIter2,
+    typename OutIter, typename F>
+    static void
+    transform(ExPolicy policy, std::size_t count, FwdIter1 first1,
+        FwdIter2 first2, OutIter dest, F && f)
+    {
+
+        /*return get_iter_tuple(
+            for_each_n<zip_iterator>().call(
+                policy, boost::mpl::false_(),
+                hpx::util::make_zip_iterator(first1, first2, dest),
+                std::distance(first1, last1),
+                [f, proj1, proj2](hpx::util::tuple<std::size_t,std::size_t,std::size_t>& t)
+                {
+                    using hpx::util::get;
+                    using hpx::util::invoke;
+                    get<2>(t) =
+                        invoke(f,
+                            invoke(proj1, get<0>(t)),
+                            invoke(proj2, get<1>(t)));
+                }));*/
+		F _f = std::move(f);
+    	//auto buffer = policy.executor().create_buffers(first1, count);
+    	//auto buffer2 = policy.executor().create_buffers(first2, count);
+    	//auto buffer3 = policy.executor().create_buffers(dest, count);
+        
+		//typedef typename gpu_execution_policy::executor_type::buffer_view_type<FwdIter1>::type gpu_buffer_type;
+        typedef typename FwdIter1::buffer_view_type gpu_buffer_type;
+		using kernel_name = typename hpx::parallel::get_kernel_name<F, typename ExPolicy::executor_parameters_type>::kernel_name;
+
+		///if (count != 0)
+		//{
+           // auto _f2 = [](hpx::util::tuple<std::size_t,std::size_t,std::size_t   > & tup) {};
+			//dont'return right now - we have to sync buffers after the call
+            //bulk_execute(Parameters & params, F && f, std::size_t data_count, std::size_t chunk_size, GPUBuffer & sycl_buffer,GPUBuffer2 & sycl_buffer2,GPUBuffer3 & sycl_buffer3)
+			policy.executor().bulk_execute(
+				policy.parameters(),
+               	hpx::parallel::make_kernel<kernel_name>([_f](std::size_t part_begin, std::size_t part_size,
+                    const gpu_buffer_type * gpu_buffer, const gpu_buffer_type * gpu_buffer2, const gpu_buffer_type * gpu_buffer3)
+				{
+					for(std::size_t i = 0; i < part_size; ++i)
+						(*gpu_buffer3)[part_begin + i] = _f( (*gpu_buffer)[part_begin + i], (*gpu_buffer2)[part_begin + i] );
+				}), count, 1, first1, first2, dest);
+			// the data needs to be transferred from gpu back to original buffer
+			first1.sync();
+			first2.sync();
+			dest.sync();
+			//return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
+				//std::move(end));
+		//}
+        
+		//return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
+			//std::move(first));
+
+
+    }
+
+    template <typename ExPolicy, typename FwdIter1,
+    typename OutIter, typename F>
+    static void
+    transform(ExPolicy policy, std::size_t count, FwdIter1 first1, OutIter dest, F && f)
+    {
+
+        /*return get_iter_tuple(
+            for_each_n<zip_iterator>().call(
+                policy, boost::mpl::false_(),
+                hpx::util::make_zip_iterator(first1, first2, dest),
+                std::distance(first1, last1),
+                [f, proj1, proj2](hpx::util::tuple<std::size_t,std::size_t,std::size_t>& t)
+                {
+                    using hpx::util::get;
+                    using hpx::util::invoke;
+                    get<2>(t) =
+                        invoke(f,
+                            invoke(proj1, get<0>(t)),
+                            invoke(proj2, get<1>(t)));
+                }));*/
+		F _f = std::move(f);
+    	//auto buffer = policy.executor().create_buffers(first1, count);
+    	//auto buffer2 = policy.executor().create_buffers(first2, count);
+    	//auto buffer3 = policy.executor().create_buffers(dest, count);
+        
+		//typedef typename gpu_execution_policy::executor_type::buffer_view_type<FwdIter1>::type gpu_buffer_type;
+        typedef typename FwdIter1::buffer_view_type gpu_buffer_type;
+		using kernel_name = typename hpx::parallel::get_kernel_name<F, typename ExPolicy::executor_parameters_type>::kernel_name;
+
+		///if (count != 0)
+		//{
+           // auto _f2 = [](hpx::util::tuple<std::size_t,std::size_t,std::size_t   > & tup) {};
+			//dont'return right now - we have to sync buffers after the call
+            //bulk_execute(Parameters & params, F && f, std::size_t data_count, std::size_t chunk_size, GPUBuffer & sycl_buffer,GPUBuffer2 & sycl_buffer2,GPUBuffer3 & sycl_buffer3)
+			policy.executor().bulk_execute(
+				policy.parameters(),
+               	hpx::parallel::make_kernel<kernel_name>([_f](std::size_t part_begin, std::size_t part_size,
+                    const gpu_buffer_type * gpu_buffer, const gpu_buffer_type * gpu_buffer2)
+				{
+					for(std::size_t i = 0; i < part_size; ++i)
+						(*gpu_buffer2)[part_begin + i] = _f( (*gpu_buffer)[part_begin + i] );
+				}), count, 1, first1, dest);
+			// the data needs to be transferred from gpu back to original buffer
+			first1.sync();
+			dest.sync();
+			//return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
+				//std::move(end));
+		//}
+        
+		//return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
+			//std::move(first));
+
+
     }
 
     /// Applies the given function \a f to pairs of elements from two ranges:

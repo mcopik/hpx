@@ -67,7 +67,18 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 typename Proj = util::projection_identity>
             static typename util::detail::algorithm_result<ExPolicy, Iter>::type
             parallel(ExPolicy policy, Iter first, std::size_t count,
-                F && f, Proj && proj, std::false_type, std::false_type)
+                F && f, Proj && proj)
+            {
+				return parallel(std::forward<ExPolicy>(policy),
+				    first, std::size_t(count), std::forward<F>(f),
+				    std::forward<Proj>(proj), typename is_gpu_execution_policy<ExPolicy>::type());
+            }
+
+            template <typename ExPolicy, typename F,
+                typename Proj = util::projection_identity>
+            static typename util::detail::algorithm_result<ExPolicy, Iter>::type
+            parallel(ExPolicy policy, Iter first, std::size_t count,
+                F && f, Proj && proj, std::false_type)
             {
                 if (count != 0)
                 {
@@ -335,7 +346,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 return detail::for_each_n<Iter>().call(
                     policy, boost::mpl::false_(),
                     first, std::distance(first, last), std::forward<F>(f),
-                    std::forward<Proj>(proj), typename is_gpu_execution_policy<ExPolicy>::type());
+                    std::forward<Proj>(proj));
             }
         };
 

@@ -215,6 +215,36 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 is_segmented()));
     }
 
+    template <typename ExPolicy, typename InIter, typename OutIter>
+    void
+    copy(ExPolicy && policy, std::size_t count, InIter first, OutIter dest)
+    {
+    	//auto buffer = policy.executor().create_buffers(first1, count);
+    	//auto buffer2 = policy.executor().create_buffers(first2, count);
+    	//auto buffer3 = policy.executor().create_buffers(dest, count);
+        
+		//typedef typename gpu_execution_policy::executor_type::buffer_view_type<FwdIter1>::type gpu_buffer_type;
+        typedef typename InIter::buffer_view_type gpu_buffer_type;
+		using kernel_name = typename hpx::parallel::get_kernel_name<int, typename ExPolicy::executor_parameters_type>::kernel_name;
+
+		///if (count != 0)
+		//{
+           // auto _f2 = [](hpx::util::tuple<std::size_t,std::size_t,std::size_t   > & tup) {};
+			//dont'return right now - we have to sync buffers after the call
+            //bulk_execute(Parameters & params, F && f, std::size_t data_count, std::size_t chunk_size, GPUBuffer & sycl_buffer,GPUBuffer2 & sycl_buffer2,GPUBuffer3 & sycl_buffer3)
+		policy.executor().bulk_execute(
+			policy.parameters(),
+           	hpx::parallel::make_kernel<kernel_name>([](std::size_t part_begin, std::size_t part_size,
+                const gpu_buffer_type * gpu_buffer, const gpu_buffer_type * dest)
+			{
+				for(std::size_t i = 0; i < part_size; ++i)
+					(*dest)[part_begin + i] = (*gpu_buffer)[part_begin + i];
+			}), count, 1, first, dest);
+		// the data needs to be transferred from gpu back to original buffer
+		first.sync();
+		dest.sync();
+    }
+
     /////////////////////////////////////////////////////////////////////////////
     // copy_n
     namespace detail

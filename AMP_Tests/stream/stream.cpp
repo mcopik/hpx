@@ -401,7 +401,7 @@ numa_domain_worker(std::size_t domain,
             [=](STREAM_TYPE v1, STREAM_TYPE v2) {
                     //printf("%lu \n", v);
                     //return v1 + k*v2;
-                    return v1 + v2*3;//scalar * v2 + v1;
+                    return v1 + v2*scalar;//scalar * v2 + v1;
             });
         accView.wait();
         bufferb.buffer->get_accelerator_view().wait();
@@ -427,7 +427,11 @@ numa_domain_worker(std::size_t domain,
     buffera.sync();
     bufferb.sync();
     bufferc.sync();
-
+    buffera.buffer.reset();
+    bufferb.buffer.reset();
+    bufferc.buffer.reset();
+    t4 = std::chrono::high_resolution_clock::now();
+    std::cout << "Time of copying and destroying " << std::chrono::duration_cast<std::chrono::duration<double> >(t4 - t3).count() << std::endl;
     return timing;
 }
 
@@ -644,7 +648,7 @@ int hpx_main(boost::program_options::variables_map& vm)
         avgtime[j] = avgtime[j]/(double)(iterations-1);
 
         printf("%s%12.1f  %11.6f  %11.6f  %11.6f\n", label[j],
-           1.0E-06 * bytes[j]/avgtime[j],
+           1.0E-06 * bytes[j]/mintime[j],
            avgtime[j],
            mintime[j],
            maxtime[j]);

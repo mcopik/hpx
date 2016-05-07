@@ -175,7 +175,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				
 				std::size_t threads_to_run = data_count / chunk_size;
 				std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
-				std::cout << "Sync: " << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
+				//std::cout << "Sync: " << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
 
 				Concurrency::extent<1> e(threads_to_run);
 				Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) 
@@ -198,7 +198,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			
 			std::size_t threads_to_run = data_count / chunk_size;
 			std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
-			std::cout << "Sync: " << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
+			//std::cout << "Sync: " << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
 
 			Concurrency::extent<1> e(threads_to_run);
 			Concurrency::parallel_for_each(accl_view, e, [=](Concurrency::index<1> idx) restrict(amp) 

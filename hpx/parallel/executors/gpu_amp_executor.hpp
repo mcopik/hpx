@@ -186,6 +186,29 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			}
 		}
 
+        template <typename F, typename Parameters>
+        static void bulk_execute(Parameters & params, F && f, std::size_t data_count, std::size_t chunk_size, Concurrency::accelerator_view& accl_view)
+        {
+
+	        /**
+	         * The elements of pair are:
+	         * begin at array, # of elements to process
+	         */
+	        //for(auto const & elem : shape) {
+			
+			std::size_t threads_to_run = data_count / chunk_size;
+			std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
+			std::cout << "Sync: " << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
+
+			Concurrency::extent<1> e(threads_to_run);
+			Concurrency::parallel_for_each(accl_view, e, [=](Concurrency::index<1> idx) restrict(amp) 
+			{
+				//auto _x = std::make_pair(idx[0] * chunk_size, idx[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
+				//f(_x);
+	            f(idx[0], 1);
+			});
+        }
+
         std::size_t os_thread_count()
         {
             return 1;

@@ -24,6 +24,8 @@
 #include <iterator>
 #include <type_traits>
 
+#include <amp.h>
+
 #include <boost/utility/enable_if.hpp>
 #include <boost/type_traits/is_base_of.hpp>
 #include <boost/shared_array.hpp>
@@ -155,7 +157,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         is_execution_policy<ExPolicy>,
         typename util::detail::algorithm_result<ExPolicy, OutIter>::type
     >::type
-    copy(ExPolicy && policy, InIter first, InIter last, OutIter dest)
+    copy(ExPolicy && policy, Concurrency::accelerator_view& accl_view, InIter first, InIter last, OutIter dest)
     {
         typedef typename std::iterator_traits<InIter>::iterator_category
             input_iterator_category;
@@ -182,6 +184,34 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         return detail::copy_(
             std::forward<ExPolicy>(policy), first, last, dest,
             is_segmented());
+    }
+
+    template <typename ExPolicy, typename InIter, typename OutIter>
+    void
+    copy(ExPolicy && policy, Concurrency::accelerator_view& accl_view, std::size_t count, InIter & first, OutIter & dest)
+    {
+    	//auto buffer = policy.executor().create_buffers(first1, count);
+    	//auto buffer2 = policy.executor().create_buffers(first2, count);
+    	//auto buffer3 = policy.executor().create_buffers(dest, count);
+        
+		//typedef typename gpu_execution_policy::executor_type::buffer_view_type<FwdIter1>::type gpu_buffer_type;
+        typedef typename InIter::buffer_view_type gpu_buffer_type;
+
+		auto gpu_buffer = *first.buffer_view();
+		auto dest_buffer = *dest.buffer_view();
+		///if (count != 0)
+		//{
+           // auto _f2 = [](hpx::util::tuple<std::size_t,std::size_t,std::size_t   > & tup) {};
+			//dont'return right now - we have to sync buffers after the call
+            //bulk_execute(Parameters & params, F && f, std::size_t data_count, std::size_t chunk_size, GPUBuffer & sycl_buffer,GPUBuffer2 & sycl_buffer2,GPUBuffer3 & sycl_buffer3)
+		policy.executor().bulk_execute(
+			policy.parameters(),
+           	[dest_buffer, gpu_buffer](std::size_t part_begin, std::size_t part_size)
+			{
+				for(std::size_t i = 0; i < part_size; ++i)
+					dest_buffer[part_begin + i] = gpu_buffer[part_begin + i];
+			}, count, 1, accl_view);
+		// the data needs to be transferred from gpu back to original buffer
     }
 
     /////////////////////////////////////////////////////////////////////////////

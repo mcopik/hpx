@@ -270,6 +270,10 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 			
 		    	auto gpu_buffer = *buffer.buffer_view();
 
+                //auto _f = [](std::tuple<std::size_t,std::size_t,std::size_t> & tup) {};
+                //_f( gpu_buffer[0] );
+                //Concurrency::array_view< std::tuple<std::size_t,std::size_t,std::size_t> > gpu_buffer = *buffer.buffer_view();
+                //std::cout << typeid(typename std::iterator_traits<Iter>::value_type).name() <<  typeid(gpu_buffer).name() << std::endl;
 				if (count != 0)
 				{
 					//dont'return right now - we have to sync buffers after the call

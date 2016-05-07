@@ -42,7 +42,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 
 				v = 400;
 			});
-
+		int k = 3;
 		std::iota(boost::begin(d), boost::end(d), std::rand());
 		hpx::parallel::for_each(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(5)),
 			boost::begin(d), boost::end(d),
@@ -54,9 +54,9 @@ int hpx_main(boost::program_options::variables_map& vm)
 		std::cout << *boost::begin(c) << " " << *boost::begin(d) << std::endl;
 		hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32)),
                         boost::begin(c), boost::end(c), boost::begin(d), boost::begin(e),
-                        [](std::size_t v1, std::size_t v2) {
+                        [=](std::size_t v1, std::size_t v2) {
                                 //printf("%lu \n", v);
-                                return v1 + v2 + 300;
+                                return v1 + v2 *k;
                         });
 		std::cout << *boost::begin(c) << " " << *boost::begin(d) << std::endl;
 

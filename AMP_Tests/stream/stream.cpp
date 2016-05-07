@@ -396,12 +396,12 @@ numa_domain_worker(std::size_t domain,
             }
         );*/
         t1 = std::chrono::high_resolution_clock::now();
-        hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(1)),
+        hpx::parallel::transform(hpx::parallel::gpu,
             accView, part_size, bufferb, bufferc, buffera,
             [=](STREAM_TYPE v1, STREAM_TYPE v2) {
                     //printf("%lu \n", v);
                     //return v1 + k*v2;
-                    return v1*2 + v2*2.5;//scalar * v2 + v1;
+                    return v1 + v2*3;//scalar * v2 + v1;
             });
         accView.wait();
         bufferb.buffer->get_accelerator_view().wait();

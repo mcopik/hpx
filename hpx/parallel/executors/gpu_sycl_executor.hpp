@@ -268,6 +268,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 							
 						});
 				});
+                sycl_buffer.queue.wait();
              }
            }
 
@@ -287,6 +288,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			
 			        std::size_t threads_to_run = data_count / chunk_size;
 			        std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
+                    //std::cout << "Runs: " << data_count << std::endl;
 
 			        sycl_buffer.queue.submit( [_f, &sycl_buffer,&sycl_buffer2,&sycl_buffer3, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
 
@@ -323,6 +325,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 						
 					        });
 			        });
+                    sycl_buffer.queue.wait();
 		        }
 
             template <typename F, typename Parameters, typename GPUBuffer, typename GPUBuffer2>
@@ -341,7 +344,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			
 			        std::size_t threads_to_run = data_count / chunk_size;
 			        std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
-
+                    //std::cout << "Runs: " << data_count << std::endl;
 			        sycl_buffer.queue.submit( [_f, &sycl_buffer,&sycl_buffer2, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
 
 				        buffer_view_type buffer_view = 
@@ -375,6 +378,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 						
 					        });
 			        });
+                    sycl_buffer.queue.wait();
 		        }
 
         std::size_t os_thread_count()

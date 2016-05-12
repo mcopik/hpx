@@ -44,7 +44,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		#endif
 
         typedef gpu_execution_tag execution_category;
-
+        template<typename value_type>
+        struct gpu_amp_buffer_iterator;
 		template<typename Iter>
     	struct gpu_amp_buffer : detail::gpu_executor_buffer<Iter,
 			Concurrency::array_view< typename std::iterator_traits<Iter>::value_type > >
@@ -54,17 +55,31 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     		typedef typename Concurrency::array_view<value_type> buffer_view_type;
 
     		Iter cpu_buffer;
-    		Concurrency::extent<1> extent;
+    		//Concurrency::extent<1> extent;
+            std::size_t count;
     		std::shared_ptr<buffer_type> buffer;
     		std::shared_ptr<buffer_view_type> _buffer_view;
 
     		gpu_amp_buffer(Iter first, std::size_t count) :
     			cpu_buffer( first ),
-    			extent( count )
+                count(count)
+    			//extent( count )
     		{
     			Iter last = first;
     			std::advance(last, count);
 
+    		    Concurrency::extent<1> extent(count);
+    			buffer.reset( new buffer_type(extent, first, last) );
+    			_buffer_view.reset( new buffer_view_type( *buffer.get() ) );
+    		}
+
+    		gpu_amp_buffer(Iter first, Iter last) :
+    			cpu_buffer( first )
+    		{
+    			count = std::distance(first, last);
+                std::cout << "Input count: " << count << std::endl;
+    		    Concurrency::extent<1> extent(count);
+                
     			buffer.reset( new buffer_type(extent, first, last) );
     			_buffer_view.reset( new buffer_view_type( *buffer.get() ) );
     		}
@@ -83,12 +98,94 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     		{
     			std::cout << "buffer: " << *cpu_buffer << std::endl;
     		}
+            
+            gpu_amp_buffer_iterator<value_type> begin()
+            {
+                return gpu_amp_buffer_iterator<value_type>(*buffer.get(), 0, count);
+            }
+
+            gpu_amp_buffer_iterator<value_type> end()
+            {
+                return gpu_amp_buffer_iterator<value_type>(*buffer.get(), count, count);
+            }
 		};
+   
+        template<typename value_type>
+        struct gpu_amp_buffer_iterator : 
+            public boost::iterator_facade<
+                gpu_amp_buffer_iterator<value_type>,
+                value_type,
+                std::random_access_iterator_tag
+            >
+        {
+        private:
+            Concurrency::array_view<value_type> array_view;
+            std::size_t idx_, size;
+        public:
+            explicit gpu_amp_buffer_iterator(Concurrency::array<value_type> & array, std::size_t idx, std::size_t size) : 
+                array_view(array), idx_(idx), size(size) {}
+
+            gpu_amp_buffer_iterator(const gpu_amp_buffer_iterator & other) : 
+                array_view(other.array_view), idx_(other.idx_), size(other.size) {}
+            
+            gpu_amp_buffer_iterator & operator=(const gpu_amp_buffer_iterator & a)
+            {
+                return *this;
+            }
+
+            Concurrency::array_view<value_type> get_array_view() { return array_view; }
+
+            void increment()
+            {
+                idx_ = std::min(++idx_, size);
+                std::cout << idx_ << std::endl;
+            }
+
+            void decrement()
+            {
+                std::cout << idx_ << " " << idx_ << " " << std::min(idx_-1, idx_) << std::endl;
+                idx_ = std::min(idx_--, idx_);
+                std::cout << idx_ << std::endl;
+            }
+
+            void advance(std::size_t n)
+            {
+                idx_ = std::min(idx_ + n, size);
+                std::cout << "advanc: " << idx_ << std::endl;
+            }
+
+            bool equal(gpu_amp_buffer_iterator const& other) const
+            {
+                return idx_ == other.idx_;
+            }
+
+            value_type & dereference() const
+            {
+                return array_view[idx_];
+            }
+
+            std::ptrdiff_t distance_to(gpu_amp_buffer_iterator const& other) const
+            {
+                //std::cout << "Compute dist: " << idx_ << " " << other.idx_ << " " << idx_ - other.idx_ << " " <<  other.idx_ - idx_ << " " << (idx_ > other.idx_ ? idx_ - other.idx_ : other.idx_ - idx_) << std::endl;
+                return other.idx_ - idx_;//idx_ > other.idx_ ? idx_ - other.idx_ : other.idx_ - idx_;
+            }
+
+            std::size_t idx()
+            {
+                return idx_;
+            }
+        };
 
     	template<typename Iter>
     	static gpu_amp_buffer<Iter> create_buffers(Iter first, std::size_t count)
 		{
     		return gpu_amp_buffer<Iter>(first, count);
+		}
+
+    	template<typename Iter>
+    	static gpu_amp_buffer<Iter> create_buffers(Iter first, Iter end)
+		{
+    		return gpu_amp_buffer<Iter>(first, end);
 		}
 
     	template<typename Iter>
@@ -161,7 +258,41 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			return std::move(results);
 		}
 
-		template <typename F, typename Shape>
+		template <typename F, typename Iter>
+		static void bulk_execute(Iter first, std::size_t count, F && f)
+		{
+			std::size_t data_count = count;
+			std::size_t chunk_size = 1;//elem.second;
+			
+			std::size_t threads_to_run = data_count / chunk_size;
+			std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
+            std::size_t offset = first.idx();
+            auto array_view = first.get_array_view();
+
+
+		    std::cout << "Sync: " << offset << " " << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
+
+			Concurrency::extent<1> e(threads_to_run);
+			Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) 
+			{
+                //Iter start(first);
+                //std::advance(start, idx[0] * chunk_size);
+                std::size_t part_begin = idx[0] * chunk_size;
+                std::size_t part_size = part_begin + (idx[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
+                for(std::size_t i = part_begin; i < part_size ; ++i)
+					f( array_view[offset + i] );
+			});
+
+            /** Synchronize **/
+            /** TODO: put array_view in an executor **/
+            first.get_array_view().get_source_accelerator_view().wait();
+            /**
+                This should not be in an executor
+            **/
+            //Concurrency::copy(*buffer.get(), cpu_buffer);
+		}
+
+		template <typename Shape, typename F>
 		static typename detail::bulk_execute_result<F, Shape>::type
 		bulk_execute(F && f, Shape const& shape)
 		{

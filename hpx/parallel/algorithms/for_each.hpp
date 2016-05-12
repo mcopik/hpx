@@ -262,13 +262,15 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 			parallel(ExPolicy policy, Iter first, std::size_t count,
 	    	F && f, Proj && proj, std::true_type, std::false_type)
 			{
+                std::cout << "exec" <<count <<std::endl;
 				Iter end = first;
 		    	std::advance(end, count);
+                    std::cout << count << std::endl;
 
-		    	auto buffer = policy.executor().create_buffers(first, count);
+		    	//auto buffer = policy.executor().create_buffers(first, count);
 				Proj _proj(std::move(proj));
 			
-		    	auto gpu_buffer = *buffer.buffer_view();
+		    	//auto gpu_buffer = *buffer.buffer_view();
 
                 //auto _f = [](std::tuple<std::size_t,std::size_t,std::size_t> & tup) {};
                 //_f( gpu_buffer[0] );
@@ -277,16 +279,18 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 				if (count != 0)
 				{
 					//dont'return right now - we have to sync buffers after the call
-					util::foreach_n_partitioner<gpu_execution_policy>::call(
+					/*util::foreach_n_partitioner<gpu_execution_policy>::call(
 						policy, first, count,
 		                			std::move([f, _proj, gpu_buffer](std::size_t part_begin, std::size_t part_size)
 						{
 							for(std::size_t i = 0; i < part_size; ++i)
 								f( _proj( gpu_buffer[part_begin + i]) );
-						}));
+						}));*/
 
 					// the data needs to be transferred from gpu back to original buffer
-					buffer.sync();
+					//buffer.sync();
+                    std::cout << count << std::endl;
+                    policy.executor().bulk_execute(first, count, f);
 
 					return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
 						std::move(end));
@@ -491,6 +495,10 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             parallel(ExPolicy policy, InIter first, InIter last, F && f,
                 Proj && proj)
             {
+                std::size_t dist = std::distance(first, last);
+                std::cout << "Dist: " << dist << std::endl;
+                dist = std::distance(first, last);
+                std::cout << "Dist: " << dist << std::endl;
                 return detail::for_each_n<Iter>().call(
                     policy, boost::mpl::false_(),
                     first, std::distance(first, last), std::forward<F>(f),

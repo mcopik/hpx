@@ -174,7 +174,8 @@ namespace hpx { namespace parallel { namespace util
                 typedef typename hpx::util::tuple<FwdIter, std::size_t> tuple;
 
 				FwdIter last = first;
-				std::advance(last, count);
+                last.idx() += count;				
+                //std::advance(last, count);
 
 				std::vector<hpx::future<Result> > inititems, workitems;
 				std::list<boost::exception_ptr> errors;

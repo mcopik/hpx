@@ -263,9 +263,10 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 	    	F && f, Proj && proj, std::true_type, std::false_type)
 			{
                 std::cout << "exec" <<count <<std::endl;
-				Iter end = first;
-		    	std::advance(end, count);
-                    std::cout << count << std::endl;
+				//Iter end = first;
+		    	//std::advance(end, count);
+                //end.idx() += count;                
+                std::cout << count << std::endl;
 
 		    	//auto buffer = policy.executor().create_buffers(first, count);
 				Proj _proj(std::move(proj));

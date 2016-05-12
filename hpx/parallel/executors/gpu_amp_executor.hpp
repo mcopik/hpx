@@ -120,13 +120,21 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         {
         private:
             Concurrency::array_view<value_type> array_view;
-            std::size_t idx_, size;
+            uint32_t idx_, size;
         public:
-            explicit gpu_amp_buffer_iterator(Concurrency::array<value_type> & array, std::size_t idx, std::size_t size) : 
+            explicit gpu_amp_buffer_iterator(Concurrency::array<value_type> & array, uint32_t idx, uint32_t size) : 
                 array_view(array), idx_(idx), size(size) {}
 
-            explicit gpu_amp_buffer_iterator(const Concurrency::array_view<value_type> & array_view, std::size_t idx, std::size_t size) : 
+            explicit gpu_amp_buffer_iterator(const Concurrency::array_view<value_type> & array_view, uint32_t idx, uint32_t size) : 
                 array_view(array_view), idx_(idx), size(size) {}
+
+            template<typename ValueType>
+            explicit gpu_amp_buffer_iterator(const Concurrency::array_view<ValueType> & array_view, uint32_t idx, uint32_t size) : 
+                array_view(array_view), idx_(idx), size(size) {}
+
+            template<typename ValueType>
+            gpu_amp_buffer_iterator(const gpu_amp_buffer_iterator<ValueType> & other) : 
+                array_view(other.array_view), idx_(other.idx_), size(other.size) {}
 
             gpu_amp_buffer_iterator(const gpu_amp_buffer_iterator & other) : 
                 array_view(other.array_view), idx_(other.idx_), size(other.size) {}
@@ -148,7 +156,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 idx_ = std::min(idx_--, idx_);
             }
 
-            void advance(std::size_t n)
+            void advance(uint32_t n) restrict(amp)
             {
                 idx_ = std::min(idx_ + n, size);
             }
@@ -168,7 +176,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 return other.idx_ - idx_;
             }
 
-            std::size_t idx()
+            uint32_t & idx() restrict(amp,cpu)
             {
                 return idx_;
             }
@@ -309,10 +317,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 // This works
                 //gpu_amp_buffer_iterator<std::size_t> it(array_view, 1,1);
 				Concurrency::extent<1> e(threads_to_run);
-				Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) 
+				Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp)
 				{
-                    gpu_amp_buffer_iterator<std::size_t> it(array_view, offset + idx[0]*chunk_size, data_count);
-                    f(it, data_count);
+                    //gpu_amp_buffer_iterator<std::size_t> it(array_view, (uint32_t)offset + idx[0]*chunk_size, (uint32_t)data_count);
+                    gpu_amp_buffer_iterator<std::size_t> it(iter);
+                    //it.advance(idx[0]*chunk_size);
+                    it.idx() += idx[0]*chunk_size;
+                    hpx::util::tuple<gpu_amp_buffer_iterator<std::size_t>, std::size_t> tuple(it, chunk_size);                    
+                    f( tuple );
 				});
 			}
 		}

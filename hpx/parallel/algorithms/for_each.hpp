@@ -290,10 +290,24 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					// the data needs to be transferred from gpu back to original buffer
 					//buffer.sync();
                     std::cout << count << std::endl;
-                    policy.executor().bulk_execute(first, count, f);
+                    //policy.executor().bulk_execute(first, count, f);
+                    return util::foreach_n_partitioner<ExPolicy>::call(
+                        policy, first, count,
+                        [f, proj](Iter part_begin, std::size_t part_size)
+                        {
+                            // VS2015 bails out when proj or f are captured by
+                            // ref
+                            util::loop_n(
+                                part_begin, part_size,
+                                [=](Iter const& curr)
+                                {
+                                    hpx::util::invoke(
+                                        f, hpx::util::invoke(proj, *curr));
+                                });
+                        });
 
-					return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
-						std::move(end));
+					//return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
+						//std::move(end));
 				}
 				return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
 					std::move(first));

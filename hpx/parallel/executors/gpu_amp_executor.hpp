@@ -125,6 +125,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             explicit gpu_amp_buffer_iterator(Concurrency::array<value_type> & array, std::size_t idx, std::size_t size) : 
                 array_view(array), idx_(idx), size(size) {}
 
+            explicit gpu_amp_buffer_iterator(const Concurrency::array_view<value_type> & array_view, std::size_t idx, std::size_t size) : 
+                array_view(array_view), idx_(idx), size(size) {}
+
             gpu_amp_buffer_iterator(const gpu_amp_buffer_iterator & other) : 
                 array_view(other.array_view), idx_(other.idx_), size(other.size) {}
             
@@ -138,20 +141,16 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             void increment()
             {
                 idx_ = std::min(++idx_, size);
-                std::cout << idx_ << std::endl;
             }
 
             void decrement()
             {
-                std::cout << idx_ << " " << idx_ << " " << std::min(idx_-1, idx_) << std::endl;
                 idx_ = std::min(idx_--, idx_);
-                std::cout << idx_ << std::endl;
             }
 
             void advance(std::size_t n)
             {
                 idx_ = std::min(idx_ + n, size);
-                std::cout << "advanc: " << idx_ << std::endl;
             }
 
             bool equal(gpu_amp_buffer_iterator const& other) const
@@ -166,8 +165,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
             std::ptrdiff_t distance_to(gpu_amp_buffer_iterator const& other) const
             {
-                //std::cout << "Compute dist: " << idx_ << " " << other.idx_ << " " << idx_ - other.idx_ << " " <<  other.idx_ - idx_ << " " << (idx_ > other.idx_ ? idx_ - other.idx_ : other.idx_ - idx_) << std::endl;
-                return other.idx_ - idx_;//idx_ > other.idx_ ? idx_ - other.idx_ : other.idx_ - idx_;
+                return other.idx_ - idx_;
             }
 
             std::size_t idx()
@@ -231,7 +229,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 					std::size_t threads_to_run = data_count / chunk_size;
 					std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
 
-					std::cout << "Async: " << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
 					results.push_back(hpx::async(launch::async,
 						/**
 						 * Lambda calling the AMP parallel execution.
@@ -262,15 +259,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		static void bulk_execute(Iter first, std::size_t count, F && f)
 		{
 			std::size_t data_count = count;
-			std::size_t chunk_size = 1;//elem.second;
+			std::size_t chunk_size = 1;
 			
 			std::size_t threads_to_run = data_count / chunk_size;
 			std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
             std::size_t offset = first.idx();
             auto array_view = first.get_array_view();
 
-
-		    std::cout << "Sync: " << offset << " " << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
 
 			Concurrency::extent<1> e(threads_to_run);
 			Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) 
@@ -284,7 +279,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			});
 
             /** Synchronize **/
-            /** TODO: put array_view in an executor **/
+            /** TODO: put acc_view in an executor **/
             first.get_array_view().get_source_accelerator_view().wait();
             /**
                 This should not be in an executor
@@ -301,18 +296,23 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			 * begin at array, # of elements to process
 			 */
 			for(auto const & elem : shape) {
-				std::size_t data_count = elem.first;
-				std::size_t chunk_size = elem.second;
+				auto iter = hpx::util::get<0>(elem);
+                std::size_t offset = iter.idx();
+                Concurrency::array_view<std::size_t> array_view = iter.get_array_view();
+				std::size_t data_count = hpx::util::get<1>(elem);
+                //deal with it later
+                std::size_t chunk_size = 1;
 				
 				std::size_t threads_to_run = data_count / chunk_size;
 				std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
-				//std::cout << "Sync: " << chunk_size << " " << data_count << " " << threads_to_run << " " << last_thread_chunk << std::endl;
 
+                // This works
+                //gpu_amp_buffer_iterator<std::size_t> it(array_view, 1,1);
 				Concurrency::extent<1> e(threads_to_run);
 				Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp) 
 				{
-					auto _x = std::make_pair(idx[0] * chunk_size, idx[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
-					f(_x);
+                    gpu_amp_buffer_iterator<std::size_t> it(array_view, offset + idx[0]*chunk_size, data_count);
+                    f(it, data_count);
 				});
 			}
 		}

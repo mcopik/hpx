@@ -156,7 +156,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 idx_ = std::min(idx_--, idx_);
             }
 
-            void advance(uint32_t n) restrict(amp)
+            void advance(uint32_t n) restrict(amp,cpu)
             {
                 idx_ = std::min(idx_ + n, size);
             }
@@ -173,7 +173,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
             std::ptrdiff_t distance_to(gpu_amp_buffer_iterator const& other) const
             {
-                return other.idx_ - idx_;
+                return other.idx_ < idx_ ? other.idx_ - idx_ : idx_ - other.idx_;
             }
 
             uint32_t & idx() restrict(amp,cpu)
@@ -218,7 +218,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
 		}
 
-		template <typename F, typename Shape>
+		/*template <typename F, typename Shape>
 		static std::vector<hpx::future<
 			typename detail::bulk_async_execute_result<F, Shape>::type
 		> >
@@ -241,12 +241,65 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 						/**
 						 * Lambda calling the AMP parallel execution.
 						 */
-						[=]() {
+						/*[=]() {
 							Concurrency::extent<1> e(threads_to_run);
 							Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp)
 							{
 								auto _x = std::make_pair(idx[0] * chunk_size, idx[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
 								f(_x);
+							});
+						}));
+				}
+			}
+			catch (std::bad_alloc const& ba) {
+				boost::throw_exception(ba);
+			}
+			catch (...) {
+				boost::throw_exception(
+				    exception_list(boost::current_exception())
+				);
+			}
+
+			return std::move(results);
+		}*/
+
+		template <typename F, typename Shape>
+		static std::vector<hpx::future<
+			typename detail::bulk_async_execute_result<F, Shape>::type
+		> >
+		bulk_async_execute(F && f, Shape const& shape)
+		{
+			typedef typename
+				    detail::bulk_async_execute_result<F, Shape>::type
+				result_type;
+			std::vector< hpx::future<result_type> > results;
+
+			try {	
+				for (auto const& elem: shape) {
+				auto iter = hpx::util::get<0>(elem);
+                std::size_t offset = iter.idx();
+                //Concurrency::array_view<std::size_t> array_view = iter.get_array_view();
+				std::size_t data_count = hpx::util::get<1>(elem);
+                //deal with it later
+                std::size_t chunk_size = hpx::util::get<2>(elem);
+				
+				std::size_t threads_to_run = data_count / chunk_size;
+				std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
+
+					results.push_back(hpx::async(launch::async,
+						/**
+						 * Lambda calling the AMP parallel execution.
+						 */
+						[=]() {
+							Concurrency::extent<1> e(threads_to_run);
+							Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp)
+							{
+                				std::size_t part_size = idx[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk;
+								auto it = iter;
+						        //it.advance(idx[0]*chunk_size);
+						        it.idx() += idx[0]*chunk_size;
+						        hpx::util::tuple<decltype(it), std::size_t, std::size_t> tuple(it, 0, part_size);                    
+						        f( tuple );
 							});
 						}));
 				}
@@ -299,17 +352,19 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		static typename detail::bulk_execute_result<F, Shape>::type
 		bulk_execute(F && f, Shape const& shape)
 		{
+			typedef typename Shape::value_type tuple_t;
 			/**
 			 * The elements of pair are:
 			 * begin at array, # of elements to process
 			 */
 			for(auto const & elem : shape) {
 				auto iter = hpx::util::get<0>(elem);
-                std::size_t offset = iter.idx();
-                Concurrency::array_view<std::size_t> array_view = iter.get_array_view();
+				//using value_type = typename iter::value_type;
+                //std::size_t offset = iter.idx();
+                //auto array_view = iter.get_array_view();
 				std::size_t data_count = hpx::util::get<1>(elem);
                 //deal with it later
-                std::size_t chunk_size = 1;
+                std::size_t chunk_size = hpx::util::get<2>(elem);
 				
 				std::size_t threads_to_run = data_count / chunk_size;
 				std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
@@ -320,12 +375,16 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				Concurrency::parallel_for_each(e, [=](Concurrency::index<1> idx) restrict(amp)
 				{
                     //gpu_amp_buffer_iterator<std::size_t> it(array_view, (uint32_t)offset + idx[0]*chunk_size, (uint32_t)data_count);
-                    gpu_amp_buffer_iterator<std::size_t> it(iter);
+                    //gpu_amp_buffer_iterator<std::size_t> it(iter);
+                	std::size_t part_size = idx[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk;
+                    auto it = iter;
                     //it.advance(idx[0]*chunk_size);
-                    it.idx() += idx[0]*chunk_size;
-                    hpx::util::tuple<gpu_amp_buffer_iterator<std::size_t>, std::size_t> tuple(it, chunk_size);                    
+                    //it.idx() += idx[0]*chunk_size;
+					//std::advance(it, idx[0]*chunk_size);                 
+					tuple_t tuple(it, 0, part_size);                    
                     f( tuple );
 				});
+            	//array_view.get_source_accelerator_view().wait();
 			}
 		}
 

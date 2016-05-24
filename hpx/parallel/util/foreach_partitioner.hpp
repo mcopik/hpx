@@ -171,10 +171,11 @@ namespace hpx { namespace parallel { namespace util
 					executor_traits;
                 typedef typename ExPolicy::executor_parameters_type parameters_type;
                 typedef executor_parameter_traits<parameters_type> traits;
-                typedef typename hpx::util::tuple<FwdIter, std::size_t> tuple;
+                typedef typename hpx::util::tuple<FwdIter, std::size_t, std::size_t> tuple;
 
 				FwdIter last = first;
-                last.idx() += count;				
+                //last.idx() += count;		
+				count = 10;		
                 //std::advance(last, count);
 
 				std::vector<hpx::future<Result> > inititems, workitems;
@@ -188,7 +189,7 @@ namespace hpx { namespace parallel { namespace util
 					// std::vector< std::tuple<std::size_t, std::size_t, std::size_t, std::size_t> > shape{ {0, 0, count, chunk_size} };
 					//std::vector< std::pair<std::size_t, std::size_t> > shape{ {count, chunk_size} };
                     std::vector< tuple > shape;
-                    shape.emplace_back(first, chunk_size);
+                    shape.emplace_back(first, count, chunk_size);
 
 					/**
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
@@ -198,9 +199,9 @@ namespace hpx { namespace parallel { namespace util
 					 * correcly detect the return type of this lambda
 					 */
 					F1 _f1 = std::move(f1);				
-					auto f = [_f1](hpx::util::tuple<FwdIter, std::size_t> const& elem)
+					auto f = [_f1](hpx::util::tuple<FwdIter, std::size_t, std::size_t> const& elem)
 					{
-						_f1(hpx::util::get<0>(elem), hpx::util::get<1>(elem));
+						_f1(hpx::util::get<0>(elem), hpx::util::get<2>(elem));
 					};
 
 					//workitems.reserve(shape.size());
@@ -251,8 +252,12 @@ namespace hpx { namespace parallel { namespace util
 					executor_traits;
                 typedef typename ExPolicy::executor_parameters_type parameters_type;
                 typedef executor_parameter_traits<parameters_type> traits;
+                typedef typename hpx::util::tuple<FwdIter, std::size_t, std::size_t> tuple;
 
 				FwdIter last = first;
+				count = 10;
+                //last.idx() += count;
+				//FwdIter last = first;
 				std::advance(last, count);
 
 				std::vector<hpx::future<Result> > inititems, workitems;
@@ -262,15 +267,21 @@ namespace hpx { namespace parallel { namespace util
 					std::size_t chunk_size = traits::get_chunk_size(policy.parameters(), policy.executor(), 
                         [](){ return 0; }, count);
                     chunk_size = std::min(chunk_size, count);
-					std::vector< std::pair<std::size_t, std::size_t> > shape{ {count, chunk_size} };
-
+					//std::vector< std::pair<std::size_t, std::size_t> > shape{ {count, chunk_size} };
+                    std::vector< tuple > shape;
+                    shape.emplace_back(first, count, chunk_size);
 					/**
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
 					 * one of them will point to the starting index and the second one will give the size.
 					 */
-					auto f = [f1](std::pair<std::size_t, std::size_t> const& elem)
+					/*auto f = [f1](std::pair<std::size_t, std::size_t> const& elem)
 					{
 						return f1(elem.first, elem.second);
+					};*/
+					F1 _f1 = std::move(f1);				
+					auto f = [_f1](hpx::util::tuple<FwdIter, std::size_t, std::size_t> const& elem)
+					{
+						_f1(hpx::util::get<0>(elem), hpx::util::get<2>(elem));
 					};
 
 					workitems.reserve(shape.size());

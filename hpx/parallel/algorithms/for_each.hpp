@@ -320,7 +320,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 			F && f, Proj && proj, std::true_type, std::true_type)
 			{
 				//using kernel_name = typename hpx::parallel::kernel_extract_name<F>::kernel_name;
-				if (count != 0)
+			/*	if (count != 0)
 				{
 
 					Iter end = first;
@@ -330,9 +330,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					/**
 					 * Allocate data on the GPU.
 					 */
-					auto buffer = policy.executor().create_buffers_shared(first, count);
+			//		auto buffer = policy.executor().create_buffers_shared(first, count);
 					//auto * gpu_buffer = buffer.get()->buffer_view();
-					auto gpu_buffer = *buffer.get()->buffer_view();
+				/*	auto gpu_buffer = *buffer.get()->buffer_view();
 					hpx::future<Iter> x = util::foreach_n_partitioner<ExPolicy>::call(
 							policy, first, count,
 							std::move( [_f, proj, gpu_buffer](std::size_t part_begin, std::size_t part_size)
@@ -343,12 +343,33 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					/**
 					 * Sync the data after finishing GPU computation.
 					 */
-					hpx::future<Iter> s = x.then( [=](hpx::future<Iter> it)
+			/*		hpx::future<Iter> s = x.then( [=](hpx::future<Iter> it)
 								{ it.wait(); buffer.get()->sync(); return it.get(); });
 					return s;
 				}
 				return util::detail::algorithm_result<ExPolicy, Iter>::get(
-					std::move(first));
+					std::move(first));*/
+
+                if (count != 0)
+                {
+                    return util::foreach_n_partitioner<ExPolicy>::call(
+                        policy, first, count,
+                        [f, proj](Iter part_begin, std::size_t part_size)
+                        {
+                            // VS2015 bails out when proj or f are captured by
+                            // ref
+                            util::loop_n(
+                                part_begin, part_size,
+                                [=](Iter const& curr)
+                                {
+                                    hpx::util::invoke(
+                                        f, hpx::util::invoke(proj, *curr));
+                                });
+                        });
+                }
+
+                return util::detail::algorithm_result<ExPolicy, Iter>::get(
+                    std::move(first));
 			}
 #endif
         };

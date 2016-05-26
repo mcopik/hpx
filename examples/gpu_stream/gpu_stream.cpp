@@ -35,57 +35,59 @@ int hpx_main(boost::program_options::variables_map& vm)
 		std::iota(boost::begin(b), boost::end(b),  std::rand());
 		std::iota(boost::begin(c), boost::end(c),  std::rand());
 
-	    auto buffera = hpx::parallel::gpu.executor().create_buffers(a.begin(), part_size);
-	    auto bufferb = hpx::parallel::gpu.executor().create_buffers(b.begin(), part_size);
-	    auto bufferc = hpx::parallel::gpu.executor().create_buffers(c.begin(), part_size);
+	    auto buffera = hpx::parallel::gpu.executor().create_buffers(a.begin(), n);
+	    auto bufferb = hpx::parallel::gpu.executor().create_buffers(b.begin(), n);
+	    auto bufferc = hpx::parallel::gpu.executor().create_buffers(c.begin(), n);
 		/**
 		 * First, last
 		 */
 		hpx::parallel::for_each(hpx::parallel::gpu,//hpx::parallel::gpu,
-			boost::begin(buffera), boost::end(buffera),
+			buffera.begin(), buffera.end(),
 			[](std::size_t& v) {
 
 				v = 400;
 			});
 		int k = 3;
 		hpx::parallel::for_each(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(5)),
-			boost::begin(bufferb), boost::end(bufferb),
+			bufferb.begin(), bufferb.end(),
 			[](std::size_t& v) {
 				//printf("%lu \n", v); 
 				v = 43;
 			});
 
 		hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32)),
-                        boost::begin(buffera), boost::end(buffera), boost::begin(bufferb), boost::begin(bufferc),
+                        buffera.begin(), buffera.end(), bufferb.begin(), bufferc.begin(),
                         [=](std::size_t v1, std::size_t v2) {
                                 //printf("%lu \n", v);
                                 return v1 + v2 *k;
                         });
-
+		buffera.sync();
+        bufferb.sync();
+        bufferc.sync();
 
 		// verify values
 		std::size_t count = 0;
-		std::for_each(boost::begin(c), boost::end(c),
+		std::for_each(boost::begin(a), boost::end(a),
 			[&count](std::size_t v) -> void {
 				HPX_TEST_EQ(v, std::size_t(400));
 				++count;
 			});
-		HPX_TEST_EQ(count, c.size());
+		HPX_TEST_EQ(count, a.size());
 
 		count = 0;
-		std::for_each(boost::begin(d), boost::end(d),
+		std::for_each(boost::begin(b), boost::end(b),
 			[&count](std::size_t v) -> void {
 				HPX_TEST_EQ(v, std::size_t(43));
 				++count;
 			});
-		HPX_TEST_EQ(count, d.size());
+		HPX_TEST_EQ(count, b.size());
 		count = 0;
-		std::for_each(boost::begin(e), boost::end(e),
+		std::for_each(boost::begin(c), boost::end(c),
 				[&count](std::size_t v) -> void {
 						HPX_TEST_EQ(v, std::size_t(400+43+300));
 						++count;
 				});
-		HPX_TEST_EQ(count, e.size());
+		HPX_TEST_EQ(count, c.size());
 
 		double elapsed = t.elapsed();
 		std::cout

@@ -110,9 +110,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             }
 		};
    
-        template<typename value_type>
+        template<typename T>
         struct buffer_iterator
         {
+            typedef std::random_access_iterator_tag iterator_category;
+            typedef std::ptrdiff_t difference_type;
+            typedef T value_type;
+            typedef value_type* pointer;
+            typedef value_type& reference;
         private:
             Concurrency::array_view<value_type> array_view;
             uint32_t idx_, size;
@@ -244,12 +249,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 return array_view[idx_ + offset];
             }
 
-            operator value_type*() const
+            operator value_type*() const restrict(amp, cpu)
             {
-                return array_view[idx_];
+                return &array_view[idx_];
             }
 
-            value_type* operator->() const
+            value_type* operator->() const restrict(amp, cpu)
             {
                 return &array_view[idx_];
             }
@@ -453,7 +458,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     auto it = iter;
                     //it.advance(idx[0]*chunk_size);
                     //it.idx() += idx[0]*chunk_size;
-					//std::advance(it, idx[0]*chunk_size);                 
+					std::advance(it, idx[0]*chunk_size);
 					tuple_t tuple(it, 0, part_size);                    
                     f( tuple );
 				});

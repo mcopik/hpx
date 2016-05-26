@@ -45,6 +45,7 @@ macro(kalmar_configure)
   if(NOT HPX_WITH_HCC_STDCXX)
         add_definitions(-DHPX_WITH_AMP)
         add_definitions(-DHPX_WITH_GPU_EXECUTOR)
+        set(HPX_WITH_GPU_EXECUTOR TRUE CACHE INTERNAL "")
   endif()
 
   hpx_add_compile_flag("${KALMAR_CXX_FLAGS}")

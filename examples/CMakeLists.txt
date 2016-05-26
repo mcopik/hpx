@@ -49,6 +49,12 @@ if(HPX_WITH_APEX)
      )
 endif()
 
+if(HPX_WITH_GPU_EXECUTOR)
+  set(subdirs ${subdirs}
+      gpu_stream
+  )
+endif()
+
 foreach(subdir ${subdirs})
   add_hpx_pseudo_target(examples.${subdir})
   add_subdirectory(${subdir})

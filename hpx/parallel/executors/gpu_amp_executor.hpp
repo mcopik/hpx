@@ -45,7 +45,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
         typedef gpu_execution_tag execution_category;
         template<typename value_type>
-        struct gpu_amp_buffer_iterator;
+        struct buffer_iterator;
 		template<typename Iter>
     	struct gpu_amp_buffer : detail::gpu_executor_buffer<Iter,
 			Concurrency::array_view< typename std::iterator_traits<Iter>::value_type > >
@@ -99,86 +99,159 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     			std::cout << "buffer: " << *cpu_buffer << std::endl;
     		}
             
-            gpu_amp_buffer_iterator<value_type> begin()
+    		buffer_iterator<value_type> begin()
             {
-                return gpu_amp_buffer_iterator<value_type>(*buffer.get(), 0, count);
+                return buffer_iterator<value_type>(*buffer.get(), 0, count);
             }
 
-            gpu_amp_buffer_iterator<value_type> end()
+            buffer_iterator<value_type> end()
             {
-                return gpu_amp_buffer_iterator<value_type>(*buffer.get(), count, count);
+                return buffer_iterator<value_type>(*buffer.get(), count, count);
             }
 		};
    
         template<typename value_type>
-        struct gpu_amp_buffer_iterator : 
-            public boost::iterator_facade<
-                gpu_amp_buffer_iterator<value_type>,
-                value_type,
-                std::random_access_iterator_tag
-            >
+        struct buffer_iterator
         {
         private:
             Concurrency::array_view<value_type> array_view;
             uint32_t idx_, size;
         public:
-            explicit gpu_amp_buffer_iterator(Concurrency::array<value_type> & array, uint32_t idx, uint32_t size) : 
+            explicit buffer_iterator(Concurrency::array<value_type> & array, uint32_t idx, uint32_t size) :
                 array_view(array), idx_(idx), size(size) {}
 
-            explicit gpu_amp_buffer_iterator(const Concurrency::array_view<value_type> & array_view, uint32_t idx, uint32_t size) : 
+            explicit buffer_iterator(const Concurrency::array_view<value_type> & array_view, uint32_t idx, uint32_t size) :
                 array_view(array_view), idx_(idx), size(size) {}
 
             template<typename ValueType>
-            explicit gpu_amp_buffer_iterator(const Concurrency::array_view<ValueType> & array_view, uint32_t idx, uint32_t size) : 
+            explicit buffer_iterator(const Concurrency::array_view<ValueType> & array_view, uint32_t idx, uint32_t size) :
                 array_view(array_view), idx_(idx), size(size) {}
 
             template<typename ValueType>
-            gpu_amp_buffer_iterator(const gpu_amp_buffer_iterator<ValueType> & other) : 
+            buffer_iterator(const buffer_iterator<ValueType> & other) :
                 array_view(other.array_view), idx_(other.idx_), size(other.size) {}
 
-            gpu_amp_buffer_iterator(const gpu_amp_buffer_iterator & other) : 
+            buffer_iterator(const buffer_iterator & other) :
                 array_view(other.array_view), idx_(other.idx_), size(other.size) {}
             
-            gpu_amp_buffer_iterator & operator=(const gpu_amp_buffer_iterator & a)
+            buffer_iterator & operator=(const buffer_iterator & a) restrict(amp, cpu)
             {
                 return *this;
             }
 
             Concurrency::array_view<value_type> get_array_view() { return array_view; }
 
-            void increment()
+            buffer_iterator const& operator++() restrict(amp, cpu)
             {
-                idx_ = std::min(++idx_, size);
+                ++idx_;
+                return *this;
             }
 
-            void decrement()
+            buffer_iterator const& operator--() restrict(amp, cpu)
             {
-                idx_ = std::min(idx_--, idx_);
+                --idx_;
+                return *this;
             }
 
-            void advance(uint32_t n) restrict(amp,cpu)
+            buffer_iterator operator++(int) restrict(amp, cpu)
             {
-                idx_ = std::min(idx_ + n, size);
+            	buffer_iterator copy(*this);
+                ++idx_;
+                return copy;
             }
 
-            bool equal(gpu_amp_buffer_iterator const& other) const
+            buffer_iterator operator--(int) restrict(amp, cpu)
+            {
+            	buffer_iterator copy(*this);
+                --idx_;
+                return copy;
+            }
+
+            explicit operator bool() const restrict(amp, cpu)
+            {
+                return idx_;
+            }
+
+            bool operator==(buffer_iterator const& other) const restrict(amp, cpu)
             {
                 return idx_ == other.idx_;
             }
 
-            value_type & dereference() const
+            bool operator!=(buffer_iterator const& other) const restrict(amp, cpu)
+            {
+                return idx_ != other.idx_;
+            }
+
+            bool operator<(buffer_iterator const& other) const restrict(amp, cpu)
+            {
+                return idx_ < other.idx_;
+            }
+
+            bool operator>(buffer_iterator const& other) const restrict(amp, cpu)
+            {
+                return idx_ > other.idx_;
+            }
+
+            bool operator<=(buffer_iterator const& other) const restrict(amp, cpu)
+            {
+                return idx_ <= other.idx_;
+            }
+
+            bool operator>=(buffer_iterator const& other) const restrict(amp, cpu)
+            {
+                return idx_ >= other.idx_;
+            }
+
+            buffer_iterator& operator+=(std::ptrdiff_t offset) restrict(amp, cpu)
+            {
+                idx_ += offset;
+                return *this;
+            }
+
+            buffer_iterator & operator-=(std::ptrdiff_t offset) restrict(amp, cpu)
+            {
+                idx_ -= offset;
+                return *this;
+            }
+
+            std::ptrdiff_t operator-(buffer_iterator const& other) const restrict(amp, cpu)
+            {
+                return idx_ - other.idx_;
+            }
+
+            buffer_iterator operator-(std::ptrdiff_t offset) const restrict(amp, cpu)
+            {
+                return buffer_iterator(array_view, idx_ - offset, size);
+            }
+
+            buffer_iterator operator+(std::ptrdiff_t offset) const restrict(amp, cpu)
+            {
+                return buffer_iterator(array_view, idx_ + offset, size);
+            }
+
+            value_type & operator*() restrict(amp, cpu)
             {
                 return array_view[idx_];
             }
 
-            std::ptrdiff_t distance_to(gpu_amp_buffer_iterator const& other) const
+            value_type const& operator[](std::ptrdiff_t offset) const restrict(amp, cpu)
             {
-                return other.idx_ < idx_ ? other.idx_ - idx_ : idx_ - other.idx_;
+                return array_view[idx_ + offset];
             }
 
-            uint32_t & idx() restrict(amp,cpu)
+            value_type& operator[](std::ptrdiff_t offset) restrict(amp, cpu)
             {
-                return idx_;
+                return array_view[idx_ + offset];
+            }
+
+            operator value_type*() const
+            {
+                return array_view[idx_];
+            }
+
+            value_type* operator->() const
+            {
+                return &array_view[idx_];
             }
         };
 

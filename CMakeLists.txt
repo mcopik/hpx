@@ -605,6 +605,11 @@ hpx_option(HPX_WITH_COMPRESSION_BZIP2 BOOL "Enable bzip2 compression for parcel 
 hpx_option(HPX_WITH_COMPRESSION_SNAPPY BOOL "Enable snappy compression for parcel data (default: OFF)." OFF ADVANCED)
 hpx_option(HPX_WITH_COMPRESSION_ZLIB BOOL "Enable zlib compression for parcel data (default: OFF)." OFF ADVANCED)
 
+# Developer tools
+hpx_option(HPX_WITH_VIM_YCM STRING
+  "Generate HPX completion file for VIM YouCompleteMe plugin and save in specified location"
+  "" ADVANCED)
+
 ################################################################################
 # Backwards compatibility options (edit for each release)
 
@@ -1258,6 +1263,10 @@ if(HPX_WITH_VALGRIND)
   hpx_add_config_define(HPX_HAVE_VALGRIND)
 endif()
 
+if(NOT "${HPX_WITH_VIM_YCM}" STREQUAL "")
+  SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
 ################################################################################
 # Security, libsodium: P(ortable|ackageable) NaCl
 ################################################################################
@@ -1665,6 +1674,12 @@ if(HPX_WITH_DOCUMENTATION)
     COMPONENT docs
     FILES_MATCHING PATTERN "*.png"
     PATTERN ".git" EXCLUDE)
+endif()
+
+
+if(HPX_WITH_VIM_YCM)
+  configure_file(${CMAKE_SOURCE_DIR}/tools/vim/.ycm_extra_conf.py
+               ${HPX_WITH_VIM_YCM}/.ycm_extra_conf.py @ONLY)
 endif()
 
 ################################################################################

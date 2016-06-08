@@ -1,6 +1,7 @@
 # Copyright (c) 2007-2015 Hartmut Kaiser
 # Copyright (c) 2011-2014 Thomas Heller
 # Copyright (c) 2007-2008 Chirag Dekate
+# Copyright (c) 2015-2016 Marcin Copik
 # Copyright (c)      2011 Bryce Lelbach
 # Copyright (c)      2011 Vinay C Amatya
 # Copyright (c)      2013 Jeroen Habraken
@@ -38,6 +39,16 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran
 ################################################################################
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Configuration type (one of Debug, RelWithDebInfo, Release, MinSizeRel)")
+endif()
+
+################################################################################
+# HCC compiler configuration
+# It has to be done before any call to project()!
+################################################################################
+
+if(HPX_WITH_HCC)
+    include(cmake/HPX_HCCConfigure.cmake)
+    hcc_configure_cxx()
 endif()
 
 ################################################################################
@@ -235,8 +246,8 @@ if(HPX_WITH_CUDA)
   hpx_add_config_define(HPX_HAVE_CUDA)
   hpx_add_config_define(HPX_HAVE_COMPUTE)
 endif()
-hpx_option(HPX_WITH_HCC BOOL
-  "Enable hcc support (default: OFF)" ADVANCED)
+hpx_option(HPX_WITH_HCC STRING
+    "Enable support for C++AMP/HC through HCC compiler. Requires path." ADVANCED)
 hpx_option(HPX_WITH_SYCL BOOL
   "Enable sycl support (default: OFF)" ADVANCED)
 
@@ -690,6 +701,10 @@ hpx_option(HPX_WITH_PARCEL_COALESCING BOOL
   "Enable the parcel coalescing plugin (default: ON)." ON ADVANCED)
 if(HPX_WITH_PARCEL_COALESCING)
   hpx_add_config_define(HPX_HAVE_PARCEL_COALESCING)
+endif()
+
+if(HPX_WITH_HCC)
+    hcc_configure()
 endif()
 
 ################################################################################

@@ -21,11 +21,11 @@ macro(hcc_configure_cxx)
                 OUTPUT_STRIP_TRAILING_WHITESPACE
             )
     execute_process(
-                COMMAND ${KALMAR_CONFIG} --cxxflags OUTPUT_VARIABLE HCC_CXX_FLAGS
+                COMMAND ${HCC_CONFIG} --cxxflags OUTPUT_VARIABLE HCC_CXX_FLAGS
                 OUTPUT_STRIP_TRAILING_WHITESPACE
             )
     execute_process(
-                COMMAND ${KALMAR_CONFIG} --ldflags OUTPUT_VARIABLE HCC_LD_FLAGS
+                COMMAND ${HCC_CONFIG} --ldflags OUTPUT_VARIABLE HCC_LD_FLAGS
                 OUTPUT_STRIP_TRAILING_WHITESPACE
             )
 
@@ -41,7 +41,6 @@ macro(hcc_configure_cxx)
 endmacro()
 
 macro(hcc_configure)
-
 
     set(HPX_WITH_COMPUTE On)
     hpx_add_config_define(HPX_HAVE_HCC)

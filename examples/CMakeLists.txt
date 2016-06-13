@@ -15,10 +15,8 @@ set(subdirs
     future_reduce
     heartbeat
     interpolate1d
-    jacobi
     jacobi_smp
     nqueen
-    performance_counters
     queue
     quickstart
     qt
@@ -26,7 +24,6 @@ set(subdirs
     spell_check
     startup_shutdown
     thread_aware_timer
-    throttle
    )
 
 if(HPX_WITH_FORTRAN)
@@ -53,6 +50,14 @@ if(HPX_WITH_COMPUTE)
   set(subdirs ${subdirs}
       compute
      )
+endif()
+
+if(NOT HPX_WITH_HCC)
+    set(subdirs ${subdirs}
+        jacobi
+        performance_counters
+        throttle
+    )
 endif()
 
 foreach(subdir ${subdirs})

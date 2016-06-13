@@ -22,7 +22,6 @@ set(subdirs
     qt
     random_mem_access
     spell_check
-    startup_shutdown
     thread_aware_timer
    )
 
@@ -56,6 +55,7 @@ if(NOT HPX_WITH_HCC)
     set(subdirs ${subdirs}
         jacobi
         performance_counters
+        startup_shutdown
         throttle
     )
 endif()

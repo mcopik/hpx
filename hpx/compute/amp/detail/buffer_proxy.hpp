@@ -28,6 +28,11 @@ namespace hpx { namespace compute { namespace amp
             : device_buffer_(other.device_buffer_), p_(other.p_)
         {}
 
+        ~buffer_proxy()
+        {
+            delete device_obj;
+        }
+
         operator T() const
         {
             return access_target::read(*target_, p_);

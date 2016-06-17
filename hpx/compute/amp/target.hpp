@@ -52,7 +52,7 @@ namespace hpx { namespace compute { namespace amp
 
             native_handle_type& operator=(native_handle_type && rhs) HPX_NOEXCEPT;
 
-            int get_device() const HPX_NOEXCEPT
+            accelerator_view get_device() const HPX_NOEXCEPT
             {
                 return device_;
             }
@@ -67,7 +67,7 @@ namespace hpx { namespace compute { namespace amp
 
             mutable mutex_type mtx_;
             int device_;
-            mutable cudaStream_t stream_;
+            accelerator_view device_view;
             hpx::id_type locality_;
         };
 

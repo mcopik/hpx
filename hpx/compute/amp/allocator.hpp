@@ -92,27 +92,34 @@ namespace hpx { namespace compute { namespace amp
         // attempt to allocate the new memory block as close as possible to hint.
         pointer allocate(size_type n) restrict(amp, cpu)
         {
-            /// No memory allocation on device side
 #if defined(__HCC_ACCELERATOR__)
+            /// No memory allocation on device side
             pointer result;
+            return result;
 #else
             value_type *p = 0;
-            ///TODO: we don't need to select a device, right?
-            ///detail::scoped_active_target active(*target_);
+            try {
+                buffer_type * buffer = new buffer_type(Concurrency::extent<1>(n)
+                    target_.get_view());
+                p = new value_type(buffer);
+                pointer result(p, *target_);
+                return result;
+            } catch (Concurrency::runtime_exception & exc) {
 
-            buffer_type * buffer = new buffer_type(Concurrency::extent<1>(n)
-                target_.get_view());
-
-            pointer result(p, *target_);
-            if (error != cudaSuccess)
-            {
                 HPX_THROW_EXCEPTION(out_of_memory,
-                    "cuda::allocator<T>::allocate()",
-                    std::string("cudaMalloc failed: ") +
-                        cudaGetErrorString(error));
+                    "amp::allocator<T>::allocate()",
+                    std::string("Construction of AMP array failed: ") +
+                        std::string(exc.what()));
+
+            } catch (std::exception & exc) {
+
+                HPX_THROW_EXCEPTION(no_success,
+                    "amp::allocator<T>::allocate()",
+                    std::string("Construction of AMP array failed: ") +
+                        std::string(exc.what()));
+
             }
 #endif
-            return result;
         }
 
         // Deallocates the storage referenced by the pointer p, which must be a
@@ -121,38 +128,44 @@ namespace hpx { namespace compute { namespace amp
         // originally produced p; otherwise, the behavior is undefined.
         void deallocate(pointer p, size_type n)
         {
-#if !defined(__CUDA_ARCH__)
-            detail::scoped_active_target active(*target_);
+#if !defined(__HCC_ACCELERATOR__)
+            try {
+                delete p.device_ptr();
+            } catch (Concurrency::runtime_exception & exc) {
 
-            cudaError_t error = cudaFree(p.device_ptr());
-            if (error != cudaSuccess)
-            {
-                HPX_THROW_EXCEPTION(kernel_error,
-                    "cuda::allocator<T>::deallocate()",
-                    std::string("cudaFree failed: ") +
-                        cudaGetErrorString(error));
+                HPX_THROW_EXCEPTION(out_of_memory,
+                    "amp::allocator<T>::deallocate()",
+                    std::string("Deallocation of AMP array failed: ") +
+                        std::string(exc.what()));
+
+            } catch (std::exception & exc) {
+
+                HPX_THROW_EXCEPTION(no_success,
+                    "amp::allocator<T>::allocate()",
+                    std::string("Deallocation of AMP array failed: ") +
+                        std::string(exc.what()));
+
             }
 #endif
         }
 
         // Returns the maximum theoretically possible value of n, for which the
-        // call allocate(n, 0) could succeed. In most implementations, this
-        // returns std::numeric_limits<size_type>::max() / sizeof(value_type).
+        // call allocate(n, 0) could succeed.
+        // Implementation uses dedicated_memory() to obtain amount of memory
+        // on accelerator.
         size_type max_size() const HPX_NOEXCEPT
         {
-            detail::scoped_active_target active(*target_);
-            std::size_t free = 0;
-            std::size_t total = 0;
-            cudaError_t error = cudaMemGetInfo(&free, &total);
-            if (error != cudaSuccess)
-            {
-                HPX_THROW_EXCEPTION(kernel_error,
-                    "cuda::allocator<T>::max_size()",
-                    std::string("cudaMemGetInfo failed: ") +
-                        cudaGetErrorString(error));
-            }
+            try {
+                auto device = target_->native_handle().get_device();
+                return device.dedicated_memory() / sizeof(value_type);
+            } catch (Concurrency::runtime_exception & exc) {
 
-            return total / sizeof(value_type);
+                HPX_THROW_EXCEPTION(no_success,
+                    "amp::allocator<T>::max_size(()",
+                    std::string("Calling accellerator_view.dedicated_memory()"
+                    " failed: ") +  std::string(exc.what()));
+
+            }
         }
 
     public:

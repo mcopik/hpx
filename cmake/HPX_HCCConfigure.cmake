@@ -43,7 +43,7 @@ endmacro()
 macro(hcc_configure)
 
     set(HPX_WITH_COMPUTE On)
-    hpx_add_config_define(HPX_HAVE_HCC)
+    hpx_add_config_define(HPX_HAVE_AMP)
     hpx_add_config_define(HPX_HAVE_COMPUTE)
 
     hpx_add_compile_flag("${HCC_CXX_FLAGS}")

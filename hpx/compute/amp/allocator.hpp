@@ -28,7 +28,7 @@ namespace hpx { namespace compute { namespace amp
         typedef detail::array_proxy<T> value_type;
         typedef target_ptr<T> pointer;
         typedef target_ptr<T const> const_pointer;
-#if defined(__HCC_ACCELERATOR__)
+#if defined(__COMPUTE__ACCELERATOR__)
         /// Define direct access to allocated data in device code
         typedef T& reference;
         typedef T const& const_reference;
@@ -50,6 +50,7 @@ namespace hpx { namespace compute { namespace amp
         typedef std::true_type propagate_on_container_move_assignment;
 
         typedef amp::target target_type;
+        typedef Concurrency::array<T, 1> buffer_type;
 
         allocator()
           : target_(&amp::get_default_target())
@@ -89,16 +90,18 @@ namespace hpx { namespace compute { namespace amp
         // called. The pointer hint may be used to provide locality of
         // reference: the allocator, if supported by the implementation, will
         // attempt to allocate the new memory block as close as possible to hint.
-        pointer allocate(size_type n, std::allocator<void>::const_pointer hint = 0) restrict(amp, cpu)
+        pointer allocate(size_type n) restrict(amp, cpu)
         {
             /// No memory allocation on device side
 #if defined(__HCC_ACCELERATOR__)
             pointer result;
 #else
             value_type *p = 0;
-            detail::scoped_active_target active(*target_);
+            ///TODO: we don't need to select a device, right?
+            ///detail::scoped_active_target active(*target_);
 
-            cudaError_t error = cudaMalloc(&p, n*sizeof(T));
+            buffer_type * buffer = new buffer_type(Concurrency::extent<1>(n)
+                target_.get_view());
 
             pointer result(p, *target_);
             if (error != cudaSuccess)

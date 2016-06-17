@@ -183,7 +183,7 @@ set(hpx_SOURCES ${hpx_SOURCES} ${HPX_STATIC_PARCELPORT_PLUGINS_SOURCES})
 ################################################################################
 # libhpx
 if(HPX_WITH_STATIC_LINKING)
-  set(hpx_SOURCES ${hpx_SOURCES} ${hpx_init_SOURCES} ../hpx/compute/amp/detail/array_proxy.hpp)
+  set(hpx_SOURCES ${hpx_SOURCES} ${hpx_init_SOURCES} ../hpx/compute/amp/detail/buffer_proxy.hpp)
 endif()
 if(HPX_WITH_DEFAULT_TARGETS)
   if(HPX_WITH_CUDA)

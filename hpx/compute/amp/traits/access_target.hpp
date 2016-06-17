@@ -24,8 +24,7 @@ namespace hpx { namespace compute { namespace traits
         typedef amp::target target_type;
 
         template <typename T>
-        HPX_HOST_DEVICE
-        static T read(cuda::target const& tgt, T const* t)
+        static T read(amp::target const& tgt, T const* t)
         {
 #if defined(__COMPUTE__ACCELERATOR__)
             return *t;
@@ -39,8 +38,7 @@ namespace hpx { namespace compute { namespace traits
         }
 
         template <typename T>
-        HPX_HOST_DEVICE
-        static void write(cuda::target const& tgt, T* dst, T const* src)
+        static void write(amp::target const& tgt, T* dst, T const* src)
         {
 #if defined(__COMPUTE__ACCELERATOR__)
             *dst = *src;

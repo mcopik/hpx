@@ -9,6 +9,8 @@
 #include <hpx/config.hpp>
 
 #if defined(HPX_HAVE_AMP)
+#include <hpx/compute/amp/detail/buffer_proxy.hpp>
+
 #include <hpx/exception.hpp>
 #include <hpx/util/unused.hpp>
 
@@ -25,7 +27,7 @@ namespace hpx { namespace compute { namespace amp
     class allocator
     {
     public:
-        typedef detail::array_proxy<T> value_type;
+        typedef detail::buffer_proxy<T> value_type;
         typedef target_ptr<T> pointer;
         typedef target_ptr<T const> const_pointer;
 #if defined(__COMPUTE__ACCELERATOR__)
@@ -169,72 +171,72 @@ namespace hpx { namespace compute { namespace amp
         }
 
     public:
-        // Constructs count objects of type T in allocated uninitialized
-        // storage pointed to by p, using placement-new
-        template <typename U, typename ... Args>
-        void bulk_construct(U* p, std::size_t count, Args &&... args)
-        {
-            int threads_per_block = (std::min)(1024, int(count));
-            int num_blocks =
-                int((count + threads_per_block - 1) / threads_per_block);
-
-            detail::launch(
-                *target_, num_blocks, threads_per_block,
-                [] __device__ (U* p, std::size_t count, Args const&... args)
-                {
-                    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-                    if (idx < count)
-                    {
-                        ::new (p + idx) U (std::forward<Args>(args)...);
-                    }
-                },
-                p, count, std::forward<Args>(args)...);
-            target_->synchronize();
-        }
-
-        // Constructs an object of type T in allocated uninitialized storage
-        // pointed to by p, using placement-new
-        template <typename U, typename ... Args>
-        void construct(U* p, Args &&... args)
-        {
-            detail::launch(
-                *target_, 1, 1,
-                [] __device__ (U* p, Args const&... args)
-                {
-                    ::new (p) U (std::forward<Args>(args)...);
-                },
-                p, std::forward<Args>(args)...);
-            target_->synchronize();
-        }
-
-        // Calls the destructor of count objects pointed to by p
-        template <typename U>
-        void bulk_destroy(U* p, std::size_t count)
-        {
-            int threads_per_block = (std::min)(1024, int(count));
-            int num_blocks =
-                int((count + threads_per_block) / threads_per_block) - 1;
-
-            detail::launch(
-                *target_, num_blocks, threads_per_block,
-                [] __device__ (U* p, std::size_t count)
-                {
-                    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-                    if (idx < count)
-                    {
-                        (p + idx)->~U();
-                    }
-                },
-                p, count);
-            target_->synchronize();
-        }
-
-        // Calls the destructor of the object pointed to by p
-        template <typename U>
-        void destroy(U* p)
-        {
-            bulk_destroy(p, 1);
-        }
+//        // Constructs count objects of type T in allocated uninitialized
+//        // storage pointed to by p, using placement-new
+//        template <typename U, typename ... Args>
+//        void bulk_construct(U* p, std::size_t count, Args &&... args)
+//        {
+//            int threads_per_block = (std::min)(1024, int(count));
+//            int num_blocks =
+//                int((count + threads_per_block - 1) / threads_per_block);
+//
+//            detail::launch(
+//                *target_, num_blocks, threads_per_block,
+//                [] __device__ (U* p, std::size_t count, Args const&... args)
+//                {
+//                    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+//                    if (idx < count)
+//                    {
+//                        ::new (p + idx) U (std::forward<Args>(args)...);
+//                    }
+//                },
+//                p, count, std::forward<Args>(args)...);
+//            target_->synchronize();
+//        }
+//
+//        // Constructs an object of type T in allocated uninitialized storage
+//        // pointed to by p, using placement-new
+//        template <typename U, typename ... Args>
+//        void construct(U* p, Args &&... args)
+//        {
+//            detail::launch(
+//                *target_, 1, 1,
+//                [] __device__ (U* p, Args const&... args)
+//                {
+//                    ::new (p) U (std::forward<Args>(args)...);
+//                },
+//                p, std::forward<Args>(args)...);
+//            target_->synchronize();
+//        }
+//
+//        // Calls the destructor of count objects pointed to by p
+//        template <typename U>
+//        void bulk_destroy(U* p, std::size_t count)
+//        {
+//            int threads_per_block = (std::min)(1024, int(count));
+//            int num_blocks =
+//                int((count + threads_per_block) / threads_per_block) - 1;
+//
+//            detail::launch(
+//                *target_, num_blocks, threads_per_block,
+//                [] __device__ (U* p, std::size_t count)
+//                {
+//                    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+//                    if (idx < count)
+//                    {
+//                        (p + idx)->~U();
+//                    }
+//                },
+//                p, count);
+//            target_->synchronize();
+//        }
+//
+//        // Calls the destructor of the object pointed to by p
+//        template <typename U>
+//        void destroy(U* p)
+//        {
+//            bulk_destroy(p, 1);
+//        }
 
         // Access the underlying target (device)
         target_type& target() const HPX_NOEXCEPT

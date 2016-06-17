@@ -8,6 +8,10 @@
 
 #if defined(HPX_HAVE_AMP)
 
+#include <hpx/compute/amp/traits/access_target.hpp>
+
+#include <amp.h>
+
 namespace hpx { namespace compute { namespace amp
 {
     template <typename T>
@@ -16,8 +20,9 @@ namespace hpx { namespace compute { namespace amp
         typedef Concurrency::array<T, 1> buffer;
         typedef std::size_t size_type;
     public:
+        /// Initialize pointer with begin position of device data
         buffer_proxy(buffer * device_buffer) HPX_NOEXCEPT
-            : device_buffer_(device_buffer), p_(device_buffer.data())
+            : device_buffer_(device_buffer), p_(device_buffer->data())
         {}
 
         buffer_proxy(buffer * device_buffer, T * p) HPX_NOEXCEPT
@@ -30,7 +35,7 @@ namespace hpx { namespace compute { namespace amp
 
         ~buffer_proxy()
         {
-            delete device_obj;
+            delete device_buffer_;
         }
 
         operator T() const
@@ -61,7 +66,7 @@ namespace hpx { namespace compute { namespace amp
         }
 
     private:
-        buffer* device_obj;
+        buffer* device_buffer_;
         T * p_;
     };
 }}}

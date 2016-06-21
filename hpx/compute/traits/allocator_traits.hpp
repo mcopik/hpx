@@ -222,7 +222,7 @@ namespace hpx { namespace compute { namespace traits
         }
 
         template<class... Args >
-        static void destroy(Allocator& alloc, pointer* p)
+        static void destroy(Allocator& alloc, pointe* p)
         {
             alloc.destroy(p);
         }

@@ -45,6 +45,13 @@ namespace hpx { namespace compute { namespace amp
                 delete device_buffer_;
             }
 
+            buffer_proxy& operator=(T const& t)
+            {
+                //access_target::write(*target_, p_, &t);
+                device_buffer_view[0] = t;
+                return *this;
+            }
+
             //operator T() const
             //{
                 //TODO: which version is more efficient?
@@ -52,10 +59,10 @@ namespace hpx { namespace compute { namespace amp
               //  return device_buffer_view[0];
             //}
 
-		operator T&() const
-		{
-			return device_buffer_view[0];
-		}
+            operator T&() const
+            {
+                return device_buffer_view[0];
+            }
 
             T &operator*() const {
                 return *p_;
@@ -117,7 +124,7 @@ namespace hpx { namespace compute { namespace amp
                 delete device_buffer_;
             }
 
-            operator T() const
+            operator T&() const
             {
                 //TODO: which version is more efficient?
                 //return access_target::read(*target_, p_);

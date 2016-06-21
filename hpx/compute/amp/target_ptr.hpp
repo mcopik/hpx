@@ -21,13 +21,27 @@
 
 namespace hpx { namespace compute { namespace amp
 {
+
+	template<typename T>
+	struct get_internal_type
+	{
+		typedef T type;
+	};
+
+	template<typename T>
+	struct get_internal_type<detail::buffer_proxy<T>>
+	{
+		typedef get_internal_type<T> type;
+	};
+
     template <typename T>
     class target_ptr
     {
     public:
         typedef typename compute::detail::get_proxy_type<T>::type *
             proxy_type;
-        typedef std::random_access_iterator_tag iterator_category;
+	typedef typename get_internal_type<T>::type internal_type;
+	typedef std::random_access_iterator_tag iterator_category;
 #if defined(__COMPUTE__ACCELERATOR__)
         typedef T value_type;
         typedef T * pointer;
@@ -169,6 +183,11 @@ namespace hpx { namespace compute { namespace amp
             return p_;
         }
 
+//        operator int*() const
+//        {
+//            return static_cast<int*>(*p_);
+//        }
+
         T* operator->() const
         {
             return p_;
@@ -188,6 +207,11 @@ namespace hpx { namespace compute { namespace amp
         {
             return p_;
         }
+
+//        explicit operator int*() const
+//        {
+//            return p_;
+//        }
 
         T* operator->() const
         {

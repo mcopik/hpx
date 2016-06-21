@@ -196,12 +196,50 @@ namespace hpx { namespace compute { namespace traits
     struct allocator_traits
       : std::allocator_traits<Allocator>
     {
+#if (defined(HPX_GCC_VERSION) && HPX_GCC_VERSION < 40700) || defined(HPX_NATIVE_MIC)
+    public:
+        typedef typename Allocator::value_type value_type;
+        typedef typename Allocator::pointer pointer;
+        typedef typename Allocator::const_pointer const_pointer;
+        typedef typename Allocator::size_type size_type;
+        typedef typename Allocator::difference_type difference_type;
+
+        static pointer allocate(Allocator& alloc, size_type n,
+            const_pointer hint = nullptr)
+        {
+            return alloc.allocate(n, hint);
+        }
+
+        static void deallocate(Allocator& alloc, pointer p, size_type n)
+        {
+            alloc.deallocate(p, n);
+        }
+
+        template<class... Args >
+        static void construct(Allocator& alloc, pointer* p, Args&&... args)
+        {
+            alloc.construct(p, std::forward<Args>(args)...);
+        }
+
+        template<class... Args >
+        static void destroy(Allocator& alloc, pointer* p)
+        {
+            alloc.destroy(p);
+        }
+
+        size_type max_size(Allocator const& alloc)
+        {
+            return alloc.max_size();
+        }
+#else
     private:
         typedef std::allocator_traits<Allocator> base_type;
 
     public:
         using typename base_type::size_type;
         using typename base_type::value_type;
+        using typename base_type::pointer;
+#endif
 
         typedef
             typename detail::get_reference_type<Allocator>::type reference;
@@ -219,17 +257,16 @@ namespace hpx { namespace compute { namespace traits
             return detail::call_target_helper(alloc);
         }
 
-        template <typename T, typename ...Ts>
+        template <typename ...Ts>
         HPX_HOST_DEVICE
-        static void bulk_construct(Allocator& alloc, T* p, size_type count,
+        static void bulk_construct(Allocator& alloc, pointer p, size_type count,
             Ts &&... vs)
         {
             detail::call_bulk_construct(alloc, p, count, std::forward<Ts>(vs)...);
         }
 
-        template <typename T>
         HPX_HOST_DEVICE
-        static void bulk_destroy(Allocator& alloc, T* p, size_type count) HPX_NOEXCEPT
+        static void bulk_destroy(Allocator& alloc, pointer p, size_type count) HPX_NOEXCEPT
         {
             if (p != 0) detail::call_bulk_destroy(alloc, p, count);
         }

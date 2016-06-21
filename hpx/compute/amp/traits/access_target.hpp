@@ -30,9 +30,11 @@ namespace hpx { namespace compute { namespace traits
             return *t;
 #else
             T tmp;
-            cudaMemcpyAsync(&tmp, t, sizeof(T), cudaMemcpyDeviceToHost,
-                tgt.native_handle().get_stream());
-            tgt.synchronize();
+            //cudaMemcpyAsync(&tmp, t, sizeof(T), cudaMemcpyDeviceToHost,
+            //    tgt.native_handle().get_stream());
+            //tgt.synchronize();
+            //Concurrency::copy()
+            std::cout << "READ_TRAITS" << '\n';
             return tmp;
 #endif
         }
@@ -43,8 +45,9 @@ namespace hpx { namespace compute { namespace traits
 #if defined(__COMPUTE__ACCELERATOR__)
             *dst = *src;
 #else
-            cudaMemcpyAsync(dst, src, sizeof(T), cudaMemcpyHostToDevice,
-                tgt.native_handle().get_stream());
+//            cudaMemcpyAsync(dst, src, sizeof(T), cudaMemcpyHostToDevice,
+//                tgt.native_handle().get_stream());
+            std::cout << "WRITE_TRAITS" << '\n';
 #endif
         }
     };

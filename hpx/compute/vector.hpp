@@ -137,9 +137,9 @@ namespace hpx { namespace compute
 
         ~vector()
         {
-            if(static_cast<T*>(data_) != nullptr)
+            if(data_ != nullptr)//static_cast<T*>(data_) != nullptr)
             {
-                alloc_traits::bulk_destroy(alloc_, static_cast<T*>(data_), size_);
+                alloc_traits::bulk_destroy(alloc_, /*static_cast<T*>(data_)*/ data_, size_);
                 alloc_traits::deallocate(alloc_, data_, capacity_);
             }
         }

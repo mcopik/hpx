@@ -25,7 +25,7 @@ namespace hpx { namespace compute { namespace amp
     class target_ptr
     {
     public:
-        typedef typename compute::detail:::get_proxy_type<T>::type *
+        typedef typename compute::detail::get_proxy_type<T>::type *
             proxy_type;
         typedef std::random_access_iterator_tag iterator_category;
 #if defined(__COMPUTE__ACCELERATOR__)
@@ -33,7 +33,7 @@ namespace hpx { namespace compute { namespace amp
         typedef T * pointer;
         typedef T & reference;
 #else
-        typedef value_proxy< buffer_proxy<T> > value_type;
+        typedef value_proxy< T > value_type;
         typedef T * pointer;
         typedef value_proxy<T> reference;
 #endif
@@ -44,7 +44,7 @@ namespace hpx { namespace compute { namespace amp
           , tgt_(nullptr)
         {}
 
-        target_ptr(T *p, target & tgt)
+        target_ptr(T *p, amp::target & tgt)
           : p_(p)
           , tgt_(&tgt)
         {}

@@ -11,22 +11,24 @@
 #define HPX_COMPUTE_AMP_TARGET_HPP
 
 #include <hpx/config.hpp>
-#include <hpx/compute/amp/config.hpp>
 
 #if defined(HPX_HAVE_AMP)
 #include <hpx/runtime/runtime_fwd.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/lcos/local/spinlock.hpp>
+#include <hpx/compute/amp/config.hpp>
+#include <hpx/config/warnings_prefix.hpp>
 
 #if !defined(__COMPUTE__ACCELERATOR__)
 #include <hpx/runtime/serialization/serialization_fwd.hpp>
 #endif
 
+#include <amp.h>
+
 #include <mutex>
 #include <string>
 #include <utility>
 
-#include <hpx/config/warnings_prefix.hpp>
 
 namespace hpx { namespace compute { namespace amp
 {
@@ -52,9 +54,9 @@ namespace hpx { namespace compute { namespace amp
 
             native_handle_type& operator=(native_handle_type && rhs) HPX_NOEXCEPT;
 
-            accelerator_view get_device() const HPX_NOEXCEPT
+            Concurrency::accelerator_view get_device() const HPX_NOEXCEPT
             {
-                return device_;
+                return device_view;
             }
 
             hpx::id_type const& get_locality() const HPX_NOEXCEPT
@@ -67,7 +69,7 @@ namespace hpx { namespace compute { namespace amp
 
             mutable mutex_type mtx_;
             int device_;
-            accelerator_view device_view;
+            Concurrency::accelerator_view device_view;
             hpx::id_type locality_;
         };
 

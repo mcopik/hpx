@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 //  Copyright (c) 2016 Thomas Heller
-//  Copyright (c) 2016 Marcin COpik
+//  Copyright (c) 2016 Marcin Copik
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -10,8 +10,9 @@
 #define HPX_COMPUTE_AMP_VALUE_PROXY_HPP
 
 #include <hpx/config.hpp>
+#include <hpx/compute/amp/config.hpp>
 
-#if defined(HPX_HAVE_AMP) && defined(__CUDACC__)
+#if defined(HPX_HAVE_AMP)
 
 #include <hpx/compute/amp/target.hpp>
 #include <hpx/compute/amp/traits/access_target.hpp>
@@ -71,38 +72,26 @@ namespace hpx { namespace compute { namespace amp
     };
 
 
-    template <typename T const>
-    class value_proxy
+    template <typename T>
+    class value_proxy<const T>
     {
         typedef traits::access_target<amp::target> access_target;
     public:
+        typedef T const proxy_type;
 
         value_proxy(T *p, amp::target & tgt) HPX_NOEXCEPT
-          : p_(p)
-          , target_(&tgt)
+            : p_(p)
+            , target_(tgt)
         {}
 
-        value_proxy(value_proxy const& other)
-          : p_(other.p_)
-          , target_(other.target_)
+        value_proxy(value_proxy<T> const& other)
+            : p_(other.device_ptr())
+            , target_(other.target())
         {}
-
-        value_proxy& operator=(T const& t)
-        {
-            access_target::write(*target_, p_, &t);
-            return *this;
-        }
-
-        value_proxy& operator=(value_proxy const& other)
-        {
-            p_ = other.p_;
-            target_ = other.target_;
-            return *this;
-        }
 
         operator T() const
         {
-            return access_target::read(*target_, p_);
+            return access_target::read(target_, p_);
         }
 
         T* device_ptr() const HPX_NOEXCEPT
@@ -117,7 +106,7 @@ namespace hpx { namespace compute { namespace amp
 
     private:
         T* p_;
-        amp::target* target_;
+        amp::target& target_;
     };
 }}}
 

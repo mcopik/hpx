@@ -10,6 +10,7 @@
 
 #if defined(HPX_HAVE_AMP)
 #include <hpx/compute/amp/detail/buffer_proxy.hpp>
+#include <hpx/compute/amp/target_ptr.hpp>
 
 #include <hpx/exception.hpp>
 #include <hpx/util/unused.hpp>
@@ -28,16 +29,16 @@ namespace hpx { namespace compute { namespace amp
     {
     public:
         typedef detail::buffer_proxy<T> value_type;
-        typedef target_ptr<T> pointer;
-        typedef target_ptr<T const> const_pointer;
+        typedef target_ptr<value_type> pointer;
+        typedef target_ptr<value_type const> const_pointer;
 #if defined(__COMPUTE__ACCELERATOR__)
         /// Define direct access to allocated data in device code
-        typedef T& reference;
-        typedef T const& const_reference;
+        typedef value_type& reference;
+        typedef value_type const& const_reference;
 #else
         /// On host code, use a proxy handling access to device memory
-        typedef value_proxy<T> reference;
-        typedef value_proxy<T const> const_reference;
+        typedef value_proxy<value_type> & reference;
+        typedef value_proxy<value_type const> & const_reference;
 #endif
         typedef std::size_t size_type;
         typedef std::ptrdiff_t difference_type;
@@ -72,7 +73,7 @@ namespace hpx { namespace compute { namespace amp
         pointer address(reference x) const HPX_NOEXCEPT
         {
 #if defined(__HCC_ACCELERATOR__)
-            return &x;
+             return &x;
 #else
             return pointer(x.device_ptr(), *target_);
 #endif
@@ -101,8 +102,9 @@ namespace hpx { namespace compute { namespace amp
 #else
             value_type *p = 0;
             try {
-                buffer_type * buffer = new buffer_type(Concurrency::extent<1>(n)
-                    target_.get_view());
+                buffer_type * buffer = new buffer_type(
+                    Concurrency::extent<1>(n),
+                    target_->native_handle().get_device());
                 p = new value_type(buffer);
                 pointer result(p, *target_);
                 return result;
@@ -159,7 +161,8 @@ namespace hpx { namespace compute { namespace amp
         {
             try {
                 auto device = target_->native_handle().get_device();
-                return device.dedicated_memory() / sizeof(value_type);
+                return device.get_accelerator().get_dedicated_memory() /
+                    sizeof(value_type);
             } catch (Concurrency::runtime_exception & exc) {
 
                 HPX_THROW_EXCEPTION(no_success,
@@ -210,9 +213,9 @@ namespace hpx { namespace compute { namespace amp
 //        }
 //
 //        // Calls the destructor of count objects pointed to by p
-//        template <typename U>
-//        void bulk_destroy(U* p, std::size_t count)
-//        {
+	template <typename U>
+        void bulk_destroy(U* p, std::size_t count)
+        {
 //            int threads_per_block = (std::min)(1024, int(count));
 //            int num_blocks =
 //                int((count + threads_per_block) / threads_per_block) - 1;
@@ -229,7 +232,7 @@ namespace hpx { namespace compute { namespace amp
 //                },
 //                p, count);
 //            target_->synchronize();
-//        }
+        }
 //
 //        // Calls the destructor of the object pointed to by p
 //        template <typename U>

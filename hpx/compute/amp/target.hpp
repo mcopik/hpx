@@ -32,6 +32,16 @@
 
 namespace hpx { namespace compute { namespace amp
 {
+    namespace detail
+    {
+        struct HPX_EXPORT runtime_registration_wrapper
+        {
+            runtime_registration_wrapper(hpx::runtime* rt);
+            ~runtime_registration_wrapper();
+
+            hpx::runtime* rt_;
+        };
+    }
 
     ///////////////////////////////////////////////////////////////////////////
     struct HPX_EXPORT target
@@ -46,7 +56,7 @@ namespace hpx { namespace compute { namespace amp
 
             HPX_MOVABLE_ONLY(native_handle_type);
 
-            native_handle_type(int device = 0);
+            native_handle_type(int device = -1);
 
             ~native_handle_type();
 
@@ -54,9 +64,9 @@ namespace hpx { namespace compute { namespace amp
 
             native_handle_type& operator=(native_handle_type && rhs) HPX_NOEXCEPT;
 
-            Concurrency::accelerator_view get_device() const HPX_NOEXCEPT
+            Concurrency::accelerator_view & get_device() const HPX_NOEXCEPT
             {
-                return device_view;
+                return device_view_;
             }
 
             hpx::id_type const& get_locality() const HPX_NOEXCEPT
@@ -69,7 +79,9 @@ namespace hpx { namespace compute { namespace amp
 
             mutable mutex_type mtx_;
             int device_;
-            Concurrency::accelerator_view device_view;
+            // Dynamic allocation allows for marking device_view in an
+            // incorrect state after move operation.
+            mutable Concurrency::accelerator_view device_view_;
             hpx::id_type locality_;
         };
 

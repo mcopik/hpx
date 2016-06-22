@@ -5,7 +5,7 @@
 
 set(example_programs)
 
-if(HPX_WITH_AMP)
+if(HPX_WITH_HCC)
     set(example_programs ${example_programs}
         partitioned_vector
     )

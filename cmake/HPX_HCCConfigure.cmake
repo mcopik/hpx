@@ -7,7 +7,7 @@ macro(hcc_configure_cxx)
 
     if(HPX_WITH_HCC)
         set(compiler_directory ${HPX_WITH_HCC})
-        set(config_app "hcc-config")
+        set(config_app "clamp-config")
     endif()
 
     execute_process(

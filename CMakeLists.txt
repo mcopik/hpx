@@ -853,7 +853,11 @@ if(NOT MSVC)
       endif()
     endif()
 
-    hpx_add_target_compile_option(${CXX_FLAG})
+    # HCC doesn't allow any additional -std=cxx flag
+    # with -std=c++amp. CXX_FLAG won't be defined
+    if(CXX_FLAG)
+        hpx_add_target_compile_option(${CXX_FLAG})
+    endif()
   endif()
 endif()
 

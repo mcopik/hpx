@@ -58,6 +58,13 @@ namespace hpx { namespace compute { namespace amp
           , tgt_(nullptr)
         {}
 
+        // Necessary for nullability of pointer:
+        //
+        target_ptr(std::nullptr_t)
+            : p_(nullptr)
+            , tgt_(nullptr)
+        {}
+
         target_ptr(T *p, amp::target & tgt)
           : p_(p)
           , tgt_(&tgt)
@@ -106,6 +113,11 @@ namespace hpx { namespace compute { namespace amp
         bool operator!=(target_ptr const& other) const
         {
             return p_ != other.p_;
+        }
+
+        bool operator!=(std::nullptr_t) const
+        {
+            return p_ != nullptr;
         }
 
         bool operator<(target_ptr const& other) const

@@ -110,15 +110,15 @@ namespace hpx { namespace compute { namespace traits
         {
             template <typename Allocator, typename ...Ts>
             HPX_HOST_DEVICE
-            static void call(hpx::traits::detail::wrap_int, Allocator& alloc, 
+            static void call(hpx::traits::detail::wrap_int, Allocator& alloc,
                 typename Allocator::pointer p, typename Allocator::size_type count,
                 Ts &&... vs)
             {
                 typedef typename Allocator::pointer pointer;
                 pointer init_value(std::forward<Ts>(vs)...);
-                pointer* end = p + count;
+                pointer end = p + count;
                 typename Allocator::size_type allocated = 0;
-                for(pointer* it = p; it != end; ++it)
+                for(pointer it = p; it != end; ++it)
                 {
 #if defined(__CUDA_ARCH__)
                     allocator_traits<Allocator>::construct(alloc, it, init_value);
@@ -140,7 +140,7 @@ namespace hpx { namespace compute { namespace traits
 
             template <typename Allocator, typename ...Ts>
             HPX_HOST_DEVICE
-            static auto call(int, Allocator& alloc, 
+            static auto call(int, Allocator& alloc,
                 typename Allocator::pointer p, typename Allocator::size_type count,
                     Ts &&... vs)
               -> decltype(alloc.bulk_construct(p, count, std::forward<Ts>(vs)...))
@@ -162,8 +162,8 @@ namespace hpx { namespace compute { namespace traits
         {
             template <typename Allocator>
             HPX_HOST_DEVICE
-            static void call(hpx::traits::detail::wrap_int, Allocator& alloc, 
-                typename Allocator::pointer* p, typename Allocator::size_type count)
+            static void call(hpx::traits::detail::wrap_int, Allocator& alloc,
+                typename Allocator::pointer p, typename Allocator::size_type count)
                 HPX_NOEXCEPT
             {
                 typedef typename Allocator::pointer pointer;
@@ -176,7 +176,7 @@ namespace hpx { namespace compute { namespace traits
 
             template <typename Allocator>
             HPX_HOST_DEVICE
-            static auto call(int, Allocator& alloc, 
+            static auto call(int, Allocator& alloc,
                 typename Allocator::pointer p, typename Allocator::size_type count)
                     HPX_NOEXCEPT
             ->  decltype(alloc.bulk_destroy(p, count))

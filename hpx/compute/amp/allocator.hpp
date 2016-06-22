@@ -93,7 +93,8 @@ namespace hpx { namespace compute { namespace amp
         // called. The pointer hint may be used to provide locality of
         // reference: the allocator, if supported by the implementation, will
         // attempt to allocate the new memory block as close as possible to hint.
-        pointer allocate(size_type n) restrict(amp, cpu)
+        pointer allocate(size_type n, const_pointer hint = nullptr)
+            restrict(amp, cpu)
         {
 #if defined(__HCC_ACCELERATOR__)
             /// No memory allocation on device side
@@ -213,8 +214,7 @@ namespace hpx { namespace compute { namespace amp
 //        }
 //
 //        // Calls the destructor of count objects pointed to by p
-	template <typename U>
-        void bulk_destroy(U* p, std::size_t count)
+        void bulk_destroy(pointer p, std::size_t count)
         {
 //            int threads_per_block = (std::min)(1024, int(count));
 //            int num_blocks =
@@ -234,12 +234,11 @@ namespace hpx { namespace compute { namespace amp
 //            target_->synchronize();
         }
 //
-//        // Calls the destructor of the object pointed to by p
-//        template <typename U>
-//        void destroy(U* p)
-//        {
-//            bulk_destroy(p, 1);
-//        }
+        // Calls the destructor of the object pointed to by p
+        void destroy(pointer p)
+        {
+            bulk_destroy(p, 1);
+        }
 
         // Access the underlying target (device)
         target_type& target() const HPX_NOEXCEPT

@@ -270,7 +270,7 @@ namespace hpx { namespace compute { namespace traits
         HPX_HOST_DEVICE
         static void bulk_destroy(Allocator& alloc, pointer p, size_type count) HPX_NOEXCEPT
         {
-            if (p != 0) detail::call_bulk_destroy(alloc, p, count);
+            if (p != nullptr) detail::call_bulk_destroy(alloc, p, count);
         }
     };
 }}}

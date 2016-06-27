@@ -24,9 +24,9 @@ namespace hpx { namespace compute { namespace amp
         public:
             /// Initialize pointer with begin position of device data
             buffer_proxy(buffer *device_buffer) HPX_NOEXCEPT :
-                device_buffer_(device_buffer),
-                device_buffer_view(*device_buffer_),
-                p_(device_buffer->data())
+                device_buffer_(*device_buffer),
+                device_buffer_view(device_buffer_),
+                p_(device_buffer.data())
             {}
 
             buffer_proxy(buffer *device_buffer, T *p) HPX_NOEXCEPT :
@@ -42,7 +42,7 @@ namespace hpx { namespace compute { namespace amp
             {}
 
             ~buffer_proxy() {
-                delete device_buffer_;
+                delete &device_buffer_;
             }
 
             buffer_proxy& operator=(T const& t)
@@ -88,7 +88,7 @@ namespace hpx { namespace compute { namespace amp
             }
 
         private:
-            buffer *device_buffer_;
+            buffer & device_buffer_;
             buffer_view device_buffer_view;
             T *p_;
         };
@@ -103,14 +103,14 @@ namespace hpx { namespace compute { namespace amp
         public:
             /// Initialize pointer with begin position of device data
             buffer_proxy(buffer *device_buffer) HPX_NOEXCEPT :
-                device_buffer_(device_buffer),
-                device_buffer_view(*device_buffer_),
-                p_(device_buffer->data())
+                device_buffer_(*device_buffer),
+                device_buffer_view(device_buffer),
+                p_(device_buffer.data())
             {}
 
             buffer_proxy(buffer *device_buffer, T *p) HPX_NOEXCEPT :
-                device_buffer_(device_buffer),
-                device_buffer_view(*device_buffer_),
+                device_buffer_(*device_buffer),
+                device_buffer_view(device_buffer_),
                 p_(p)
             {}
 
@@ -121,7 +121,7 @@ namespace hpx { namespace compute { namespace amp
             {}
 
             ~buffer_proxy() {
-                delete device_buffer_;
+                delete &device_buffer_;
             }
 
             operator T&() const
@@ -155,7 +155,7 @@ namespace hpx { namespace compute { namespace amp
             }
 
         private:
-            buffer *device_buffer_;
+            buffer & device_buffer_;
             buffer_view device_buffer_view;
             T *p_;
         };

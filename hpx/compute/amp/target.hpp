@@ -66,7 +66,7 @@ namespace hpx { namespace compute { namespace amp
 
             Concurrency::accelerator_view & get_device() const HPX_NOEXCEPT
             {
-                return device_view_;
+                return *device_view_;
             }
 
             hpx::id_type const& get_locality() const HPX_NOEXCEPT
@@ -81,7 +81,7 @@ namespace hpx { namespace compute { namespace amp
             int device_;
             // Dynamic allocation allows for marking device_view in an
             // incorrect state after move operation.
-            mutable Concurrency::accelerator_view device_view_;
+            mutable Concurrency::accelerator_view * device_view_;
             hpx::id_type locality_;
         };
 

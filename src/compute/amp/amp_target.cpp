@@ -127,49 +127,56 @@ namespace hpx { namespace compute { namespace amp
 //        }
     }
 
-    target::native_handle_type::native_handle_type(int device)
-      : device_(device), 
-	device_view_(Concurrency::accelerator().create_view()),
-	locality_(hpx::find_here())
+    target::native_handle_type::native_handle_type(int device) :
+        device_(device),
+	    device_view_(nullptr),
+	    locality_(hpx::find_here())
     {
         HPX_ASSERT(device_ >= -1);
         // TODO: recheck if this implementation is what we want
         if(device_ != -1) {
             auto devices = Concurrency::accelerator::get_all();
             HPX_ASSERT(devices.size() > static_cast<std::size_t>(device_));
-            device_view_ = devices[device_].create_view();
+            device_view_ = new device_t(
+                devices[device_].create_view()
+            );
         } else {
             // Use default accelerator
-            device_view_ = Concurrency::accelerator().create_view();
+            device_view_ = new device_t(
+                Concurrency::accelerator().create_view()
+            );
         }
     }
 
     target::native_handle_type::~native_handle_type()
     {
         // TODO: do we need it here?
-        device_view_.flush();
+        device_view_->flush();
+        delete device_view_;
     }
 
     target::native_handle_type::native_handle_type(
             target::native_handle_type && rhs) HPX_NOEXCEPT
       : device_(rhs.device_),
-        device_view_(rhs.device_view_),
+        device_view_(new device_t(*rhs.device_view_)),
         locality_(rhs.locality_)
     {
-        //rhs.device_view_ = nullptr;
+        // TODO: is it supposed to be incorrect after copy construct?
+        // If yes, then pointer to device_t should be nullptr
         rhs.locality_ = hpx::invalid_id;
     }
 
     target::native_handle_type& target::native_handle_type::operator=(
         target::native_handle_type && rhs) HPX_NOEXCEPT
     {
+        // TODO: same as above
         if (this == &rhs)
             return *this;
 
         device_ = rhs.device_;
         device_view_ = rhs.device_view_;
         locality_ = rhs.locality_;
-        //rhs.device_view_ = 0;
+        rhs.device_view_ = new device_t(*rhs.device_view_);
         rhs.locality_ = hpx::invalid_id;
         return *this;
     }
@@ -177,7 +184,7 @@ namespace hpx { namespace compute { namespace amp
     ///////////////////////////////////////////////////////////////////////////
     void target::synchronize() const
     {
-        if (false)//handle_.device_view_)
+        if (handle_.device_view_)
         {
             HPX_THROW_EXCEPTION(invalid_status,
                 "amp::target::synchronize",
@@ -186,7 +193,7 @@ namespace hpx { namespace compute { namespace amp
 
         try {
             // TODO: is synchronized correctly implemented?
-            handle_.device_view_.wait();
+            handle_.device_view_->wait();
         } catch (Concurrency::runtime_exception & exc) {
 
             HPX_THROW_EXCEPTION(kernel_error,

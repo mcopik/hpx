@@ -53,6 +53,7 @@ namespace hpx { namespace compute { namespace amp
         struct HPX_EXPORT native_handle_type
         {
             typedef hpx::lcos::local::spinlock mutex_type;
+            typedef Concurrency::accelerator_view device_t;
 
             HPX_MOVABLE_ONLY(native_handle_type);
 
@@ -74,14 +75,20 @@ namespace hpx { namespace compute { namespace amp
                 return locality_;
             }
 
+            device_t & get_device() const HPX_NOEXCEPT
+            {
+                return *device_view;
+            }
+
         private:
             friend struct target;
 
             mutable mutex_type mtx_;
             int device_;
             // Dynamic allocation allows for marking device_view in an
-            // incorrect state after move operation.
-            mutable Concurrency::accelerator_view * device_view_;
+            // incorrect state after move operation and allows for not
+            // constructing a default view in a constructor initializer list.
+            mutable device_t * device_view_;
             hpx::id_type locality_;
         };
 

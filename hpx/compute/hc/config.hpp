@@ -10,7 +10,9 @@
 
 #include <hc.hpp>
 
-#define __COMPUTE__ACCELERATOR__ __KALMAR_ACCELERATOR__
+#if __KALMAR_ACCELERATOR__ != 0
+#define __COMPUTE__ACCELERATOR__
+#endif
 
 namespace hpx { namespace compute { namespace hc {
     template<size_t N>

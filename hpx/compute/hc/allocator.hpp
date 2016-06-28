@@ -40,8 +40,8 @@ namespace hpx { namespace compute { namespace hc
         typedef value_type const& const_reference;
 #else
         /// On host code, use a proxy handling access to device memory
-        typedef value_proxy<value_type> & reference;
-        typedef value_proxy<value_type const> & const_reference;
+        typedef value_proxy<value_type> reference;
+        typedef value_proxy<value_type const> const_reference;
 #endif
         typedef std::size_t size_type;
         typedef std::ptrdiff_t difference_type;
@@ -187,9 +187,12 @@ namespace hpx { namespace compute { namespace hc
                 int((count + threads_per_block - 1) / threads_per_block);
 
             detail::launch(*target_, threads_per_block, num_blocks,
-                [] (local_index<1> idx, pointer p, Args const&... args)
+                [] (local_index<1> idx, pointer p, Args const&... args) [[hc]]
                 {
+#if defined(__COMPUTE__ACCELERATOR__)
                     ::new (&p[ idx.global[0] ]) T (args...);
+#endif
+                    //p[ idx.global[0] ] = 1;
                 },
                 p, std::forward<Args>(args)...);
             target_->synchronize();
@@ -197,13 +200,15 @@ namespace hpx { namespace compute { namespace hc
 
         // Constructs an object of type T in allocated uninitialized storage
         // pointed to by p, using placement-new
-        template <typename U, typename ... Args>
-        void construct(U* p, Args &&... args)
+        template <typename ... Args>
+        void construct(pointer p, Args &&... args)
         {
             detail::launch(*target_, 1, 1,
-                [] (local_index<1> idx, pointer p, Args const&... args)
+                [] (local_index<1> idx, pointer p, Args const&... args) [[hc]]
                 {
+#if defined(__COMPUTE__ACCELERATOR__)
                     ::new (&p) T (args...);
+#endif
                 },
                 p, std::forward<Args>(args)...);
             target_->synchronize();
@@ -217,9 +222,14 @@ namespace hpx { namespace compute { namespace hc
                 int((count + threads_per_block) / threads_per_block) - 1;
 
             detail::launch(*target_, num_blocks, threads_per_block,
-                [](local_index<1> idx, pointer p) {
+                [](local_index<1> idx, pointer p) [[hc]]
+                {
+#if defined(__COMPUTE__ACCELERATOR__)
                     p[idx.global[0]]->~T();
-                }, p);
+#endif
+//                    p[idx.global[0]] = 1;
+                }, p);//, p.device_ptr()->device_ptr());
+            target_->synchronize();
         }
 
         // Calls the destructor of the object pointed to by p

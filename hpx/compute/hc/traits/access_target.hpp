@@ -14,7 +14,7 @@
 #include <hpx/compute/hc/config.hpp>
 #include <hpx/compute/traits/access_target.hpp>
 #include <hpx/compute/hc/target.hpp>
-
+#include <hpx/compute/hc/detail/buffer_proxy.hpp>
 
 namespace hpx { namespace compute { namespace traits
 {
@@ -22,9 +22,11 @@ namespace hpx { namespace compute { namespace traits
     struct access_target<hc::target>
     {
         typedef hc::target target_type;
+        template<typename T>
+        using buffer_proxy = hc::detail::buffer_proxy<T>;
 
         template <typename T>
-        static T read(hc::target const& tgt, T const* t)
+        static T read(hc::target const& tgt, buffer_proxy<T> const* t)
         {
 #if defined(__COMPUTE__ACCELERATOR__)
             return *t;
@@ -33,14 +35,14 @@ namespace hpx { namespace compute { namespace traits
             //cudaMemcpyAsync(&tmp, t, sizeof(T), cudaMemcpyDeviceToHost,
             //    tgt.native_handle().get_stream());
             //tgt.synchronize();
-            hc::copy_async()
+            //hc::copy_async()
             std::cout << "READ_TRAITS" << '\n';
             return tmp;
 #endif
         }
 
         template <typename T>
-        static void write(hc::target const& tgt, T* dst, T const* src)
+        static void write(hc::target const& tgt, buffer_proxy<T> * dst, T const* src)
         {
 #if defined(__COMPUTE__ACCELERATOR__)
             *dst = *src;

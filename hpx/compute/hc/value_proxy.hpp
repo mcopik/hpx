@@ -25,6 +25,7 @@ namespace hpx { namespace compute { namespace hc
     template <typename T>
     class value_proxy
     {
+        typedef typename T::value_type value_type;
         typedef traits::access_target<hc::target> access_target;
     public:
 
@@ -38,11 +39,17 @@ namespace hpx { namespace compute { namespace hc
           , target_(other.target_)
         {}
 
-        value_proxy& operator=(T const& t)
+        value_proxy& operator=(value_type const& t)
         {
             access_target::write(*target_, p_, &t);
             return *this;
         }
+
+        //value_proxy& operator=(T const& t)
+        //{
+         //   access_target::write(*target_, p_, &t);
+          //  return *this;
+        //}
 
         value_proxy& operator=(value_proxy const& other)
         {
@@ -51,7 +58,7 @@ namespace hpx { namespace compute { namespace hc
             return *this;
         }
 
-        operator T() const
+        operator value_type() const
         {
             return access_target::read(*target_, p_);
         }
@@ -66,6 +73,14 @@ namespace hpx { namespace compute { namespace hc
             return *target_;
         }
 
+/*        value_proxy<value_type> operator*() const HPX_NOEXCEPT
+        {
+            return value_proxy<value_type>(
+
+        value_type * operator->() const HPX_NOEXCEPT
+        {
+           return p_;
+        }*/
     private:
         T* p_;
         hc::target* target_;
@@ -76,6 +91,7 @@ namespace hpx { namespace compute { namespace hc
     class value_proxy<const T>
     {
         typedef traits::access_target<hc::target> access_target;
+        typedef typename T::value_type value_type;
     public:
         typedef T const proxy_type;
 
@@ -89,7 +105,7 @@ namespace hpx { namespace compute { namespace hc
             , target_(other.target())
         {}
 
-        operator T() const
+        operator value_type() const
         {
             return access_target::read(target_, p_);
         }
@@ -104,6 +120,10 @@ namespace hpx { namespace compute { namespace hc
             return *target_;
         }
 
+        const value_type * operator->() const HPX_NOEXCEPT
+        {
+           return p_;
+        }
     private:
         T* p_;
         hc::target& target_;

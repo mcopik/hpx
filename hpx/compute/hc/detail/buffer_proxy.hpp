@@ -17,8 +17,10 @@ namespace hpx { namespace compute { namespace hc
 
         template<typename T>
         class buffer_proxy {
-            typedef std::size_t size_type;
         public:
+            typedef std::size_t size_type;
+            typedef T value_type;
+
             /// Initialize pointer with begin position of device data
             buffer_proxy(buffer_t<T> *device_buffer) HPX_NOEXCEPT :
                 device_buffer_(*device_buffer),
@@ -64,7 +66,7 @@ namespace hpx { namespace compute { namespace hc
 
             operator T&() const
             {
-                return *t;
+                return *p_;
                 //return device_buffer_view[0];
             }
 
@@ -95,7 +97,10 @@ namespace hpx { namespace compute { namespace hc
             {
                 return p_;
             }
-
+            T * device_ptr()
+            {
+                return p_;
+            }
         private:
             buffer_t<T> & device_buffer_;
             buffer_acc_t<T> device_buffer_view;

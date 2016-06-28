@@ -35,12 +35,14 @@ int hpx_main(boost::program_options::variables_map& vm)
     std::cout << "using seed: " << seed << std::endl;
     std::srand(seed);
 
-    //typedef hpx::compute::cuda::allocator<int> allocator_type;
+    typedef hpx::compute::hc::allocator<int> allocator_type;
 
-    //hpx::compute::amp::target target;
-    //hpx::compute::amp::allocator_type alloc
+    hpx::compute::hc::target target;
+    allocator_type alloc(target);
     //    (target);
-    //hpx::compute::vector<int, allocator_type> d_A(N, alloc);
+    hpx::compute::vector<int, allocator_type> d_A(50, alloc);
+    d_A[0] = 1;
+    //std::cout << d_A[0] << std::endl;
 
     return hpx::finalize();
 }

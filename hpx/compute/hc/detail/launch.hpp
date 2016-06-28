@@ -26,15 +26,17 @@ namespace hpx { namespace compute { namespace hc { namespace detail
     void launch(target const& t, int tile_count, int threads_per_tile, F && f,
         Args&&... args)
     {
-#if !defined(__COMPUTE__ACCELERATOR__)
-        hc::parallel_for_each(
-            hc::extent<1>(threads_to_launch),
-            [=](index<1> idx) [[hc]]
+//#if !defined(__COMPUTE__ACCELERATOR__)
+        ::hc::parallel_for_each(
+            global_size<1>(tile_count*threads_per_tile).tile(threads_per_tile),
+            [=](local_index<1> idx) [[hc]]
             {
-                f(idx, args);
+                f(idx, args...);
             }
         );
-#endif
+//#else
+        //
+//#endif
     }
 
     // Launch any given function F with the given parameters. This function
@@ -44,16 +46,17 @@ namespace hpx { namespace compute { namespace hc { namespace detail
     void launch(target const& t, int threads_to_launch, F && f,
         Args const &... args)
     {
-#if !defined(__COMPUTE__ACCELERATOR__)
-        hc::parallel_for_each(
-            hc::extent<1>(threads_to_launch),
+//#if !defined(__COMPUTE__ACCELERATOR__)
+        ::hc::parallel_for_each(
+            global_size<1>(threads_to_launch),
             [=](index<1> idx) [[hc]]
             {
-                f(idx, args);
+                f(idx, args...);
             }
         );
-#endif
+
     }
+
 }}}}
 
 #endif

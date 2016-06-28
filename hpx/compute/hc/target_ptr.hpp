@@ -49,9 +49,10 @@ namespace hpx { namespace compute { namespace hc
         typedef T * pointer;
         typedef T & reference;
 #else
-        typedef value_proxy< T > value_type;
+        typedef value_proxy<T> value_type;
         typedef T * pointer;
         typedef value_proxy<T> reference;
+        typedef value_proxy<const T> const_reference;
 #endif
         typedef std::ptrdiff_t difference_type;
 
@@ -192,7 +193,7 @@ namespace hpx { namespace compute { namespace hc
 //             return *p_;
 //         }
 
-        T& operator*()
+        T & operator*()
         {
             return *p_;
         }
@@ -222,14 +223,24 @@ namespace hpx { namespace compute { namespace hc
             return p_;
         }
 #else
-        value_proxy<T> operator*() const
+        reference operator*() const
         {
             return value_proxy<T>(p_, *tgt_);
         }
 
-        value_proxy<T> operator[](std::ptrdiff_t offset)
+        /*const_reference operator*() const
+        {
+            return value_proxy<const T>(p_, *tgt_);
+        }*/
+
+        reference operator[](std::ptrdiff_t offset)
         {
             return value_proxy<T>(p_ + offset, *tgt_);
+        }
+
+        const_reference operator[](std::ptrdiff_t offset) const
+        {
+            return value_proxy<const T>(p_ + offset, *tgt_);
         }
 
         explicit operator T*() const

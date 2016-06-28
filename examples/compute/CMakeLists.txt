@@ -13,9 +13,15 @@ if(HPX_WITH_CUDA)
      )
 endif()
 
-if(HPX_WITH_HCC)
+if(HPX_WITH_COMPUTE_AMP)
     set(subdirs ${subdirs}
         amp
+        )
+endif()
+
+if(HPX_WITH_COMPUTE_HC)
+    set(subdirs ${subdirs}
+        hc
         )
 endif()
 

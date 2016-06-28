@@ -14,6 +14,7 @@
 #include <hpx/runtime/threads/thread_helpers.hpp>
 #include <hpx/util/assert.hpp>
 
+#include <hpx/compute/hc/config.hpp>
 #include <hpx/compute/hc/target.hpp>
 
 #include <hc.hpp>
@@ -128,19 +129,19 @@ namespace hpx { namespace compute { namespace hc
     }
 
     target::native_handle_type::native_handle_type(int device) :
-    device_(device),
-	device_view_(nullptr),
-	locality_(hpx::find_here())
+        device_(device),
+        device_view_(nullptr),
+        locality_(hpx::find_here())
     {
         HPX_ASSERT(device_ >= -1);
         // TODO: recheck if this implementation is what we want
         if(device_ != -1) {
-            auto devices = hc::accelerator::get_all();
+            auto devices = ::hc::accelerator::get_all();
             HPX_ASSERT(devices.size() > static_cast<std::size_t>(device_));
             device_view_ = new device_t(devices[device_].create_view());
         } else {
             // Use default accelerator
-            device_view_ = new device_t(hc::accelerator().create_view());
+            device_view_ = new device_t(::hc::accelerator().create_view());
         }
     }
 
@@ -154,7 +155,7 @@ namespace hpx { namespace compute { namespace hc
     target::native_handle_type::native_handle_type(
             target::native_handle_type && rhs) HPX_NOEXCEPT
       : device_(rhs.device_),
-        device_view_(new device_t(rhs.device_view_)),
+        device_view_(new device_t(*rhs.device_view_)),
         locality_(rhs.locality_)
     {
         //rhs.device_view_ = nullptr;
@@ -170,7 +171,7 @@ namespace hpx { namespace compute { namespace hc
         device_ = rhs.device_;
         device_view_ = rhs.device_view_;
         locality_ = rhs.locality_;
-        device_view_ = new device_t(rhs.device_view_);
+        device_view_ = new device_t(*rhs.device_view_);
         rhs.locality_ = hpx::invalid_id;
         return *this;
     }
@@ -188,7 +189,7 @@ namespace hpx { namespace compute { namespace hc
         try {
             // TODO: is synchronized correctly implemented?
             handle_.device_view_->wait();
-        } catch (Concurrency::runtime_exception & exc) {
+        } catch (exception_t & exc) {
 
             HPX_THROW_EXCEPTION(kernel_error,
                 "hc::target::synchronize",

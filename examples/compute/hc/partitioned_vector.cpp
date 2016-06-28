@@ -42,7 +42,8 @@ int hpx_main(boost::program_options::variables_map& vm)
     //    (target);
     hpx::compute::vector<int, allocator_type> d_A(50, alloc);
     d_A[0] = 1;
-    //std::cout << d_A[0] << std::endl;
+    int read_val = d_A[0];
+    std::cout << read_val << std::endl;
 
     return hpx::finalize();
 }

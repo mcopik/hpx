@@ -16,6 +16,7 @@
 #include <hpx/compute/hc/config.hpp>
 #include <hpx/compute/hc/target.hpp>
 #include <hpx/compute/hc/traits/access_target.hpp>
+#include <hpx/compute/hc/detail/buffer_proxy.hpp>
 #include <hpx/traits/is_value_proxy.hpp>
 
 #include <type_traits>
@@ -23,13 +24,16 @@
 namespace hpx { namespace compute { namespace hc
 {
     template <typename T>
-    class value_proxy
+    class value_proxy;
+
+    template <typename T>
+    class value_proxy< detail::buffer_proxy<T> >
     {
-        typedef typename T::value_type value_type;
+        typedef detail::buffer_proxy<T> proxy_type;
         typedef traits::access_target<hc::target> access_target;
     public:
 
-        value_proxy(T *p, hc::target & tgt) HPX_NOEXCEPT
+        value_proxy(proxy_type *p, hc::target & tgt) HPX_NOEXCEPT
           : p_(p)
           , target_(&tgt)
         {}
@@ -39,7 +43,7 @@ namespace hpx { namespace compute { namespace hc
           , target_(other.target_)
         {}
 
-        value_proxy& operator=(value_type const& t)
+        value_proxy& operator=(T const& t)
         {
             access_target::write(*target_, p_, &t);
             return *this;
@@ -58,14 +62,19 @@ namespace hpx { namespace compute { namespace hc
             return *this;
         }
 
-        operator value_type() const
+        operator T() const
         {
             return access_target::read(*target_, p_);
         }
 
-        T* device_ptr() const HPX_NOEXCEPT
+        proxy_type * ptr() const HPX_NOEXCEPT
         {
             return p_;
+        }
+
+        T* device_ptr() const HPX_NOEXCEPT
+        {
+            return p_->device_ptr();
         }
 
         hc::target& target() const HPX_NOEXCEPT
@@ -82,37 +91,38 @@ namespace hpx { namespace compute { namespace hc
            return p_;
         }*/
     private:
-        T* p_;
+        proxy_type * p_;
         hc::target* target_;
     };
 
 
     template <typename T>
-    class value_proxy<const T>
+    class value_proxy<const detail::buffer_proxy<T>>
     {
         typedef traits::access_target<hc::target> access_target;
-        typedef typename T::value_type value_type;
+        typedef const detail::buffer_proxy<T> proxy_type;
     public:
-        typedef T const proxy_type;
 
-        value_proxy(T *p, hc::target & tgt) HPX_NOEXCEPT
+        value_proxy(proxy_type *p, hc::target & tgt) HPX_NOEXCEPT
             : p_(p)
             , target_(tgt)
         {}
 
-        value_proxy(value_proxy<T> const& other)
-            : p_(other.device_ptr())
+        /// Required for conversion between value_proxy<T> ->
+        /// value_proxy<const T>
+        value_proxy(value_proxy<detail::buffer_proxy<T>> const& other)
+            : p_(other.ptr())
             , target_(other.target())
         {}
 
-        operator value_type() const
+        operator T() const
         {
             return access_target::read(target_, p_);
         }
 
         T* device_ptr() const HPX_NOEXCEPT
         {
-            return p_;
+            return p_->device_ptr();
         }
 
         hc::target& target() const HPX_NOEXCEPT
@@ -120,12 +130,12 @@ namespace hpx { namespace compute { namespace hc
             return *target_;
         }
 
-        const value_type * operator->() const HPX_NOEXCEPT
+        const T * operator->() const HPX_NOEXCEPT
         {
            return p_;
         }
     private:
-        T* p_;
+        proxy_type * p_;
         hc::target& target_;
     };
 }}}

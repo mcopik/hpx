@@ -44,8 +44,8 @@ namespace hpx { namespace compute { namespace hc
 
             buffer_proxy& operator=(T const& t)
             {
+                *p_ = t;
                 //access_target::write(*target_, p_, &t);
-                device_buffer_view[0] = t;
                 return *this;
             }
 
@@ -64,7 +64,8 @@ namespace hpx { namespace compute { namespace hc
 
             operator T&() const
             {
-                return device_buffer_view[0];
+                return *t;
+                //return device_buffer_view[0];
             }
 
             T &operator*() const {

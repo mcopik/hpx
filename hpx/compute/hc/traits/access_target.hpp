@@ -33,7 +33,7 @@ namespace hpx { namespace compute { namespace traits
             //cudaMemcpyAsync(&tmp, t, sizeof(T), cudaMemcpyDeviceToHost,
             //    tgt.native_handle().get_stream());
             //tgt.synchronize();
-            //Concurrency::copy()
+            hc::copy_async()
             std::cout << "READ_TRAITS" << '\n';
             return tmp;
 #endif

@@ -5,8 +5,11 @@
 
 macro(hcc_configure_cxx)
 
-    if(HPX_WITH_HCC)
-        set(compiler_directory ${HPX_WITH_HCC})
+    if(HPX_WITH_HCC_HC)
+        set(compiler_directory ${HPX_WITH_HCC_HC})
+        set(config_app "hcc-config")
+    elseif(HPX_WITH_HCC_AMP)
+        set(compiler_directory ${HPX_WITH_HCC_AMP})
         set(config_app "clamp-config")
     endif()
 
@@ -43,7 +46,14 @@ endmacro()
 macro(hcc_configure)
 
     set(HPX_WITH_COMPUTE On)
-    hpx_add_config_define(HPX_HAVE_AMP)
+    if(HPX_WITH_HCC_HC)
+        hpx_add_config_define(HPX_HAVE_HC)
+        #define convient boolean for cmake scripts
+        set(HPX_WITH_COMPUTE_HC On)
+    elseif(HPX_WITH_HCC_AMP)
+        hpx_add_config_define(HPX_HAVE_AMP)
+        set(HPX_WITH_COMPUTE_AMP On)
+    endif()
     hpx_add_config_define(HPX_HAVE_COMPUTE)
 
     hpx_add_compile_flag("${HCC_CXX_FLAGS}")

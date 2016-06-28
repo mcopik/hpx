@@ -15,6 +15,8 @@
 #include <hpx/compute/cuda.hpp>
 #elif defined(HPX_HAVE_AMP)
 #include <hpx/compute/amp.hpp>
+#elif defined(HPX_HAVE_HC)
+#include <hpx/compute/hc.hpp>
 #endif
 
 #endif

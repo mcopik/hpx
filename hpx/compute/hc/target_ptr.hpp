@@ -171,8 +171,8 @@ namespace hpx { namespace compute { namespace hc
             return target_ptr(p_ + offset, *tgt_);
         }
 
-        T *device_ptr() const {
-            return p_->device_ptr();
+        proxy_type *device_ptr() const {
+            return p_;
         }
 
 #if defined(__COMPUTE__ACCELERATOR__)

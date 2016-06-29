@@ -20,91 +20,121 @@ namespace hpx { namespace compute { namespace hc
         public:
             typedef std::size_t size_type;
             typedef T value_type;
-
             /// Initialize pointer with begin position of device data
             buffer_proxy(buffer_t<T> *device_buffer) HPX_NOEXCEPT :
                 device_buffer_(*device_buffer),
                 device_buffer_view(device_buffer_),
-                p_(device_buffer->data())
-            {}
+                pos_(0)
+            {std::cout << "construct " << std::endl;}
 
-            buffer_proxy(buffer_t<T> *device_buffer, T *p) HPX_NOEXCEPT :
+            buffer_proxy(buffer_t<T> *device_buffer, uint64_t pos) HPX_NOEXCEPT :
                 device_buffer_(*device_buffer),
                 device_buffer_view(device_buffer_),
-                p_(p)
-            {}
+                pos_(pos)
+            {std::cout << "construct " << std::endl;}
 
             buffer_proxy(buffer_proxy const &other) :
                 device_buffer_(other.device_buffer_),
                 device_buffer_view(other.device_buffer_view),
-                p_(other.p_)
-            {}
+                pos_(other.pos_)
+            {std::cout << "construct " << std::endl;}
 
             ~buffer_proxy() {
+                std::cout << "Destruct" << std::endl;
                 delete &device_buffer_;
             }
 
             buffer_proxy& operator=(T const& t)
             {
-                *p_ = t;
+#if defined(__COMPUTE__ACCELERATOR__)
+                device_buffer_[pos_] = t;
+#else
+                device_buffer_view[pos_] = t;
+#endif
                 //access_target::write(*target_, p_, &t);
                 return *this;
             }
 
             buffer_proxy& operator=(buffer_proxy const& t)
             {
-                *p_ = *t;
+#if defined(__COMPUTE__ACCELERATOR__)
+                device_buffer_[pos_] = *t;
+#else
+                device_buffer_view[pos_] = *t;
+#endif
                 return *this;
             }
 
-            //operator T() const
-            //{
-                //TODO: which version is more efficient?
-                //return access_target::read(*target_, p_);
-              //  return device_buffer_view[0];
-            //}
-
-            operator T&() const
+            operator T() const
             {
-                return *p_;
-                //return device_buffer_view[0];
+#if defined(__COMPUTE__ACCELERATOR__)
+                return device_buffer_[pos_];
+#else
+                return device_buffer_view[pos_];
+#endif
             }
+
+//            operator T&() const
+//            {
+//                return *p_;
+//                //return device_buffer_view[0];
+//            }
 
             T &operator*() const {
-                return *p_;
+                return device_buffer_[pos_];
             }
 
-            operator T*() const
-            {
-                return p_;
-            }
+//            operator T*() const
+//            {
+//                return p_;
+//            }
 
             buffer_proxy<T> operator+(size_type pos) {
-                return buffer_proxy(device_buffer_, p_ + pos);
+                return buffer_proxy(device_buffer_, pos_ + pos);
             }
 
             T &operator++() {
-                ++p_;
+                ++pos_;
                 return *this;
             }
 
             T &operator--() {
-                --p_;
+                --pos_;
                 return *this;
             }
 
             T* operator->() const
             {
-                return p_;
+#if defined(__COMPUTE__ACCELERATOR__)
+                return device_buffer_.data() + pos_;
+#else
+                // todo : throw exception
+                return nullptr;
+#endif
             }
-            T * device_ptr()
+
+            //T * device_ptr() const
+            //{
+            //    return p_;
+            //}
+
+            buffer_t<T> & get_buffer() const HPX_NOEXCEPT
             {
-                return p_;
+                return device_buffer_;
             }
+
+            buffer_acc_t<T> get_buffer_acc() const HPX_NOEXCEPT
+            {
+                return device_buffer_view;
+            }
+
         private:
             buffer_t<T> & device_buffer_;
             buffer_acc_t<T> device_buffer_view;
-            T *p_;
+            // We can't operate directly on pointers, because
+            // amp::array<T>.data() evalues to nullptr on host
+            // We have to count positions to behave like a pointer
+            uint64_t pos_;
         };
 
         // Const specialization is required for situations
@@ -126,21 +156,43 @@ namespace hpx { namespace compute { namespace hc
                 p_(p)
             {}
 
-            buffer_proxy(buffer_proxy const &other) :
-                device_buffer_(other.device_buffer_),
-                device_buffer_view(other.device_buffer_view),
-                p_(other.p_)
+            buffer_proxy(buffer_proxy<T> const &other) :
+                device_buffer_(other.get_buffer()),
+                device_buffer_view(other.get_buffer_acc()),
+                p_(other.device_ptr())
             {}
 
             ~buffer_proxy() {
-                delete device_buffer_;
+                delete &device_buffer_;
             }
 
-            operator T&() const
+            buffer_proxy& operator=(T const& t)
             {
-                //TODO: which version is more efficient?
-                //return access_target::read(*target_, p_);
-                return device_buffer_view[0];
+#if defined(__COMPUTE__ACCELERATOR__)
+                *p_ = t;
+#else
+                size_t idx = p_ - device_buffer_.data();
+                device_buffer_view[idx] = t;
+#endif
+                //access_target::write(*target_, p_, &t);
+                return *this;
+            }
+
+            buffer_proxy& operator=(buffer_proxy const& t)
+            {
+                *p_ = *t;
+                return *this;
+            }
+
+            operator T() const
+            {
+#if defined(__COMPUTE__ACCELERATOR__)
+                return *p_;
+#else
+                size_t idx = p_ - device_buffer_.data();
+                return device_buffer_view[idx];
+#endif
+
             }
 
             T &operator*() const {

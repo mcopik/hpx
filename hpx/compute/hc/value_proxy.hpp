@@ -45,7 +45,7 @@ namespace hpx { namespace compute { namespace hc
 
         value_proxy& operator=(T const& t)
         {
-            access_target::write(*target_, p_, &t);
+            (*p_) = t;
             return *this;
         }
 
@@ -64,7 +64,7 @@ namespace hpx { namespace compute { namespace hc
 
         operator T() const
         {
-            return access_target::read(*target_, p_);
+            return *p_;
         }
 
         proxy_type * ptr() const HPX_NOEXCEPT

@@ -10,8 +10,8 @@
 
 #include <hpx/config.hpp>
 #include <hpx/exception_fwd.hpp>
-#include <hpx/runtime/threads/thread_enums.hpp>
 #include <hpx/runtime/threads/coroutines/coroutine_fwd.hpp>
+#include <hpx/runtime/threads/thread_enums.hpp>
 #include <hpx/util_fwd.hpp>
 
 #include <boost/intrusive_ptr.hpp>
@@ -45,7 +45,7 @@ namespace hpx { namespace threads
     HPX_API_EXPORT void intrusive_ptr_add_ref(thread_data* p);
     HPX_API_EXPORT void intrusive_ptr_release(thread_data* p);
 
-    HPX_CONSTEXPR_OR_CONST thread_id_repr_type invalid_thread_id_repr = 0;
+    HPX_CONSTEXPR_OR_CONST thread_id_repr_type invalid_thread_id_repr = nullptr;
     thread_id_type const invalid_thread_id = thread_id_type();
     /// \endcond
 

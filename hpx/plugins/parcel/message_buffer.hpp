@@ -7,11 +7,11 @@
 #define HPX_RUNTIME_PARCELSET_POLICIES_COALESCING_MESSAGE_BUFFER_MAR_07_2013_1250PM
 
 #include <hpx/config.hpp>
-#include <hpx/util/assert.hpp>
-#include <hpx/runtime/parcelset_fwd.hpp>
 #include <hpx/runtime/parcelset/locality.hpp>
 #include <hpx/runtime/parcelset/parcel.hpp>
 #include <hpx/runtime/parcelset/parcelport.hpp>
+#include <hpx/runtime/parcelset_fwd.hpp>
+#include <hpx/util/assert.hpp>
 
 #include <vector>
 
@@ -61,7 +61,7 @@ namespace hpx { namespace plugins { namespace parcel { namespace detail
         {
             if (!messages_.empty())
             {
-                if (0 == threads::get_self_ptr())
+                if (nullptr == threads::get_self_ptr())
                 {
                     // reschedule this call on a new HPX thread
                     using parcelset::parcelport;

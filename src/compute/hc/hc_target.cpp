@@ -20,6 +20,7 @@
 #include <hc.hpp>
 
 #include <string>
+#include <exception>
 
 namespace hpx { namespace compute { namespace hc
 {
@@ -38,6 +39,7 @@ namespace hpx { namespace compute { namespace hc
             hpx::error_code ec(hpx::lightweight);       // ignore errors
             hpx::register_thread(rt_, "hc", ec);
         }
+
         runtime_registration_wrapper::~runtime_registration_wrapper()
         {
             // Unregister the thread from HPX, this should be done once in
@@ -45,87 +47,97 @@ namespace hpx { namespace compute { namespace hc
             hpx::unregister_thread(rt_);
         }
 
-//        ///////////////////////////////////////////////////////////////////////
-//        struct future_data : lcos::detail::future_data<void>
-//        {
-//        private:
-//            static void CUDART_CB stream_callback(cudaStream_t stream,
-//                cudaError_t error, void* user_data);
-//
-//        public:
-//            future_data(cudaStream_t stream);
-//
-//        private:
-//            hpx::runtime* rt_;
-//        };
-//
-//        struct release_on_exit
-//        {
-//            release_on_exit(future_data* data)
-//              : data_(data)
-//            {}
-//
-//            ~release_on_exit()
-//            {
-//                // release the shared state
-//                lcos::detail::intrusive_ptr_release(data_);
-//            }
-//
-//            future_data* data_;
-//        };
-//
-//        ///////////////////////////////////////////////////////////////////////
-//        void CUDART_CB future_data::stream_callback(cudaStream_t stream,
-//            cudaError_t error, void* user_data)
-//        {
-//            future_data* this_ = static_cast<future_data*>(user_data);
-//
-//            runtime_registration_wrapper wrap(this_->rt_);
-//
-//            // We need to run this as an HPX thread ...
-//            hpx::applier::register_thread_nullary(
-//                [this_, error] ()
-//                {
-//                    release_on_exit on_exit(this_);
-//
-//                    if (error != cudaSuccess)
-//                    {
-//                        this_->set_exception(
-//                            HPX_GET_EXCEPTION(kernel_error,
-//                                "cuda::detail::future_data::stream_callback()",
-//                                std::string("cudaStreamAddCallback failed: ") +
-//                                    cudaGetErrorString(error))
-//                        );
-//                        return;
-//                    }
-//
-//                    this_->set_data(hpx::util::unused);
-//                },
-//                "hpx::compute::cuda::future_data::stream_callback"
-//            );
-//        }
-//
-//        future_data::future_data(cudaStream_t stream)
-//           : rt_(hpx::get_runtime_ptr())
-//        {
-//            // Hold on to the shared state on behalf of the cuda runtime
-//            // right away as the callback could be called immediately.
-//            lcos::detail::intrusive_ptr_add_ref(this);
-//
-//            cudaError_t error = cudaStreamAddCallback(
-//                stream, stream_callback, this, 0);
-//            if (error != cudaSuccess)
-//            {
-//                // callback was not called, release object
-//                lcos::detail::intrusive_ptr_release(this);
-//
-//                // report error
-//                HPX_THROW_EXCEPTION(kernel_error,
-//                    "cuda::detail::future_data::future_data()",
-//                    std::string("cudaStreamAddCallback failed: ") +
-//                        cudaGetErrorString(error));
-//            }
-//        }
+        ///////////////////////////////////////////////////////////////////////
+        /// Shared future state responsible for notifying
+        struct future_data : lcos::detail::future_data<void>
+        {
+        private:
+            static void marker_callback(future_data * data,
+                boost::exception_ptr exc_ptr = boost::exception_ptr());
+        public:
+            future_data(device_t & device);
+        private:
+            hpx::runtime* rt_;
+            ::hc::completion_future hc_marker;
+        };
+
+        struct release_on_exit
+        {
+            release_on_exit(future_data* data)
+              : data_(data)
+            {}
+
+            ~release_on_exit()
+            {
+                // release the shared state
+                lcos::detail::intrusive_ptr_release(data_);
+            }
+
+            future_data* data_;
+        };
+
+        ///////////////////////////////////////////////////////////////////////
+        void future_data::marker_callback(future_data * this_,
+                boost::exception_ptr exc_ptr)
+        {
+            // Notify HPX runtime about executing from a "foreign" thread -
+            // asynchronous result from execution supported by HC runtime,
+            // not HPX.
+            runtime_registration_wrapper wrap(this_->rt_);
+
+            // We need to run this as an HPX thread ...
+            hpx::applier::register_thread_nullary(
+                [this_, exc_ptr] ()
+                {
+                    // Delete the shared state after setting future value
+                    // Reference count for the shared state has been increased
+                    // in marker callback creation
+                    release_on_exit on_exit(this_);
+
+                    if(exc_ptr) {
+                        this_->set_exception(exc_ptr);
+                    }
+
+                    // future<void>, hence we do not transfer any data
+                    this_->set_data(hpx::util::unused);
+                },
+                "hpx::compute::hc::future_data::marker_callback"
+            );
+        }
+
+        future_data::future_data(device_t & device)
+           : rt_(hpx::get_runtime_ptr())
+        {
+            // Hold on to the shared state on behalf of the cuda runtime
+            // right away as the callback could be called immediately.
+            lcos::detail::intrusive_ptr_add_ref(this);
+
+            try {
+                hc_marker = device.create_marker();
+                hc_marker.then(
+                    [this]() {
+                        // propagate exception
+                        try {
+                            this->hc_marker.get();
+                            marker_callback(this);
+                        } catch(...) {
+                            marker_callback(this,
+                                boost::current_exception());
+                        }
+                    }
+                );
+            } catch(exception_t & exc) {
+                // callback was not called, release object
+                lcos::detail::intrusive_ptr_release(this);
+
+                // report error
+                HPX_THROW_EXCEPTION(kernel_error,
+                    "hc::detail::future_data::future_data()",
+                    std::string("accelerator_view::create_marker() andfailed") +
+                        std::string(exc.what())
+                );
+            }
+        }
     }
 
     target::native_handle_type::native_handle_type(int device) :
@@ -198,13 +210,12 @@ namespace hpx { namespace compute { namespace hc
         }
     }
 
-    // TODO: implement
-//    hpx::future<void> target::get_future() const
-//    {
-////        typedef detail::future_data shared_state_type;
-////        shared_state_type* p = new shared_state_type(handle_.stream_);
-//        return hpx::traits::future_access<hpx::future<void> >::create<(nullptr);
-//    }
+    hpx::future<void> target::get_future() const
+    {
+        typedef detail::future_data shared_state_type;
+        shared_state_type* p = new shared_state_type(*handle_.device_view_);
+        return hpx::traits::future_access<hpx::future<void>>::create(p);
+    }
 
     ///////////////////////////////////////////////////////////////////////////
     target& get_default_target()

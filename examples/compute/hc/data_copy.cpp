@@ -42,9 +42,9 @@ int hpx_main(boost::program_options::variables_map& vm)
     f.get();
 
     // copy data from host to device
-    //hpx::parallel::copy(
-    //    hpx::parallel::par,
-    //    h_A.begin(), h_A.end(), d_A.begin());
+    hpx::parallel::copy(
+        hpx::parallel::par,
+        h_A.begin(), h_A.end(), d_A.begin());
 
     //// copy data from device to host
     //hpx::parallel::copy(

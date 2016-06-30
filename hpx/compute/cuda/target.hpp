@@ -87,7 +87,7 @@ namespace hpx { namespace compute { namespace cuda
 
         // Constructs target from a given device ID
         explicit target(int device)
-          : handle_(de vice)
+          : handle_(device)
         {}
 
         target(target && rhs) HPX_NOEXCEPT

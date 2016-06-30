@@ -10,8 +10,10 @@
 
 #include <hpx/compute/hc/config.hpp>
 #include <hpx/compute/hc/allocator.hpp>
+#include <hpx/compute/hc/default_executor.hpp>
 #include <hpx/compute/hc/target.hpp>
 #include <hpx/compute/hc/target_ptr.hpp>
 #include <hpx/compute/hc/value_proxy.hpp>
+#include <hpx/compute/hc/transfer.hpp>
 
 #endif

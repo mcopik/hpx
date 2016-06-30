@@ -76,6 +76,11 @@
 #if defined(__CUDACC__)
 #define HPX_DEVICE __device__
 #define HPX_HOST __host__
+#define HPX_DEVICE_LAMBDA HPX_DEVICE
+#elif defined(__HCC__)
+#define HPX_DEVICE
+#define HPX_HOST
+#define HPX_DEVICE_LAMBDA(...) (__VA_ARGS__) [[hc]] 
 #else
 #define HPX_DEVICE
 #define HPX_HOST

@@ -5,11 +5,15 @@
 
 macro(hcc_configure_cxx)
 
+    if("${HPX_WITH_HCC}" STREQUAL "")
+	message(FATAL_ERROR "HCC directory must be specified in HPX_WITH_HCC var!")
+    endif()
+
+    set(compiler_directory ${HPX_WITH_HCC})
+
     if(HPX_WITH_HCC_HC)
-        set(compiler_directory ${HPX_WITH_HCC_HC})
         set(config_app "hcc-config")
     elseif(HPX_WITH_HCC_AMP)
-        set(compiler_directory ${HPX_WITH_HCC_AMP})
         set(config_app "clamp-config")
     endif()
 

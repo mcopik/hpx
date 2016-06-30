@@ -46,7 +46,7 @@ endif()
 # It has to be done before any call to project()!
 ################################################################################
 
-if(${HPX_WITH_HCC_HC} OR ${HPX_WITH_HCC_AMP})
+if(HPX_WITH_HCC_HC OR HPX_WITH_HCC_AMP)
     include(cmake/HPX_HCCConfigure.cmake)
     hcc_configure_cxx()
 endif()
@@ -246,10 +246,12 @@ if(HPX_WITH_CUDA)
   hpx_add_config_define(HPX_HAVE_CUDA)
   hpx_add_config_define(HPX_HAVE_COMPUTE)
 endif()
-hpx_option(HPX_WITH_HCC_AMP STRING
-    "Enable support for C++AMP through HCC compiler. Requires path." "" ADVANCED)
-hpx_option(HPX_WITH_HCC_HC STRING
-    "Enable support for HC through HCC compiler. Requires path." "" ADVANCED)
+hpx_option(HPX_WITH_HCC_AMP BOOL
+    "Enable support for C++AMP through HCC compiler." OFF ADVANCED)
+hpx_option(HPX_WITH_HCC_HC BOOL
+    "Enable support for HC through HCC compiler." OFF ADVANCED)
+hpx_option(HPX_WITH_HCC PATH
+    "Path to HCC compiler." "" ADVANCED)
 hpx_option(HPX_WITH_SYCL BOOL
   "Enable sycl support (default: OFF)" ADVANCED)
 
@@ -705,7 +707,7 @@ if(HPX_WITH_PARCEL_COALESCING)
   hpx_add_config_define(HPX_HAVE_PARCEL_COALESCING)
 endif()
 
-if(${HPX_WITH_HCC_HC} OR ${HPX_WITH_HCC_AMP})
+if(HPX_WITH_HCC_HC OR HPX_WITH_HCC_AMP)
     hcc_configure()
 endif()
 

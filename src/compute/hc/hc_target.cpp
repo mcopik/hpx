@@ -56,6 +56,10 @@ namespace hpx { namespace compute { namespace hc
                 boost::exception_ptr exc_ptr = boost::exception_ptr());
         public:
             future_data(device_t & device);
+            ~future_data()
+            {
+                std::cout << "Destruct future data " << std::endl;
+            }
         private:
             hpx::runtime* rt_;
             ::hc::completion_future hc_marker;
@@ -114,14 +118,18 @@ namespace hpx { namespace compute { namespace hc
 
             try {
                 hc_marker = device.create_marker();
+                future_data * ptr = this;
+                hpx::runtime * rt_ptr = this->rt_;
+                //hc_marker.get();
                 hc_marker.then(
-                    [this]() {
+                    [ptr]() {
                         // propagate exception
                         try {
-                            this->hc_marker.get();
-                            marker_callback(this);
+                            ptr->hc_marker.get();
+
+                            marker_callback(ptr);
                         } catch(...) {
-                            marker_callback(this,
+                            marker_callback(ptr,
                                 boost::current_exception());
                         }
                     }

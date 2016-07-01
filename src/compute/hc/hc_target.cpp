@@ -62,6 +62,7 @@ namespace hpx { namespace compute { namespace hc
             }
             void initialize(device_t & device);
         private:
+            std::function<void ()> callback_lambda;
             hpx::runtime* rt_;
             ::hc::completion_future hc_marker;
         };
@@ -109,7 +110,14 @@ namespace hpx { namespace compute { namespace hc
                 "hpx::compute::hc::future_data::marker_callback"
             );
         }
+        /*struct marker_functor
+        {
+            future_data * ptr;
+            void operator()()
+            {
 
+            }
+        }*/
         void future_data::initialize(device_t & device)
         {
             try {
@@ -118,10 +126,16 @@ namespace hpx { namespace compute { namespace hc
                 hpx::runtime * rt_ptr = this->rt_;
                 //hc_marker.get();
                 //boost::intrusive_ptr<future_data> keep_alive(this);
-                hc_marker.then(
-                    [ptr/*, keep_alive*/]() {
+                printf("ptr: %p\n", (void*)ptr);
+                //printf("ptr: %p\n", (void*)functor.ptr);
+                callback_lambda =
+                    [ptr]() {
                         // propagate exception
                         try {
+
+                            printf("ptr: %p\n", (void*)ptr);
+                            auto dummy = ptr;
+                            printf("ptr: %p\n", (void*)dummy);
                             ptr->hc_marker.get();
 
                             marker_callback(ptr);
@@ -130,7 +144,24 @@ namespace hpx { namespace compute { namespace hc
                             marker_callback(ptr,
                                 boost::current_exception());
                         }
-                    }
+                    };
+                hc_marker.then(callback_lambda
+                    /*[ptr]() {
+                        // propagate exception
+                        try {
+
+                            printf("ptr: %p\n", (void*)ptr);
+                            auto dummy = ptr;
+                            printf("ptr: %p\n", (void*)dummy);
+                            ptr->hc_marker.get();
+
+                            marker_callback(ptr);
+
+                        } catch(...) {
+                            marker_callback(ptr,
+                                boost::current_exception());
+                        }
+                    }*/
                 );
             } catch(exception_t & exc) {
                 // callback was not called, release object

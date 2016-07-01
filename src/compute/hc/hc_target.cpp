@@ -55,11 +55,12 @@ namespace hpx { namespace compute { namespace hc
             static void marker_callback(future_data * data,
                 boost::exception_ptr exc_ptr = boost::exception_ptr());
         public:
-            future_data(device_t & device);
+            future_data();
             ~future_data()
             {
                 std::cout << "Destruct future data " << std::endl;
             }
+            void initialize(device_t & device);
         private:
             hpx::runtime* rt_;
             ::hc::completion_future hc_marker;
@@ -109,25 +110,22 @@ namespace hpx { namespace compute { namespace hc
             );
         }
 
-        future_data::future_data(device_t & device)
-           : rt_(hpx::get_runtime_ptr())
+        void future_data::initialize(device_t & device)
         {
-            // Hold on to the shared state on behalf of the cuda runtime
-            // right away as the callback could be called immediately.
-            lcos::detail::intrusive_ptr_add_ref(this);
-
             try {
                 hc_marker = device.create_marker();
                 future_data * ptr = this;
                 hpx::runtime * rt_ptr = this->rt_;
                 //hc_marker.get();
+                //boost::intrusive_ptr<future_data> keep_alive(this);
                 hc_marker.then(
-                    [ptr]() {
+                    [ptr/*, keep_alive*/]() {
                         // propagate exception
                         try {
                             ptr->hc_marker.get();
 
                             marker_callback(ptr);
+
                         } catch(...) {
                             marker_callback(ptr,
                                 boost::current_exception());
@@ -145,6 +143,14 @@ namespace hpx { namespace compute { namespace hc
                         std::string(exc.what())
                 );
             }
+        }
+
+        future_data::future_data()
+           : rt_(hpx::get_runtime_ptr())
+        {
+            // Hold on to the shared state on behalf of the cuda runtime
+            // right away as the callback could be called immediately.
+            lcos::detail::intrusive_ptr_add_ref(this);
         }
     }
 
@@ -221,7 +227,8 @@ namespace hpx { namespace compute { namespace hc
     hpx::future<void> target::get_future() const
     {
         typedef detail::future_data shared_state_type;
-        shared_state_type* p = new shared_state_type(*handle_.device_view_);
+        boost::intrusive_ptr<shared_state_type> p(new shared_state_type());
+        p.get()->initialize(*handle_.device_view_);
         return hpx::traits::future_access<hpx::future<void>>::create(p);
     }
 

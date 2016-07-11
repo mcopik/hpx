@@ -12,7 +12,7 @@
 
 #include <hpx/include/compute.hpp>
 #include <hpx/include/partitioned_vector.hpp>
-
+#include <hpx/compute/hc/detail/launch.hpp>
 #include <iostream>
 #include <numeric>
 #include <string>
@@ -36,13 +36,26 @@ int hpx_main(boost::program_options::variables_map& vm)
     std::srand(seed);
 
     typedef hpx::compute::hc::allocator<int> allocator_type;
-
+    typedef typename allocator_type::pointer pointer;
     hpx::compute::hc::target target;
     allocator_type alloc(target);
     //    (target);
     hpx::compute::vector<int, allocator_type> d_A(50, alloc);
     d_A[0] = 1;
+    int x = 5;
+    hpx::compute::hc::detail::launch(target, 25, 2,
+        [] (hpx::compute::hc::local_index<1> idx,
+            const hpx::compute::hc::buffer_acc_t<int> & p, int const & x) [[hc]]
+        {
+#if defined(__COMPUTE__ACCELERATOR__)
+            p[ idx.global[0] ] = x;
+#endif
+            //p[ idx.global[0] ] = 1;
+        },
+       d_A.data(), x);
+    target.synchronize();
     int read_val = d_A[0];
+
     std::cout << read_val << std::endl;
 
     return hpx::finalize();

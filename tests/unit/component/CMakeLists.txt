@@ -27,6 +27,7 @@ set(tests
     partitioned_vector_handle_values
     partitioned_vector_iter
     partitioned_vector_move
+    partitioned_vector_target
     partitioned_vector_transform_reduce
     partitioned_vector_fill
    )
@@ -58,6 +59,9 @@ set(get_ptr_PARAMETERS
 
 set(launch_process_FLAGS
     DEPENDENCIES iostreams_component process_component)
+set(launch_process_PARAMETERS
+  --launch=$<TARGET_FILE:launched_process_test_exe>
+)
 
 set(migrate_component_PARAMETERS
     LOCALITIES 2

@@ -8,6 +8,7 @@
 
 #include <hpx/config.hpp>
 #include <hpx/traits/pointer_category.hpp>
+#include <hpx/util/decay.hpp>
 
 #include <algorithm>
 #include <cstring> // for std::memmove
@@ -63,7 +64,7 @@ namespace hpx { namespace parallel { namespace util
         struct copy_helper
         {
             template <typename InIter, typename OutIter>
-            HPX_FORCEINLINE static std::pair<InIter, OutIter>
+            HPX_HOST_DEVICE HPX_FORCEINLINE static std::pair<InIter, OutIter>
             call(InIter first, InIter last, OutIter dest)
             {
                 while (first != last)
@@ -73,8 +74,8 @@ namespace hpx { namespace parallel { namespace util
         };
 
 #if defined(HPX_HAVE_CXX11_STD_IS_TRIVIALLY_COPYABLE)
-        template <>
-        struct copy_helper<hpx::traits::trivially_copyable_pointer_tag>
+        template <typename Dummy>
+        struct copy_helper<hpx::traits::trivially_copyable_pointer_tag, Dummy>
         {
             template <typename InIter, typename OutIter>
             HPX_FORCEINLINE static std::pair<InIter, OutIter>
@@ -90,7 +91,12 @@ namespace hpx { namespace parallel { namespace util
     HPX_FORCEINLINE std::pair<InIter, OutIter>
     copy_helper(InIter first, InIter last, OutIter dest)
     {
-        typedef decltype(hpx::traits::get_pointer_category(first, dest)) category;
+        typedef
+            typename hpx::traits::pointer_category<
+                typename hpx::util::decay<InIter>::type,
+                typename hpx::util::decay<OutIter>::type
+            >::type
+            category;
         return detail::copy_helper<category>::call(first, last, dest);
     }
 
@@ -102,7 +108,7 @@ namespace hpx { namespace parallel { namespace util
         struct copy_n_helper
         {
             template <typename InIter, typename OutIter>
-            HPX_FORCEINLINE static std::pair<InIter, OutIter>
+            HPX_HOST_DEVICE HPX_FORCEINLINE static std::pair<InIter, OutIter>
             call(InIter first, std::size_t count, OutIter dest)
             {
                 for (std::size_t i = 0; i != count; ++i)
@@ -112,8 +118,8 @@ namespace hpx { namespace parallel { namespace util
         };
 
 #if defined(HPX_HAVE_CXX11_STD_IS_TRIVIALLY_COPYABLE)
-        template <>
-        struct copy_n_helper<hpx::traits::trivially_copyable_pointer_tag>
+        template <typename Dummy>
+        struct copy_n_helper<hpx::traits::trivially_copyable_pointer_tag, Dummy>
         {
             template <typename InIter, typename OutIter>
             HPX_FORCEINLINE static std::pair<InIter, OutIter>
@@ -129,7 +135,12 @@ namespace hpx { namespace parallel { namespace util
     HPX_FORCEINLINE std::pair<InIter, OutIter>
     copy_n_helper(InIter first, std::size_t count, OutIter dest)
     {
-        typedef decltype(hpx::traits::get_pointer_category(first, dest)) category;
+        typedef
+            typename hpx::traits::pointer_category<
+                typename hpx::util::decay<InIter>::type,
+                typename hpx::util::decay<OutIter>::type
+            >::type
+            category;
         return detail::copy_n_helper<category>::call(first, count, dest);
     }
 
@@ -153,7 +164,12 @@ namespace hpx { namespace parallel { namespace util
     HPX_FORCEINLINE void
     copy_synchronize(InIter const& first, OutIter const& dest)
     {
-        typedef decltype(hpx::traits::get_pointer_category(first, dest)) category;
+        typedef
+            typename hpx::traits::pointer_category<
+                typename hpx::util::decay<InIter>::type,
+                typename hpx::util::decay<OutIter>::type
+            >::type
+            category;
         detail::copy_synchronize_helper<category>::call(first, dest);
     }
 
@@ -175,8 +191,8 @@ namespace hpx { namespace parallel { namespace util
         };
 
 #if defined(HPX_HAVE_CXX11_STD_IS_TRIVIALLY_COPYABLE)
-        template <>
-        struct move_helper<hpx::traits::trivially_copyable_pointer_tag>
+        template <typename Dummy>
+        struct move_helper<hpx::traits::trivially_copyable_pointer_tag, Dummy>
         {
             template <typename InIter, typename OutIter>
             HPX_FORCEINLINE static std::pair<InIter, OutIter>
@@ -192,7 +208,12 @@ namespace hpx { namespace parallel { namespace util
     HPX_FORCEINLINE std::pair<InIter, OutIter>
     move_helper(InIter first, InIter last, OutIter dest)
     {
-        typedef decltype(hpx::traits::get_pointer_category(first, dest)) category;
+        typedef
+            typename hpx::traits::pointer_category<
+                typename hpx::util::decay<InIter>::type,
+                typename hpx::util::decay<OutIter>::type
+            >::type
+            category;
         return detail::move_helper<category>::call(first, last, dest);
     }
 
@@ -214,8 +235,8 @@ namespace hpx { namespace parallel { namespace util
         };
 
 #if defined(HPX_HAVE_CXX11_STD_IS_TRIVIALLY_COPYABLE)
-        template <>
-        struct move_n_helper<hpx::traits::trivially_copyable_pointer_tag>
+        template <typename Dummy>
+        struct move_n_helper<hpx::traits::trivially_copyable_pointer_tag, Dummy>
         {
             template <typename InIter, typename OutIter>
             HPX_FORCEINLINE static std::pair<InIter, OutIter>
@@ -231,7 +252,12 @@ namespace hpx { namespace parallel { namespace util
     HPX_FORCEINLINE std::pair<InIter, OutIter>
     move_n_helper(InIter first, std::size_t count, OutIter dest)
     {
-        typedef decltype(hpx::traits::get_pointer_category(first, dest)) category;
+        typedef
+            typename hpx::traits::pointer_category<
+                typename hpx::util::decay<InIter>::type,
+                typename hpx::util::decay<OutIter>::type
+            >::type
+            category;
         return detail::move_n_helper<category>::call(first, count, dest);
     }
 }}}

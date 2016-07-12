@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <iterator>
 #include <type_traits>
+#include <utility>
 
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 {
@@ -35,16 +36,44 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     // for_each_n
     namespace detail
     {
+        /// \cond NOINTERNAL
         template <typename F, typename Proj>
         struct for_each_iteration
         {
-            typename hpx::util::decay<F>::type f_;
-            typename hpx::util::decay<Proj>::type proj_;
+            typedef typename hpx::util::decay<F>::type fun_type;
+            typedef typename hpx::util::decay<Proj>::type proj_type;
+
+            fun_type f_;
+            proj_type proj_;
+
+            template <typename F_, typename Proj_>
+            HPX_HOST_DEVICE for_each_iteration(F_ && f, Proj_ && proj)
+              : f_(std::forward<F_>(f))
+              , proj_(std::forward<Proj_>(proj))
+            {}
+
+#if defined(HPX_HAVE_CXX11_DEFAULTED_FUNCTIONS) && !defined(__NVCC__)
+            for_each_iteration(for_each_iteration const&) = default;
+            for_each_iteration(for_each_iteration&&) = default;
+#else
+            HPX_HOST_DEVICE for_each_iteration(for_each_iteration const& rhs)
+              : f_(rhs.f_)
+              , proj_(rhs.proj_)
+            {}
+
+            HPX_HOST_DEVICE for_each_iteration(for_each_iteration && rhs)
+              : f_(std::move(rhs.f_))
+              , proj_(std::move(rhs.proj_))
+            {}
+#endif
+
+            HPX_DELETE_COPY_ASSIGN(for_each_iteration);
+            HPX_DELETE_MOVE_ASSIGN(for_each_iteration);
 
             template <typename Iter>
-            HPX_HOST_DEVICE
-            void operator()(std::size_t /*part_index*/,
-                Iter part_begin, std::size_t part_size)
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            void operator()(Iter part_begin, std::size_t part_size,
+                std::size_t /*part_index*/)
             {
                 typedef typename util::detail::loop_n<Iter>::type it_type;
 
@@ -52,13 +81,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                     part_begin, part_size,
                     [this](it_type curr) mutable
                     {
-                        hpx::util::invoke(
-                            f_, hpx::util::invoke(proj_, *curr));
+                        hpx::util::invoke(f_, hpx::util::invoke(proj_, *curr));
                     });
             }
         };
 
-        /// \cond NOINTERNAL
         template <typename Iter>
         struct for_each_n : public detail::algorithm<for_each_n<Iter>, Iter>
         {
@@ -93,9 +120,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 {
                     return util::foreach_partitioner<ExPolicy>::call(
                         std::forward<ExPolicy>(policy), first, count,
-                        for_each_iteration<F, Proj>{
+                        for_each_iteration<F, Proj>(
                             std::forward<F>(f), std::forward<Proj>(proj)
-                        },
+                        ),
                         [](InIter && last) -> InIter
                         {
                             return std::move(last);

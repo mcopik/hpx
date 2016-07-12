@@ -185,9 +185,10 @@ namespace hpx { namespace compute { namespace hc
             int threads_per_block = (std::min)(1024, int(count));
             int num_blocks =
                 int((count + threads_per_block - 1) / threads_per_block);
-
+            std::cout << "Call bulk_construct" << std::endl;
             detail::launch(*target_, threads_per_block, num_blocks,
-                [] (local_index<1> idx, pointer p, Args const&... args) [[hc]]
+                [] (local_index<1> idx, const buffer_acc_t<T> & p,
+                    Args const&... args) [[hc]]
                 {
 #if defined(__COMPUTE__ACCELERATOR__)
                     ::new (&p[ idx.global[0] ]) T (args...);
@@ -204,7 +205,8 @@ namespace hpx { namespace compute { namespace hc
         void construct(pointer p, Args &&... args)
         {
             detail::launch(*target_, 1, 1,
-                [] (local_index<1> idx, pointer p, Args const&... args) [[hc]]
+                [] (local_index<1> idx, const buffer_acc_t<T> & p,
+                    Args const&... args) [[hc]]
                 {
 #if defined(__COMPUTE__ACCELERATOR__)
                     ::new (&p) T (args...);
@@ -222,10 +224,10 @@ namespace hpx { namespace compute { namespace hc
                 int((count + threads_per_block) / threads_per_block) - 1;
 
             detail::launch(*target_, num_blocks, threads_per_block,
-                [](local_index<1> idx, pointer p) [[hc]]
+                [](local_index<1> idx, const buffer_acc_t<T> & p) [[hc]]
                 {
 #if defined(__COMPUTE__ACCELERATOR__)
-                    p[idx.global[0]]->~T();
+                    p[idx.global[0]].~T();
 #endif
 //                    p[idx.global[0]] = 1;
                 }, p);//, p.device_ptr()->device_ptr());

@@ -33,19 +33,22 @@ namespace hpx { namespace compute { namespace hc
         typedef traits::access_target<hc::target> access_target;
     public:
 
-        value_proxy(proxy_type *p, hc::target & tgt) HPX_NOEXCEPT
-          : p_(p)
-          , target_(&tgt)
+        value_proxy(proxy_type * p, std::ptrdiff_t pos,
+                hc::target & tgt) HPX_NOEXCEPT
+          : p_(p),
+            pos_(pos),
+            target_(&tgt)
         {}
 
         value_proxy(value_proxy const& other)
-          : p_(other.p_)
-          , target_(other.target_)
+          : p_(other.p_),
+            pos_(other.pos_),
+            target_(other.target_)
         {}
 
         value_proxy& operator=(T const& t)
         {
-            (*p_) = t;
+            (*p_)[pos_] = t;
             return *this;
         }
 
@@ -58,13 +61,14 @@ namespace hpx { namespace compute { namespace hc
         value_proxy& operator=(value_proxy const& other)
         {
             p_ = other.p_;
+            pos_ = other.pos_;
             target_ = other.target_;
             return *this;
         }
 
         operator T() const
         {
-            return *p_;
+            return (*p_)[pos_];
         }
 
         proxy_type * ptr() const HPX_NOEXCEPT
@@ -91,7 +95,8 @@ namespace hpx { namespace compute { namespace hc
            return p_;
         }*/
     private:
-        proxy_type * p_;
+        proxy_type *p_;
+        std::ptrdiff_t pos_;
         hc::target* target_;
     };
 

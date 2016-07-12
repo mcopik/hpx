@@ -68,32 +68,37 @@ namespace hpx { namespace compute { namespace hc
         target_ptr(std::nullptr_t)
             : p_(nullptr), tgt_(nullptr) { }
 
-        target_ptr(proxy_type *p, hc::target &tgt)
-            : p_(p), tgt_(&tgt) { }
+        target_ptr(proxy_type * p, hc::target &tgt,
+                std::ptrdiff_t pos = 0)
+            : p_(p), pos_(pos), tgt_(&tgt) { }
+
+        target_ptr(proxy_type && p, hc::target &tgt,
+                std::ptrdiff_t pos = 0)
+            : p_(p), pos_(pos), tgt_(&tgt) { }
 
         target_ptr const &operator++() {
             HPX_ASSERT(p_);
-            ++p_;
+            ++pos_;
             return *this;
         }
 
         target_ptr const &operator--() {
             HPX_ASSERT(p_);
-            --p_;
+            --pos_;
             return *this;
         }
 
         target_ptr operator++(int) {
             target_ptr tmp(*this);
             HPX_ASSERT(p_);
-            ++p_;
+            ++pos_;
             return tmp;
         }
 
         target_ptr operator--(int) {
             target_ptr tmp(*this);
             HPX_ASSERT(p_);
-            --p_;
+            --pos_;
             return tmp;
         }
 
@@ -119,56 +124,56 @@ namespace hpx { namespace compute { namespace hc
 
         friend bool operator==(target_ptr const &lhs,
                                target_ptr const &rhs) {
-            return lhs.p_ == rhs.p_;
+            return lhs.pos_ == rhs.pos_;
         }
 
         friend bool operator!=(target_ptr const &lhs,
                                target_ptr const &rhs) {
-            return lhs.p_ != rhs.p_;
+            return lhs.pos_ != rhs.pos_;
         }
 
         friend bool operator<(target_ptr const &lhs,
                               target_ptr const &rhs) {
-            return lhs.p_ < rhs.p_;
+            return lhs.pos_ < rhs.pos_;
         }
 
         friend bool operator>(target_ptr const &lhs,
                               target_ptr const &rhs) {
-            return lhs.p_ > rhs.p_;
+            return lhs.pos_ > rhs.pos_;
         }
 
         friend bool operator<=(target_ptr const &lhs,
                                target_ptr const &rhs) {
-            return lhs.p_ <= rhs.p_;
+            return lhs.pos_ <= rhs.pos_;
         }
 
         friend bool operator>=(target_ptr const &lhs,
                                target_ptr const &rhs) {
-            return lhs.p_ >= rhs.p_;
+            return lhs.pos_ >= rhs.pos_;
         }
 
         target_ptr &operator+=(std::ptrdiff_t offset) {
             HPX_ASSERT(p_);
-            p_ += offset;
+            pos_ += offset;
             return *this;
         }
 
         target_ptr &operator-=(std::ptrdiff_t offset) {
             HPX_ASSERT(p_);
-            p_ -= offset;
+            pos_ -= offset;
             return *this;
         }
 
         std::ptrdiff_t operator-(target_ptr const &other) const {
-            return p_ - other.p_;
+            return pos_ - other.pos_;
         }
 
         target_ptr operator-(std::ptrdiff_t offset) const {
-            return target_ptr(p_ - offset, *tgt_);
+            return target_ptr(p_, *tgt_, pos_ - offset);
         }
 
         target_ptr operator+(std::ptrdiff_t offset) const {
-            return target_ptr(p_ + offset, *tgt_);
+            return target_ptr(p_, *tgt_, pos_ + offset);
         }
 
         proxy_type *device_ptr() const {
@@ -177,19 +182,20 @@ namespace hpx { namespace compute { namespace hc
 
 #if defined(__COMPUTE__ACCELERATOR__)
 
+        /// DOESN'T WORK!
         proxy_type & operator*()
         {
-            return *p_;
+            return (*p_);//[pos_];
         }
 
         proxy_type const& operator[](std::ptrdiff_t offset) const
         {
-            return *(p_ + offset);
+            return (*p_);//[pos_ + offset];
         }
 
-        proxy_type& operator[](std::ptrdiff_t offset)
+        proxy_type & operator[](std::ptrdiff_t offset)
         {
-            return *(p_ + offset);
+            return (*p_);//[pos_ + offset];
         }
 
         operator proxy_type*() const
@@ -204,7 +210,7 @@ namespace hpx { namespace compute { namespace hc
 #else
 
         reference operator*() const {
-            return value_proxy<proxy_type>(p_, *tgt_);
+            return value_proxy<proxy_type>(p_, pos_, *tgt_);
         }
 
 //        const_reference operator*() const {
@@ -212,25 +218,33 @@ namespace hpx { namespace compute { namespace hc
 //        }
 
         reference operator[](std::ptrdiff_t offset) {
-            return value_proxy<proxy_type>(p_ + offset, *tgt_);
+            return value_proxy<proxy_type>(p_, pos_ + offset, *tgt_);
         }
 
         const_reference operator[](std::ptrdiff_t offset) const {
-            return value_proxy<const proxy_type>(p_ + offset, *tgt_);
+            return value_proxy<const proxy_type>(p_, pos_ + offset,
+                *tgt_);
         }
 
+        // Dirrect access to GPU pointer, for compilation compability.
+        // Will NOT work correctly!
         explicit operator T*() const {
             return p_;
         }
 
+        // Dirrect access to GPU pointer, for compilation compability.
+        // Will NOT work correctly!
         T *operator->() const {
             return p_;
         }
 
 #endif
-
+        std::ptrdiff_t pos() const {
+            return pos_;
+        }
     protected:
-        detail::buffer_proxy<T> *p_;
+        detail::buffer_proxy<T> * p_;
+        std::ptrdiff_t pos_;
         target *tgt_;
     };
 

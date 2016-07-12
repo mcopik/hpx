@@ -19,37 +19,60 @@ namespace hpx { namespace compute { namespace hc
         class buffer_proxy {
         public:
             typedef std::size_t size_type;
+            typedef std::ptrdiff_t difference_type;
             typedef T value_type;
             /// Initialize pointer with begin position of device data
-            buffer_proxy(buffer_t<T> *device_buffer) HPX_NOEXCEPT :
+
+
+            buffer_proxy(buffer_t<T> * device_buffer) HPX_NOEXCEPT :
                 device_buffer_(*device_buffer),
-                device_buffer_view(device_buffer_),
-                pos_(0)
+                device_buffer_view(device_buffer_)
             {std::cout << "construct " << std::endl;}
 
-            buffer_proxy(buffer_t<T> *device_buffer, uint64_t pos) HPX_NOEXCEPT :
-                device_buffer_(*device_buffer),
-                device_buffer_view(device_buffer_),
-                pos_(pos)
+            buffer_proxy(const buffer_acc_t<T> & device_buffer) HPX_NOEXCEPT :
+                device_buffer_(nullptr),
+                device_buffer_view(device_buffer_)
             {std::cout << "construct " << std::endl;}
 
             buffer_proxy(buffer_proxy const &other) :
                 device_buffer_(other.device_buffer_),
-                device_buffer_view(other.device_buffer_view),
-                pos_(other.pos_)
+                device_buffer_view(other.device_buffer_view)
             {std::cout << "construct " << std::endl;}
 
             ~buffer_proxy() {
                 std::cout << "Destruct" << std::endl;
-                delete &device_buffer_;
+                //delete &device_buffer_;
             }
+
+//            buffer_proxy& operator=(T const& t)
+//            {
+//#if defined(__COMPUTE__ACCELERATOR__)
+//                device_buffer_view[pos_] = t;
+//#else
+//                std::cout << "Write: " << t << std::endl;
+//                device_buffer_view[pos_] = t;
+//#endif
+//                //access_target::write(*target_, p_, &t);
+//                return *this;
+//            }
+//
+//            buffer_proxy& operator=(buffer_proxy const& t)
+//            {
+//#if defined(__COMPUTE__ACCELERATOR__)
+//                device_buffer_view[pos_] = *t;
+//#else
+//                device_buffer_view[pos_] = *t;
+//#endif
+//                return *this;
+//            }
 
             buffer_proxy& operator=(T const& t)
             {
 #if defined(__COMPUTE__ACCELERATOR__)
-                device_buffer_[pos_] = t;
+                device_buffer_view[0] = t;
 #else
-                device_buffer_view[pos_] = t;
+                std::cout << "Write: " << t << std::endl;
+                device_buffer_view[0] = t;
 #endif
                 //access_target::write(*target_, p_, &t);
                 return *this;
@@ -58,30 +81,40 @@ namespace hpx { namespace compute { namespace hc
             buffer_proxy& operator=(buffer_proxy const& t)
             {
 #if defined(__COMPUTE__ACCELERATOR__)
-                device_buffer_[pos_] = *t;
+                device_buffer_view[0] = *t;
 #else
-                device_buffer_view[pos_] = *t;
+                device_buffer_view[0] = *t;
 #endif
                 return *this;
+            }
+
+            T & operator[](std::ptrdiff_t pos)
+            {
+#if defined(__COMPUTE__ACCELERATOR__)
+                return device_buffer_view[pos];
+#else
+                std::cout << "Write: "<< std::endl;
+                return device_buffer_view[pos];
+#endif
+                //access_target::write(*target_, p_, &t);
             }
 
             operator T() const
             {
 #if defined(__COMPUTE__ACCELERATOR__)
-                return device_buffer_[pos_];
+                return device_buffer_view[0];
 #else
-                return device_buffer_view[pos_];
+                return device_buffer_view[0];
 #endif
             }
 
-//            operator T&() const
-//            {
-//                return *p_;
-//                //return device_buffer_view[0];
-//            }
+            //operator T&()
+            //{
+            //    return device_buffer_view[0];
+            //}
 
             T &operator*() const {
-                return device_buffer_[pos_];
+                return device_buffer_view[0];
             }
 
 //            operator T*() const
@@ -89,29 +122,35 @@ namespace hpx { namespace compute { namespace hc
 //                return p_;
 //            }
 
-            buffer_proxy<T> operator+(size_type pos) {
-                return buffer_proxy(device_buffer_, pos_ + pos);
-            }
+            //buffer_proxy<T> operator+(difference_type pos) {
+            //    return buffer_proxy(&device_buffer_, pos_ + pos);
+            //}
 
-            T &operator++() {
-                ++pos_;
-                return *this;
-            }
+            //buffer_proxy<T> & operator+=(difference_type pos) {
+            //    pos_ += pos;
+            //    return *this;
+            //}
 
-            T &operator--() {
-                --pos_;
-                return *this;
-            }
+            //buffer_proxy<T> & operator++() {
+            //    std::cout << "Increment " << pos_ << " " << pos_ + 1 << std::endl;
+            //    ++pos_;
+            //    return *this;
+            //}
 
-            T* operator->() const
-            {
-#if defined(__COMPUTE__ACCELERATOR__)
-                return device_buffer_.data() + pos_;
-#else
-                // todo : throw exception
-                return nullptr;
-#endif
-            }
+            //buffer_proxy<T> & operator--() {
+            //    --pos_;
+            //    return *this;
+            //}
+
+//            T* operator->() const
+//            {
+//#if defined(__COMPUTE__ACCELERATOR__)
+//                return device_buffer_.data();
+//#else
+//                // todo : throw exception
+//                return nullptr;
+//#endif
+//            }
 
             //T * device_ptr() const
             //{
@@ -123,7 +162,7 @@ namespace hpx { namespace compute { namespace hc
                 return device_buffer_;
             }
 
-            buffer_acc_t<T> get_buffer_acc() const HPX_NOEXCEPT
+            const buffer_acc_t<T> & get_buffer_acc() const HPX_NOEXCEPT
             {
                 return device_buffer_view;
             }
@@ -134,7 +173,7 @@ namespace hpx { namespace compute { namespace hc
             // We can't operate directly on pointers, because
             // amp::array<T>.data() evalues to nullptr on host
             // We have to count positions to behave like a pointer
-            uint64_t pos_;
+            //uint64_t pos_;
         };
 
         // Const specialization is required for situations

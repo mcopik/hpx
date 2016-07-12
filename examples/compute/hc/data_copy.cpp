@@ -42,19 +42,19 @@ int hpx_main(boost::program_options::variables_map& vm)
     f.get();
 
     // copy data from host to device
-//    hpx::parallel::copy(
-//        hpx::parallel::par,
-//        h_A.begin(), h_A.end(), d_A.begin());
-
+    hpx::parallel::copy(
+        hpx::parallel::par,
+        h_A.begin(), h_A.end(), d_A.begin());
+    std::cout << h_A[0] << " " << d_A[0] << std::endl;
     //// copy data from device to host
-    //hpx::parallel::copy(
-    //    hpx::parallel::par,
-    //    d_A.begin(), d_A.end(), h_B.begin());
+    hpx::parallel::copy(
+        hpx::parallel::par,
+        d_A.begin(), d_A.end(), h_B.begin());
 
-    //if(std::equal(h_A.begin(), h_A.end(), h_B.begin()))
-    //    std::cout << "Copy succeeded!\n";
-    //else
-    //    std::cout << "Copy not successful :(\n";
+    if(std::equal(h_A.begin(), h_A.end(), h_B.begin()))
+        std::cout << "Copy succeeded!\n";
+    else
+        std::cout << "Copy not successful :(\n";
 
     return hpx::finalize();
 }

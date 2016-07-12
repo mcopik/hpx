@@ -29,9 +29,11 @@ HPX_REGISTER_PARTITIONED_VECTOR(int, target_vector);
 int hpx_main(boost::program_options::variables_map& vm)
 {
     unsigned int seed = (unsigned int)std::time(0);
+    unsigned int n = 100;
     if (vm.count("seed"))
         seed = vm["seed"].as<unsigned int>();
-
+    if (vm.count("n"))
+        n = vm["n"].as<unsigned int>();
     std::cout << "using seed: " << seed << std::endl;
     std::srand(seed);
 
@@ -40,10 +42,10 @@ int hpx_main(boost::program_options::variables_map& vm)
     hpx::compute::hc::target target;
     allocator_type alloc(target);
     //    (target);
-    hpx::compute::vector<int, allocator_type> d_A(50, alloc);
+    hpx::compute::vector<int, allocator_type> d_A(n, alloc);
     d_A[0] = 1;
     int x = 5;
-    hpx::compute::hc::detail::launch(target, 25, 2,
+    hpx::compute::hc::detail::launch(target, n/2, 2,
         [] (hpx::compute::hc::local_index<1> idx,
             const hpx::compute::hc::buffer_acc_t<int> & p, int const & x) [[hc]]
         {
@@ -73,6 +75,10 @@ int main(int argc, char* argv[])
         "the random number generator seed to use for this run")
         ;
 
+    desc_commandline.add_options()
+        ("n", value<unsigned int>(),
+        "data size")
+        ;
     // Initialize and run HPX
     return hpx::init(desc_commandline, argc, argv);
 }

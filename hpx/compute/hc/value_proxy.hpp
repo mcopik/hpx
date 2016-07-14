@@ -86,6 +86,10 @@ namespace hpx { namespace compute { namespace hc
             return *target_;
         }
 
+        buffer_acc_t<T> buffer_at_pos(std::ptrdiff_t size = 0) const HPX_NOEXCEPT
+        {
+            return (*p_).section(pos_, size);
+        }
 /*        value_proxy<value_type> operator*() const HPX_NOEXCEPT
         {
             return value_proxy<value_type>(

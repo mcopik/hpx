@@ -169,11 +169,13 @@ namespace hpx { namespace parallel { namespace util { namespace detail
         call(InIter first, InIter last, OutIter dest)
         {
             std::size_t count = std::distance(first, last);
-
+#if defined(__COMPUTE__ACCELERATOR__)
+            //TODO: somehow create an error
+#else
             ::hc::copy_async( (*first).buffer_at_pos(count),
                 (*dest).buffer_at_pos()
                 );
-
+#endif
             std::advance(dest, count);
             return std::make_pair(last, dest);
         }
@@ -190,7 +192,14 @@ namespace hpx { namespace parallel { namespace util { namespace detail
         {
             std::size_t count = std::distance(first, last);
 
-//#if defined(__CUDA_ARCH__)
+#if defined(__COMPUTE__ACCELERATOR__)
+            //TODO: somehow create an error
+#else
+            ::hc::copy_async( (*first).buffer_at_pos(count),
+                dest
+            );
+#endif
+            //#if defined(__CUDA_ARCH__)
 //            cudaMemcpyAsync(&(*dest), &(*first), bytes,
 //                cudaMemcpyDeviceToHost,
 //                first.target().native_handle().get_stream());
@@ -215,6 +224,14 @@ namespace hpx { namespace parallel { namespace util { namespace detail
         call(InIter first, InIter last, OutIter dest)
         {
             std::size_t count = std::distance(first, last);
+
+#if defined(__COMPUTE__ACCELERATOR__)
+            //TODO: somehow create an error
+#else
+            ::hc::copy_async( first, last,
+                (*dest).buffer_at_pos()
+            );
+#endif
 //
 //#if defined(__CUDA_ARCH__)
 //            cudaMemcpyAsync(&(*dest), &(*first), bytes,
@@ -242,6 +259,13 @@ namespace hpx { namespace parallel { namespace util { namespace detail
         call(InIter first, std::size_t count, OutIter dest)
         {
 
+#if defined(__COMPUTE__ACCELERATOR__)
+            //TODO: somehow create an error
+#else
+            ::hc::copy_async( (*first).buffer_at_pos(count),
+                (*dest).buffer_at_pos()
+                );
+#endif
 //#if defined(__CUDA_ARCH__)
 //            cudaMemcpyAsync(&(*dest), &(*first), bytes,
 //                cudaMemcpyDeviceToDevice,
@@ -268,6 +292,13 @@ namespace hpx { namespace parallel { namespace util { namespace detail
         call(InIter first, std::size_t count, OutIter dest)
         {
 
+#if defined(__COMPUTE__ACCELERATOR__)
+            //TODO: somehow create an error
+#else
+            ::hc::copy( (*first).buffer_at_pos(count),
+                dest
+            );
+#endif
 //#if defined(__CUDA_ARCH__)
 //            cudaMemcpyAsync(&(*dest), &(*first), bytes,
 //                cudaMemcpyDeviceToHost,
@@ -294,6 +325,17 @@ namespace hpx { namespace parallel { namespace util { namespace detail
         call(InIter first, std::size_t count, OutIter dest)
         {
 
+#if defined(__COMPUTE__ACCELERATOR__)
+            //TODO: somehow create an error
+#else
+            //TODO: is it more efficient to do it through
+            //a section at device?
+            InIter last = first;
+            std::advance(last, count);
+            ::hc::copy( first, last,
+                (*dest).buffer_at_pos()
+                );
+#endif
 //#if defined(__CUDA_ARCH__)
 //            cudaMemcpyAsync(&(*dest), &(*first), bytes,
 //                cudaMemcpyHostToDevice,

@@ -167,6 +167,20 @@ namespace hpx { namespace compute { namespace hc
                 return device_buffer_view;
             }
 
+            buffer_acc_t<T> section(std::ptrdiff_t pos,
+                    std::ptrdiff_t size) const HPX_NOEXCEPT
+            {
+                if (pos > 0 && size > 0) {
+                    return device_buffer_.section(index<1>(pos),
+                            global_size<1>(size));
+                } else if (size > 0) {
+                    return device_buffer_.section(global_size<1>(size));
+                } else if (pos > 0) {
+                    return device_buffer_.section(index<1>(pos));
+                } else {
+                    return device_buffer_view;
+                }
+            }
         private:
             buffer_t<T> & device_buffer_;
             buffer_acc_t<T> device_buffer_view;

@@ -45,6 +45,7 @@ int hpx_main(boost::program_options::variables_map& vm)
     hpx::parallel::copy(
         hpx::parallel::par,
         h_A.begin(), h_A.end(), d_A.begin());
+    target.synchronize();
     std::cout << h_A[0] << " " << d_A[0] << std::endl;
     //// copy data from device to host
     hpx::parallel::copy(

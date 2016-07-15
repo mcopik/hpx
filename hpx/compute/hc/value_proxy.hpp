@@ -34,10 +34,10 @@ namespace hpx { namespace compute { namespace hc
     public:
 
         value_proxy(proxy_type * p, std::ptrdiff_t pos,
-                hc::target & tgt) HPX_NOEXCEPT
+                hc::target * tgt) HPX_NOEXCEPT
           : p_(p),
             pos_(pos),
-            target_(&tgt)
+            target_(tgt)
         {}
 
         value_proxy(value_proxy const& other)

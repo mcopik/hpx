@@ -59,40 +59,46 @@ namespace hpx { namespace compute { namespace hc
 
         std::size_t processing_units_count()
         {
-            // wel... std::rand()?
+            // well... std::rand()?
             return 4;
         }
 
         template <typename F, typename Shape, typename ... Ts>
-        void bulk_launch(F && f, Shape const& shape, Ts &&... ts)
+        void bulk_launch(F && f, Shape const& shape, Ts &&... ts) const
         {
-            std::size_t count = boost::size(shape);
-
-            int threads_per_block = (std::min)(1024, int(count));
-            int num_blocks =
-                int((count + threads_per_block - 1) / threads_per_block);
-
             typedef typename boost::range_const_iterator<Shape>::type
                 iterator_type;
             typedef typename std::iterator_traits<iterator_type>::value_type
                 value_type;
-            typedef hc::allocator<value_type> alloc_type;
-            typedef compute::vector<value_type, alloc_type> shape_container_type;
+            for (auto const& s: shape)
+            {
+                //iterator to GPU data
+                auto begin = hpx::util::get<0>(s);
+                std::size_t chunk_size = hpx::util::get<1>(s);
+                std::size_t base_idx = hpx::util::get<2>(s);
 
-            // transfer shape to the GPU
-            shape_container_type shape_container(
-                boost::begin(shape), boost::end(shape), alloc_type(target_));
+                typedef typename
+                    std::iterator_traits<decltype(begin)>::value_type
+                    data_type;
 
-            value_type const* p = &(*boost::begin(shape));
-            detail::launch(
-                target_, num_blocks, threads_per_block,
-                [] HPX_DEVICE_LAMBDA(hc::index<1> idx, F f, value_type * p,
-                    std::size_t count, Ts&... ts)
-                {
-                    hpx::util::invoke(f, *(p + idx), std::forward<Ts>(ts)...);
-                },
-                std::forward<F>(f), shape_container.data(), count,
-                std::forward<Ts>(ts)...);
+                // FIXME: make the 1024 to be configurable...
+                int threads_per_block =
+                    (std::min)(1024, static_cast<int>(chunk_size));
+                int num_blocks = static_cast<int>(
+                    (chunk_size + threads_per_block - 1) / threads_per_block);
+
+                detail::launch(
+                    target_, num_blocks, threads_per_block,
+                    [chunk_size, f]
+                    HPX_DEVICE_LAMBDA(int idx, const target_ptr<data_type> & ptr,
+                        Ts&... ts)
+                    {
+                        hpx::util::invoke(f, value_type(ptr + idx, 1, idx),
+                            ts...);
+                    },
+                    begin.device_ptr(), std::forward<Ts>(ts)...
+                );
+            }
         }
 
         template <typename F, typename Shape, typename ... Ts>

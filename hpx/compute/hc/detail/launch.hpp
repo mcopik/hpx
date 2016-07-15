@@ -47,9 +47,13 @@ namespace hpx { namespace compute { namespace hc { namespace detail
         }
 
         template<typename T>
-        const buffer_acc_t<T> & make_target_ptr(const kernel_transfer_type<T> & t) [[hc, cpu]]
+        target_ptr< buffer_proxy<T> > make_target_ptr(const kernel_transfer_type<T> & t) [[hc, cpu]]
         {
-            return std::get<0>(t);
+            // Recreate the target_ptr
+            buffer_proxy<T> proxy(std::get<0>(t));
+            // Move the buffer proxy and pass position
+            return target_ptr< buffer_proxy<T> >(std::move(proxy), nullptr,
+                    std::get<1>(t));
         }
 
         template <typename F, typename ...Args>

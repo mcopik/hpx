@@ -68,13 +68,13 @@ namespace hpx { namespace compute { namespace hc
         target_ptr(std::nullptr_t)
             : p_(nullptr), tgt_(nullptr) { }
 
-        target_ptr(proxy_type * p, hc::target &tgt,
+        target_ptr(proxy_type * p, hc::target * tgt,
                 std::ptrdiff_t pos = 0)
-            : p_(p), pos_(pos), tgt_(&tgt) { }
+            : p_(p), pos_(pos), tgt_(tgt) { }
 
-        target_ptr(proxy_type && p, hc::target &tgt,
+        target_ptr(proxy_type && p, hc::target * tgt,
                 std::ptrdiff_t pos = 0)
-            : p_(p), pos_(pos), tgt_(&tgt) { }
+            : p_(&p), pos_(pos), tgt_(tgt) { }
 
         target_ptr const &operator++() {
             HPX_ASSERT(p_);
@@ -169,11 +169,11 @@ namespace hpx { namespace compute { namespace hc
         }
 
         target_ptr operator-(std::ptrdiff_t offset) const {
-            return target_ptr(p_, *tgt_, pos_ - offset);
+            return target_ptr(p_, tgt_, pos_ - offset);
         }
 
         target_ptr operator+(std::ptrdiff_t offset) const {
-            return target_ptr(p_, *tgt_, pos_ + offset);
+            return target_ptr(p_, tgt_, pos_ + offset);
         }
 
         proxy_type *device_ptr() const {
@@ -188,14 +188,14 @@ namespace hpx { namespace compute { namespace hc
             return (*p_);//[pos_];
         }
 
-        proxy_type const& operator[](std::ptrdiff_t offset) const
-        {
-            return (*p_);//[pos_ + offset];
-        }
+        //T const& operator[](std::ptrdiff_t offset) const
+        //{
+        //    return (*p_)[pos_ + offset];
+        //}
 
-        proxy_type & operator[](std::ptrdiff_t offset)
+        T & operator[](std::ptrdiff_t offset) const
         {
-            return (*p_);//[pos_ + offset];
+            return (*p_)[pos_ + offset];
         }
 
         operator proxy_type*() const
@@ -210,7 +210,7 @@ namespace hpx { namespace compute { namespace hc
 #else
 
         reference operator*() const {
-            return value_proxy<proxy_type>(p_, pos_, *tgt_);
+            return value_proxy<proxy_type>(p_, pos_, tgt_);
         }
 
 //        const_reference operator*() const {
@@ -218,12 +218,12 @@ namespace hpx { namespace compute { namespace hc
 //        }
 
         reference operator[](std::ptrdiff_t offset) {
-            return value_proxy<proxy_type>(p_, pos_ + offset, *tgt_);
+            return value_proxy<proxy_type>(p_, pos_ + offset, tgt_);
         }
 
         const_reference operator[](std::ptrdiff_t offset) const {
             return value_proxy<const proxy_type>(p_, pos_ + offset,
-                *tgt_);
+                tgt_);
         }
 
         // Dirrect access to GPU pointer, for compilation compability.
@@ -245,7 +245,7 @@ namespace hpx { namespace compute { namespace hc
     protected:
         detail::buffer_proxy<T> * p_;
         std::ptrdiff_t pos_;
-        target *tgt_;
+        target * tgt_;
     };
 
     template<typename T>

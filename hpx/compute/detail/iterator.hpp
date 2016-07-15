@@ -182,6 +182,11 @@ namespace hpx { namespace compute { namespace detail
             return p_;
         }
 
+        HPX_HOST_DEVICE pointer device_ptr() const
+        {
+            return p_;
+        }
+
         HPX_HOST_DEVICE reference operator[](std::size_t pos) const
         {
             HPX_ASSERT(p_);

@@ -25,13 +25,13 @@ namespace hpx { namespace compute { namespace hc
 
 
             buffer_proxy(buffer_t<T> * device_buffer) HPX_NOEXCEPT :
-                device_buffer_(*device_buffer),
-                device_buffer_view(device_buffer_)
+                device_buffer_(device_buffer),
+                device_buffer_view(*device_buffer_)
             {std::cout << "construct " << std::endl;}
 
             buffer_proxy(const buffer_acc_t<T> & device_buffer) HPX_NOEXCEPT :
                 device_buffer_(nullptr),
-                device_buffer_view(device_buffer_)
+                device_buffer_view(device_buffer)
             {std::cout << "construct " << std::endl;}
 
             buffer_proxy(buffer_proxy const &other) :
@@ -157,7 +157,7 @@ namespace hpx { namespace compute { namespace hc
             //    return p_;
             //}
 
-            buffer_t<T> & get_buffer() const HPX_NOEXCEPT
+            buffer_t<T> * get_buffer() const HPX_NOEXCEPT
             {
                 return device_buffer_;
             }
@@ -171,18 +171,18 @@ namespace hpx { namespace compute { namespace hc
                     std::ptrdiff_t size) const HPX_NOEXCEPT
             {
                 if (pos > 0 && size > 0) {
-                    return device_buffer_.section(index<1>(pos),
+                    return device_buffer_->section(index<1>(pos),
                             global_size<1>(size));
                 } else if (size > 0) {
-                    return device_buffer_.section(global_size<1>(size));
+                    return device_buffer_->section(global_size<1>(size));
                 } else if (pos > 0) {
-                    return device_buffer_.section(index<1>(pos));
+                    return device_buffer_->section(index<1>(pos));
                 } else {
                     return device_buffer_view;
                 }
             }
         private:
-            buffer_t<T> & device_buffer_;
+            buffer_t<T> * device_buffer_;
             buffer_acc_t<T> device_buffer_view;
             // We can't operate directly on pointers, because
             // amp::array<T>.data() evalues to nullptr on host

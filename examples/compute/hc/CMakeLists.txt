@@ -9,6 +9,7 @@ if(HPX_WITH_HCC_HC)
     set(example_programs ${example_programs}
         partitioned_vector
         data_copy
+        for_each
     )
 endif()
 

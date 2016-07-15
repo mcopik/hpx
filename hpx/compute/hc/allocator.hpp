@@ -109,7 +109,7 @@ namespace hpx { namespace compute { namespace hc
                     target_->native_handle().get_device()
                 );
                 p = new value_type(buffer);
-                pointer result(p, *target_);
+                pointer result(p, target_);
                 return result;
             } catch (exception_t & exc) {
 
@@ -187,7 +187,7 @@ namespace hpx { namespace compute { namespace hc
                 int((count + threads_per_block - 1) / threads_per_block);
             std::cout << "Call bulk_construct" << std::endl;
             detail::launch(*target_, threads_per_block, num_blocks,
-                [] (local_index<1> idx, const buffer_acc_t<T> & p,
+                [] (local_index<1> idx, const target_ptr<value_type> & p,
                     Args const&... args) [[hc]]
                 {
 #if defined(__COMPUTE__ACCELERATOR__)
@@ -205,7 +205,7 @@ namespace hpx { namespace compute { namespace hc
         void construct(pointer p, Args &&... args)
         {
             detail::launch(*target_, 1, 1,
-                [] (local_index<1> idx, const buffer_acc_t<T> & p,
+                [] (local_index<1> idx, const target_ptr<value_type> & p,
                     Args const&... args) [[hc]]
                 {
 #if defined(__COMPUTE__ACCELERATOR__)
@@ -224,7 +224,7 @@ namespace hpx { namespace compute { namespace hc
                 int((count + threads_per_block) / threads_per_block) - 1;
 
             detail::launch(*target_, num_blocks, threads_per_block,
-                [](local_index<1> idx, const buffer_acc_t<T> & p) [[hc]]
+                [](local_index<1> idx, const target_ptr<value_type> & p) [[hc]]
                 {
 #if defined(__COMPUTE__ACCELERATOR__)
                     p[idx.global[0]].~T();

@@ -31,7 +31,7 @@ namespace hpx { namespace compute { namespace hc
     class allocator
     {
     public:
-        typedef detail::buffer_proxy<T> value_type;
+        typedef buffer_t<T> value_type;
         typedef target_ptr<value_type> pointer;
         typedef target_ptr<value_type const> const_pointer;
 #if defined(__COMPUTE__ACCELERATOR__)
@@ -102,13 +102,13 @@ namespace hpx { namespace compute { namespace hc
             pointer result;
             return result;
 #else
-            value_type *p = 0;
+            //value_type *p = 0;
             try {
-                buffer_t<T> * buffer = new buffer_t<T>(
+                value_type p(
                     global_size<1>(n),
                     target_->native_handle().get_device()
                 );
-                p = new value_type(buffer);
+                //p = new value_type(buffer);
                 pointer result(p, target_);
                 return result;
             } catch (exception_t & exc) {

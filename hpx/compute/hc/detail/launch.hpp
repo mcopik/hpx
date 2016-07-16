@@ -65,7 +65,7 @@ namespace hpx { namespace compute { namespace hc { namespace detail
                 global_size<1>(tile_count*threads_per_tile).tile(threads_per_tile),
                 [=](local_index<1> idx) [[hc]]
                 {
-                    f(idx, make_target_ptr(args)...);
+                    f(idx, args...);//make_target_ptr(args)...);
                 }
             );
     //#else
@@ -85,7 +85,7 @@ namespace hpx { namespace compute { namespace hc { namespace detail
                 global_size<1>(threads_to_launch),
                 [=](index<1> idx) [[hc]]
                 {
-                    f(idx, make_target_ptr(args)...);
+                    f(idx, args...);//make_target_ptr(args)...);
                 }
             );
 
@@ -99,7 +99,7 @@ namespace hpx { namespace compute { namespace hc { namespace detail
         Args&&... args)
     {
         detail::launch(t, tile_count, threads_per_tile, std::forward<F>(f),
-                detail::extract_target_ptr(args)...);
+                args...);//detail::extract_target_ptr(args)...);
     }
 
     // Launch any given function F with the given parameters. This function
@@ -110,7 +110,7 @@ namespace hpx { namespace compute { namespace hc { namespace detail
         Args const &... args)
     {
         detail::launch(t, threads_to_launch, std::forward<F>(f),
-                detail::extract_target_ptr(args)...);
+                args...);//detail::extract_target_ptr(args)...);
     }
 
 }}}}

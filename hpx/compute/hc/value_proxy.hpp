@@ -27,9 +27,10 @@ namespace hpx { namespace compute { namespace hc
     class value_proxy;
 
     template <typename T>
-    class value_proxy< detail::buffer_proxy<T> >
+    class value_proxy< buffer_t<T> >
     {
-        typedef detail::buffer_proxy<T> proxy_type;
+        //typedef detail::buffer_proxy<T> proxy_type;
+        typedef buffer_t<T> proxy_type;
         typedef traits::access_target<hc::target> access_target;
     public:
 

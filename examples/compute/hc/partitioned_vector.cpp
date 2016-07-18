@@ -4,10 +4,6 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#define HPX_APPLICATION_NAME partitioned_vector.cpp
-#define HPX_APPLICATION_STRING "partitioned_vector_cpp"
-#define HPX_APPLICATION_EXPORTS
-
 #include <hpx/hpx_init.hpp>
 
 #include <hpx/include/compute.hpp>
@@ -20,8 +16,9 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // Define the partitioned vector types to be used.
-typedef hpx::compute::hc::allocator<int> target_allocator;
-typedef hpx::compute::vector<int, target_allocator> target_vector;
+typedef hpx::compute::hc::allocator<int> allocator_type;
+typedef typename allocator_type::pointer pointer;
+typedef hpx::compute::vector<int, allocator_type> target_vector;
 
 HPX_REGISTER_PARTITIONED_VECTOR(int, target_vector);
 
@@ -37,28 +34,30 @@ int hpx_main(boost::program_options::variables_map& vm)
     std::cout << "using seed: " << seed << std::endl;
     std::srand(seed);
 
-    typedef hpx::compute::hc::allocator<int> allocator_type;
-    typedef typename allocator_type::pointer pointer;
     hpx::compute::hc::target target;
     allocator_type alloc(target);
-    //    (target);
-    hpx::compute::vector<int, allocator_type> d_A(n, alloc);
+    target_vector d_A(n, alloc);
+
+    std::cout << "Write: 1" << std::endl;
     d_A[0] = 1;
+    std::cout << "Read: " << d_A[0] << std::endl;
+
     int x = 5;
+    std::cout << "Write in kernel: 5" << std::endl;
     hpx::compute::hc::detail::launch(target, n/2, 2,
         [] (hpx::compute::hc::local_index<1> idx,
-            const hpx::compute::hc::buffer_acc_t<int> & p, int const & x) [[hc]]
+            const hpx::compute::hc::target_ptr<int> & p,
+            int const & x) [[hc]]
         {
 #if defined(__COMPUTE__ACCELERATOR__)
             p[ idx.global[0] ] = x;
 #endif
             //p[ idx.global[0] ] = 1;
         },
-       d_A.data(), x);
+        d_A.data(), x);
     target.synchronize();
     int read_val = d_A[0];
-
-    std::cout << read_val << std::endl;
+    std::cout << "Read : " << read_val << std::endl;
 
     return hpx::finalize();
 }

@@ -31,7 +31,7 @@ namespace hpx { namespace compute { namespace hc
     class allocator
     {
     public:
-        typedef buffer_t<T> value_type;
+        typedef T value_type;
         typedef target_ptr<value_type> pointer;
         typedef target_ptr<value_type const> const_pointer;
 #if defined(__COMPUTE__ACCELERATOR__)
@@ -102,7 +102,6 @@ namespace hpx { namespace compute { namespace hc
             pointer result;
             return result;
 #else
-            value_type *p = 0;
             try {
                 buffer_t<T> * buffer = new buffer_t<T>(
                     global_size<1>(n),

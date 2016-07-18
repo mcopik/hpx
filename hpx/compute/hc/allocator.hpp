@@ -31,13 +31,13 @@ namespace hpx { namespace compute { namespace hc
     class allocator
     {
     public:
-        typedef detail::buffer_proxy<T> value_type;
+        typedef buffer_t<T> value_type;
         typedef target_ptr<value_type> pointer;
         typedef target_ptr<value_type const> const_pointer;
 #if defined(__COMPUTE__ACCELERATOR__)
         /// Define direct access to allocated data in device code
-        typedef value_type& reference;
-        typedef value_type const& const_reference;
+        typedef T& reference;
+        typedef T const& const_reference;
 #else
         /// On host code, use a proxy handling access to device memory
         typedef value_proxy<value_type> reference;
@@ -108,8 +108,8 @@ namespace hpx { namespace compute { namespace hc
                     global_size<1>(n),
                     target_->native_handle().get_device()
                 );
-                p = new value_type(buffer);
-                pointer result(p, target_);
+                //p = new value_type(buffer);
+                pointer result(buffer);
                 return result;
             } catch (exception_t & exc) {
 
@@ -137,7 +137,7 @@ namespace hpx { namespace compute { namespace hc
         {
 #if !defined(__HCC_ACCELERATOR__)
             try {
-                delete p.device_ptr();
+                delete p.device_buffer();
             } catch (exception_t & exc) {
 
                 HPX_THROW_EXCEPTION(out_of_memory,
@@ -187,7 +187,7 @@ namespace hpx { namespace compute { namespace hc
                 int((count + threads_per_block - 1) / threads_per_block);
             std::cout << "Call bulk_construct" << std::endl;
             detail::launch(*target_, threads_per_block, num_blocks,
-                [] (local_index<1> idx, const target_ptr<value_type> & p,
+                [] (local_index<1> idx, target_ptr<value_type> p,
                     Args const&... args) [[hc]]
                 {
 #if defined(__COMPUTE__ACCELERATOR__)
@@ -223,14 +223,14 @@ namespace hpx { namespace compute { namespace hc
             int num_blocks =
                 int((count + threads_per_block) / threads_per_block) - 1;
 
-            detail::launch(*target_, num_blocks, threads_per_block,
-                [](local_index<1> idx, const target_ptr<value_type> & p) [[hc]]
+            detail::launch(*target_, count,//num_blocks, threads_per_block,
+                [](local_index<1> idx, target_ptr<value_type> p) [[hc]]//const target_ptr<value_type> & p) [[hc]]
                 {
 #if defined(__COMPUTE__ACCELERATOR__)
-                    p[idx.global[0]].~T();
+                    //p[idx.global[0]].~T();
 #endif
 //                    p[idx.global[0]] = 1;
-                }, p);//, p.device_ptr()->device_ptr());
+                }, p);//device_ptr());//, p.device_ptr()->device_ptr());
             target_->synchronize();
         }
 

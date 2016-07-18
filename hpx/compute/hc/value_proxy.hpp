@@ -27,28 +27,30 @@ namespace hpx { namespace compute { namespace hc
     class value_proxy;
 
     template <typename T>
-    class value_proxy< detail::buffer_proxy<T> >
+    class value_proxy< buffer_t<T> >
     {
-        typedef detail::buffer_proxy<T> proxy_type;
+        typedef buffer_t<T> proxy_type;
         typedef traits::access_target<hc::target> access_target;
     public:
 
-        value_proxy(proxy_type * p, std::ptrdiff_t pos,
-                hc::target * tgt) HPX_NOEXCEPT
-          : p_(p),
-            pos_(pos),
-            target_(tgt)
+        value_proxy(proxy_type * buffer, T * p) HPX_NOEXCEPT
+          :
+            buffer_(buffer),
+            pos_(p - buffer_->accelerator_pointer()),
+            buffer_view_(*buffer)
         {}
 
         value_proxy(value_proxy const& other)
-          : p_(other.p_),
+          :
+            buffer_(other.buffer_),
             pos_(other.pos_),
-            target_(other.target_)
+            buffer_view_(other.buffer_view_)
         {}
 
         value_proxy& operator=(T const& t)
         {
-            (*p_)[pos_] = t;
+            //TODO
+            buffer_view_[pos_] = t;
             return *this;
         }
 
@@ -60,35 +62,44 @@ namespace hpx { namespace compute { namespace hc
 
         value_proxy& operator=(value_proxy const& other)
         {
-            p_ = other.p_;
+            buffer_ = other.buffer_;
             pos_ = other.pos_;
-            target_ = other.target_;
+            buffer_view_ = other.buffer_view_;
             return *this;
         }
 
         operator T() const
         {
-            return (*p_)[pos_];
+            return buffer_view_[pos_];
         }
 
         proxy_type * ptr() const HPX_NOEXCEPT
         {
-            return p_;
+            return buffer_;
         }
 
-        T* device_ptr() const HPX_NOEXCEPT
-        {
-            return p_->device_ptr();
-        }
+        //T* device_ptr() const HPX_NOEXCEPT
+        //{
+        //    return p_;
+        //}
 
-        hc::target& target() const HPX_NOEXCEPT
-        {
-            return *target_;
-        }
+        //hc::target& target() const HPX_NOEXCEPT
+        //{
+        //    return *target_;
+        //}
 
         buffer_acc_t<T> buffer_at_pos(std::ptrdiff_t size = 0) const HPX_NOEXCEPT
         {
-            return (*p_).section(pos_, size);
+            if (pos_ > 0 && size > 0) {
+                return buffer_->section(index<1>(pos_),
+                        global_size<1>(size));
+            } else if (size > 0) {
+                return buffer_->section(global_size<1>(size));
+            } else if (pos_ > 0) {
+                return buffer_->section(index<1>(pos_));
+            } else {
+                return buffer_view_;
+            }
         }
 /*        value_proxy<value_type> operator*() const HPX_NOEXCEPT
         {
@@ -99,9 +110,9 @@ namespace hpx { namespace compute { namespace hc
            return p_;
         }*/
     private:
-        proxy_type *p_;
+        proxy_type *buffer_;
         std::ptrdiff_t pos_;
-        hc::target* target_;
+        buffer_acc_t<T> buffer_view_;
     };
 
 

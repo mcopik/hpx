@@ -16,6 +16,7 @@
 #include <hpx/util/decay.hpp>
 #include <hpx/util/invoke.hpp>
 
+#include <hpx/compute/hc/config.hpp>
 #include <hpx/compute/vector.hpp>
 #include <hpx/compute/hc/allocator.hpp>
 #include <hpx/compute/hc/target.hpp>
@@ -90,13 +91,14 @@ namespace hpx { namespace compute { namespace hc
                 detail::launch(
                     target_, num_blocks, threads_per_block,
                     [chunk_size, f]
-                    HPX_DEVICE_LAMBDA(int idx, const target_ptr<data_type> & ptr,
-                        Ts&... ts)
+                    HPX_DEVICE_LAMBDA(local_index<1> idx, decltype(begin) begin, Ts&... ts)
                     {
-                        hpx::util::invoke(f, value_type(ptr + idx, 1, idx),
+#if defined(__COMPUTE__ACCELERATOR__)
+                        hpx::util::invoke(f, value_type(begin + idx.global[0], 1, idx.global[0]),
                             ts...);
+#endif
                     },
-                    begin.device_ptr(), std::forward<Ts>(ts)...
+                    begin, std::forward<Ts>(ts)...
                 );
             }
         }

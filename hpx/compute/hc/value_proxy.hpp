@@ -44,6 +44,7 @@ namespace hpx { namespace compute { namespace hc
 
         ~value_proxy()
         {
+            std::cout << "TRANSFER" << std::endl;
             // Buffer is not catched in the p_f_e,
             // hence we need to ensure manually that updates
             // in CPU cache are sent to the device.
@@ -72,6 +73,11 @@ namespace hpx { namespace compute { namespace hc
         }
 
         operator T() const
+        {
+            return buffer_view_[pos_];
+        }
+
+        operator T&()
         {
             return buffer_view_[pos_];
         }

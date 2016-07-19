@@ -61,6 +61,12 @@ namespace hpx { namespace compute { namespace detail
           , target_(&target)
         {}
 
+        template<typename U, typename Alloc>
+        HPX_HOST_DEVICE iterator(iterator<U, Alloc> const& other)
+          : base_type(other)
+          , target_(other.target_)
+        {}
+
         HPX_HOST_DEVICE iterator(iterator const& other)
           : base_type(other)
           , target_(other.target_)

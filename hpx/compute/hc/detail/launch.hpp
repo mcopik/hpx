@@ -61,7 +61,7 @@ namespace hpx { namespace compute { namespace hc { namespace detail
             const Args &... args)
         {
     //#if !defined(__COMPUTE__ACCELERATOR__)
-            ::hc::parallel_for_each(
+            ::hc::parallel_for_each(t.native_handle().get_device(),
                 global_size<1>(tile_count*threads_per_tile).tile(threads_per_tile),
                 [=](local_index<1> idx) [[hc]]
                 {
@@ -78,7 +78,7 @@ namespace hpx { namespace compute { namespace hc { namespace detail
         template <typename F, typename ...Args>
         HPX_HOST_DEVICE
         void launch(target const& t, int threads_to_launch, F && f,
-            Args... args)//Args const &... args)
+            Args const &... args)
         {
     //#if !defined(__COMPUTE__ACCELERATOR__)
             ::hc::parallel_for_each(
@@ -99,7 +99,7 @@ namespace hpx { namespace compute { namespace hc { namespace detail
         Args&&... args)
     {
         detail::launch(t, tile_count, threads_per_tile, std::forward<F>(f),
-                args...);//detail::extract_target_ptr(args)...);
+                std::forward<Args&&>(args)...);//detail::extract_target_ptr(args)...);
     }
 
     // Launch any given function F with the given parameters. This function
@@ -110,7 +110,7 @@ namespace hpx { namespace compute { namespace hc { namespace detail
         Args... args)//Args const &... args)
     {
         detail::launch(t, threads_to_launch, std::forward<F>(f),
-                args...);//detail::extract_target_ptr(args)...);
+                std::forward<Args&&>(args)...);//detail::extract_target_ptr(args)...);
     }
 
 }}}}

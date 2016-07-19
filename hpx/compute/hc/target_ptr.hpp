@@ -43,6 +43,7 @@ namespace hpx { namespace compute { namespace hc
         // array of type const T is not allowed
         typedef buffer_t< typename std::decay<T>::type > proxy_type;
         typedef T value_type;
+        typedef target_ptr<T> pointer;
         typedef std::random_access_iterator_tag iterator_category;
 #if defined(__COMPUTE__ACCELERATOR__)
         typedef T & reference;
@@ -54,14 +55,14 @@ namespace hpx { namespace compute { namespace hc
         typedef std::ptrdiff_t difference_type;
 
         [[hc,cpu]] target_ptr()
-            : p_(nullptr), buffer_(nullptr) {}//, tgt_(nullptr) { }
+            : p_(nullptr), buffer_(nullptr) {}
 
         // Necessary for nullability of pointer:
         //
         [[hc,cpu]] target_ptr(std::nullptr_t)
-            : p_(nullptr), buffer_(nullptr) {}//, tgt_(nullptr) { }
+            : p_(nullptr), buffer_(nullptr) {}
 
-        [[hc,cpu]] target_ptr(  proxy_type * buffer,
+        [[hc,cpu]] target_ptr(proxy_type * buffer,
                                 T * p = nullptr)
             : p_(p), buffer_(buffer)
         {
@@ -69,7 +70,7 @@ namespace hpx { namespace compute { namespace hc
         }
 
         [[hc,cpu]] target_ptr(proxy_type && p)
-            :  p_(p->accelerator_pointer()), buffer_(*p) {}//, buffer(&p){}//, pos_(pos), tgt_(tgt) { }
+            :  p_(p->accelerator_pointer()), buffer_(*p) {}
 
         target_ptr const &operator++() {
             HPX_ASSERT(p_);
@@ -212,6 +213,7 @@ namespace hpx { namespace compute { namespace hc
         //}
 
         reference operator[](std::ptrdiff_t offset) const {
+            std::cout << p_ + offset << std::endl;
             return value_proxy<value_type>(buffer_, p_ + offset);
         }
 
@@ -232,20 +234,12 @@ namespace hpx { namespace compute { namespace hc
         }
 
 #endif
-        //std::ptrdiff_t pos() const {
-        //    return pos_;
-        //}
-        //target * target_() {
-        //    return tgt_;
-        //}
         buffer_t<T> * device_buffer() {
             return buffer_;
         }
     protected:
         T * p_;
         buffer_t<T> * buffer_;
-        //std::ptrdiff_t pos_;
-        //target * tgt_;
     };
 }}}
 

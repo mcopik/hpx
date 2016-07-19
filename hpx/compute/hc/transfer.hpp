@@ -43,6 +43,22 @@ namespace hpx { namespace traits
         typedef hc_copyable_pointer_tag type;
     };
 
+    template <typename T>
+    struct pointer_category<
+        compute::detail::iterator<const T, compute::hc::allocator<T> >,
+        compute::detail::iterator<T, compute::hc::allocator<T> >,
+#if defined(HPX_HAVE_CXX11_STD_IS_TRIVIALLY_COPYABLE)
+        typename std::enable_if<
+           !std::is_trivially_copyable<T>::value
+        >::type
+#else
+        void
+#endif
+    >
+    {
+        typedef hc_copyable_pointer_tag type;
+    };
+
     template <typename Source, typename T>
     struct pointer_category<
         Source,
@@ -112,6 +128,18 @@ namespace hpx { namespace traits
         typedef trivially_hc_copyable_pointer_tag type;
     };
 
+    template <typename T>
+    struct pointer_category<
+        compute::detail::iterator<const T, compute::hc::allocator<T> >,
+        compute::detail::iterator<T, compute::hc::allocator<T> >,
+        typename std::enable_if<
+           std::is_trivially_copyable<T>::value
+        >::type
+    >
+    {
+        typedef trivially_hc_copyable_pointer_tag type;
+    };
+
     template <typename Source, typename T>
     struct pointer_category<
         Source,
@@ -121,6 +149,10 @@ namespace hpx { namespace traits
            !std::is_same<
                 Source,
                 compute::detail::iterator<T, compute::hc::allocator<T> >
+            >::value &&
+            !std::is_same<
+                Source,
+                compute::detail::iterator<const T, compute::hc::allocator<T> >
             >::value
         >::type
     >
@@ -142,6 +174,12 @@ namespace hpx { namespace traits
            !std::is_same<
                 Dest,
                 compute::detail::iterator<T, compute::hc::allocator<U> >
+            >::value &&
+            !std::is_same<
+                Dest,
+                compute::detail::iterator<
+                    typename hpx::util::decay<T>::type,
+                    compute::hc::allocator<U> >
             >::value
         >::type
     >

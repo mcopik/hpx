@@ -38,26 +38,27 @@ int hpx_main(boost::program_options::variables_map& vm)
     allocator_type alloc(target);
     target_vector d_A(n, alloc);
 
-    std::cout << "Write: 1" << std::endl;
-    d_A[0] = 1;
-    std::cout << "Read: " << d_A[0] << std::endl;
+    std::cout << "Write: 2" << std::endl;
+    d_A[0] = 2;
+    int read_val = d_A[0];
+    std::cout << "Read: " << read_val << std::endl;
 
     int x = 5;
-    std::cout << "Write in kernel: 5" << std::endl;
+    std::cout << "Add in kernel: 5" << std::endl;
     hpx::compute::hc::detail::launch(target, n/2, 2,
         [] (hpx::compute::hc::local_index<1> idx,
             const hpx::compute::hc::target_ptr<int> & p,
             int const & x) [[hc]]
         {
 #if defined(__COMPUTE__ACCELERATOR__)
-            p[ idx.global[0] ] = x;
+            p[ idx.global[0] ] += x;
 #endif
             //p[ idx.global[0] ] = 1;
         },
         d_A.data(), x);
     target.synchronize();
-    int read_val = d_A[0];
-    std::cout << "Read : " << read_val << std::endl;
+    read_val = d_A[0];
+    std::cout << "Read: " << read_val << std::endl;
 
     return hpx::finalize();
 }

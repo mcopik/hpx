@@ -63,7 +63,7 @@ namespace hpx { namespace compute { namespace hc { namespace detail
     //#if !defined(__COMPUTE__ACCELERATOR__)
             ::hc::parallel_for_each(t.native_handle().get_device(),
                 global_size<1>(tile_count*threads_per_tile).tile(threads_per_tile),
-                [=](local_index<1> idx) [[hc]]
+                [=](local_index<1> idx) mutable [[hc]]
                 {
                     f(idx, args...);//make_target_ptr(args)...);
                 }
@@ -83,7 +83,7 @@ namespace hpx { namespace compute { namespace hc { namespace detail
     //#if !defined(__COMPUTE__ACCELERATOR__)
             ::hc::parallel_for_each(
                 global_size<1>(threads_to_launch),
-                [=](index<1> idx) [[hc]]
+                [=](index<1> idx) mutable [[hc]]
                 {
                     f(idx, args...);//make_target_ptr(args)...);
                 }

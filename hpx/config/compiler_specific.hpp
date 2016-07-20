@@ -77,15 +77,18 @@
 #define HPX_DEVICE __device__
 #define HPX_HOST __host__
 #define HPX_DEVICE_LAMBDA HPX_DEVICE
+#define HPX_HOST_DEVICE HPX_HOST HPX_DEVICE
+#define HPX_DEVICE_COMPILER __NVCC__
 #elif defined(__HCC__)
-#define HPX_DEVICE
-#define HPX_HOST
-#define HPX_DEVICE_LAMBDA(...) (__VA_ARGS__) [[hc]] 
+#define HPX_DEVICE [[hc]]
+#define HPX_HOST [[cpu]]
+#define HPX_HOST_DEVICE [[hc, cpu]]
+#define HPX_DEVICE_LAMBDA(...) (__VA_ARGS__) mutable [[hc]]
+#define HPX_DEVICE_COMPILER __HCC__
 #else
 #define HPX_DEVICE
 #define HPX_HOST
 #endif
-#define HPX_HOST_DEVICE HPX_HOST HPX_DEVICE
 
 #if !defined(HPX_SINGLE_INHERITANCE)
 #define HPX_SINGLE_INHERITANCE /* empty */

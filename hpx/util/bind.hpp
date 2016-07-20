@@ -66,7 +66,7 @@ namespace hpx { namespace util
             typedef T& type;
 
             template <typename Us>
-            static HPX_HOST_DEVICE HPX_FORCEINLINE
+            HPX_HOST_DEVICE static HPX_FORCEINLINE
             type call(T& t, Us&& /*unbound*/)
             {
                 return t;
@@ -79,7 +79,7 @@ namespace hpx { namespace util
             typedef T&& type;
 
             template <typename Us>
-            static HPX_HOST_DEVICE HPX_FORCEINLINE
+            HPX_HOST_DEVICE static HPX_FORCEINLINE
             type call(T& t, Us&& /*unbound*/)
             {
                 return std::forward<T>(t);
@@ -113,7 +113,7 @@ namespace hpx { namespace util
             >::type&& type;
 
             template <typename T>
-            static HPX_HOST_DEVICE HPX_FORCEINLINE
+            HPX_HOST_DEVICE static HPX_FORCEINLINE
             type call(T&& /*t*/, Us&& unbound)
             {
                 return util::get<I>(std::forward<Us>(unbound));
@@ -141,7 +141,7 @@ namespace hpx { namespace util
                 T&(Us&&)
             >::type type;
 
-            static HPX_HOST_DEVICE HPX_FORCEINLINE
+            HPX_HOST_DEVICE static HPX_FORCEINLINE
             type call(T& t, Us&& unbound)
             {
                 return util::invoke_fused(t, std::forward<Us>(unbound));
@@ -268,7 +268,7 @@ namespace hpx { namespace util
               , _args(std::forward<Ts>(vs)...)
             {}
 
-#if defined(HPX_HAVE_CXX11_DEFAULTED_FUNCTIONS) && !defined(__NVCC__)
+#if defined(HPX_HAVE_CXX11_DEFAULTED_FUNCTIONS) && !defined(HPX_DEVICE_COMPILER)
             bound(bound const&) = default;
             bound(bound&&) = default;
 #else

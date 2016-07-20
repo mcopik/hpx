@@ -52,7 +52,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
               , proj_(std::forward<Proj_>(proj))
             {}
 
-#if defined(HPX_HAVE_CXX11_DEFAULTED_FUNCTIONS) && !defined(__NVCC__)
+#if defined(HPX_HAVE_CXX11_DEFAULTED_FUNCTIONS) && !defined(HPX_DEVICE_COMPILER)
             for_each_iteration(for_each_iteration const&) = default;
             for_each_iteration(for_each_iteration&&) = default;
 #else

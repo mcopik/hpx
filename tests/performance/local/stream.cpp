@@ -456,7 +456,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 
     for (std::size_t i = 0; i != numa_nodes; ++i)
     {
-        if(chunker == "dynamic")
+/*        if(chunker == "dynamic")
         {
             auto policy = par.on(execs[i]).with(dynamic_chunk_size());
             workers.push_back(
@@ -487,7 +487,7 @@ int hpx_main(boost::program_options::variables_map& vm)
             );
         }
         else
-        {
+        {*/
             // default
             auto policy = par.on(execs[i]);
             workers.push_back(
@@ -496,7 +496,7 @@ int hpx_main(boost::program_options::variables_map& vm)
                     part_size, part_size*i, iterations,
                     boost::ref(a), boost::ref(b), boost::ref(c))
             );
-        }
+//        }
     }
 
     std::vector<std::vector<std::vector<double> > >

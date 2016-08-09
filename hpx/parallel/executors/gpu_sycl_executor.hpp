@@ -48,7 +48,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				/// Create a new sequential executor
 				gpu_sycl_executor() {}
 		#endif
-		
+
 		template<typename ValueType, typename BufferType>
 		struct gpu_sycl_buffer_view_wrapper
 		{
@@ -98,7 +98,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
     		void sync()
     		{
-				buffer.reset();
+			std::cout << "Sync" << std::endl;
+			buffer.reset();
     		}
 
     		void print()
@@ -285,7 +286,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		        //for(auto const & elem : shape) {
 			        F _f( std::move(f) );
 
-			
+
 			        std::size_t threads_to_run = data_count / chunk_size;
 			        std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
                     //std::cout << "Runs: " << data_count << std::endl;
@@ -322,7 +323,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 							        //buffer_view[ index[0] ] = 1;
 							        //buffer_view[ index[0] ] = data_count;
 						        }
-						
 					        });
 			        });
                     sycl_buffer.queue.wait();
@@ -341,7 +341,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		        //for(auto const & elem : shape) {
 			        F _f( std::move(f) );
 
-			
+
 			        std::size_t threads_to_run = data_count / chunk_size;
 			        std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
                     //std::cout << "Runs: " << data_count << std::endl;
@@ -375,7 +375,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 							        //buffer_view[ index[0] ] = 1;
 							        //buffer_view[ index[0] ] = data_count;
 						        }
-						
+
 					        });
 			        });
                     sycl_buffer.queue.wait();

@@ -352,8 +352,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     template <typename ExPolicy, typename FwdIter1, typename FwdIter2,
     typename OutIter, typename F>
     static void
-    transform(ExPolicy policy, std::size_t count, FwdIter1 first1,
-        FwdIter2 first2, OutIter dest, F && f)
+    transform(ExPolicy policy, std::size_t count, FwdIter1 & first1,
+        FwdIter2 & first2, OutIter & dest, F && f)
     {
 
         /*return get_iter_tuple(
@@ -393,9 +393,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 						(*gpu_buffer3)[part_begin + i] = _f( (*gpu_buffer)[part_begin + i], (*gpu_buffer2)[part_begin + i] );
 				}), count, 1, first1, first2, dest);
 			// the data needs to be transferred from gpu back to original buffer
-			first1.sync();
-			first2.sync();
-			dest.sync();
+//			first1.sync();
+//			first2.sync();
+//			dest.sync();
 			//return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
 				//std::move(end));
 		//}
@@ -409,7 +409,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     template <typename ExPolicy, typename FwdIter1,
     typename OutIter, typename F>
     static void
-    transform(ExPolicy policy, std::size_t count, FwdIter1 first1, OutIter dest, F && f)
+    transform(ExPolicy policy, std::size_t count, FwdIter1 & first1, OutIter & dest, F && f)
     {
 
         /*return get_iter_tuple(
@@ -449,12 +449,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 						(*gpu_buffer2)[part_begin + i] = _f( (*gpu_buffer)[part_begin + i] );
 				}), count, 1, first1, dest);
 			// the data needs to be transferred from gpu back to original buffer
-			first1.sync();
-			dest.sync();
+//			first1.sync();
+//			dest.sync();
 			//return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
 				//std::move(end));
 		//}
-        
+
 		//return util::detail::algorithm_result<gpu_execution_policy, Iter>::get(
 			//std::move(first));
 

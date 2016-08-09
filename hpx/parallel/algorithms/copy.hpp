@@ -217,7 +217,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
     template <typename ExPolicy, typename InIter, typename OutIter>
     void
-    copy(ExPolicy && policy, std::size_t count, InIter first, OutIter dest)
+    copy(ExPolicy && policy, std::size_t count, InIter & first, OutIter & dest)
     {
     	//auto buffer = policy.executor().create_buffers(first1, count);
     	//auto buffer2 = policy.executor().create_buffers(first2, count);
@@ -241,8 +241,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					(*dest)[part_begin + i] = (*gpu_buffer)[part_begin + i];
 			}), count, 1, first, dest);
 		// the data needs to be transferred from gpu back to original buffer
-		first.sync();
-		dest.sync();
+		//first.sync();
+		//dest.sync();
     }
 
     /////////////////////////////////////////////////////////////////////////////

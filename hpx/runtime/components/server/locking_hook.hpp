@@ -6,15 +6,17 @@
 #if !defined(HPX_COMPONENTS_SERVER_LOCKING_HOOK_OCT_17_2012_0732PM)
 #define HPX_COMPONENTS_SERVER_LOCKING_HOOK_OCT_17_2012_0732PM
 
-#include <hpx/hpx_fwd.hpp>
-#include <hpx/runtime/get_lva.hpp>
-#include <hpx/util/unlock_guard.hpp>
-#include <hpx/util/move.hpp>
-#include <hpx/util/coroutine/coroutine.hpp>
-#include <hpx/util/register_locks.hpp>
+#include <hpx/config.hpp>
 #include <hpx/lcos/local/spinlock.hpp>
+#include <hpx/runtime/get_lva.hpp>
+#include <hpx/runtime/threads/coroutines/coroutine.hpp>
+#include <hpx/traits/action_decorate_function.hpp>
+#include <hpx/util/bind.hpp>
+#include <hpx/util/register_locks.hpp>
+#include <hpx/util/unlock_guard.hpp>
 
-#include <boost/thread/locks.hpp>
+#include <mutex>
+#include <utility>
 
 namespace hpx { namespace components
 {
@@ -46,7 +48,8 @@ namespace hpx { namespace components
                 util::one_shot(&locking_hook::thread_function),
                 get_lva<this_component_type>::call(lva),
                 util::placeholders::_1,
-                base_type::decorate_action(lva, std::forward<F>(f)));
+                traits::action_decorate_function<base_type>::call(
+                    lva, std::forward<F>(f)));
         }
 
     protected:
@@ -54,9 +57,15 @@ namespace hpx { namespace components
             threads::thread_state_ex_enum(threads::thread_state_enum)
         > yield_decorator_type;
 
-        struct undecorate_wrapper
+        struct decorate_wrapper
         {
-            ~undecorate_wrapper()
+            template <typename F>
+            decorate_wrapper(F && f)
+            {
+                threads::get_self().decorate_yield(std::forward<F>(f));
+            }
+
+            ~decorate_wrapper()
             {
                 threads::get_self().undecorate_yield();
             }
@@ -71,7 +80,7 @@ namespace hpx { namespace components
             threads::thread_state_enum result = threads::unknown;
 
             // now lock the mutex and execute the action
-            boost::unique_lock<mutex_type> l(mtx_);
+            std::unique_lock<mutex_type> l(mtx_);
 
             // We can safely ignore this lock while checking as it is
             // guaranteed to be unlocked before the thread is suspended.
@@ -79,31 +88,30 @@ namespace hpx { namespace components
             // If this lock is not ignored it will cause false positives as the
             // check for held locks is performed before this lock is unlocked.
             util::ignore_while_checking<
-                    boost::unique_lock<mutex_type>
+                    std::unique_lock<mutex_type>
                 > ignore_lock(&l);
 
             {
                 // register our yield decorator
-                using util::placeholders::_1;
-                threads::get_self().decorate_yield(
-                    util::bind(&locking_hook::yield_function, this, _1));
-
-                undecorate_wrapper yield_undecorator;
-                (void)yield_undecorator;       // silence gcc warnings
+                decorate_wrapper yield_decorator(
+                    util::bind(&locking_hook::yield_function, this,
+                        util::placeholders::_1));
 
                 result = f(state);
+
+                (void)yield_decorator;       // silence gcc warnings
             }
 
             return result;
         }
 
-        struct decorate_wrapper
+        struct undecorate_wrapper
         {
-            decorate_wrapper()
+            undecorate_wrapper()
               : yield_decorator_(threads::get_self().undecorate_yield())
             {}
 
-            ~decorate_wrapper()
+            ~undecorate_wrapper()
             {
                 threads::get_self().decorate_yield(std::move(yield_decorator_));
             }
@@ -118,7 +126,7 @@ namespace hpx { namespace components
         {
             // We un-decorate the yield function as the lock handling may
             // suspend, which causes an infinite recursion otherwise.
-            decorate_wrapper yield_decorator;
+            undecorate_wrapper yield_decorator;
             threads::thread_state_ex_enum result = threads::wait_unknown;
 
             {

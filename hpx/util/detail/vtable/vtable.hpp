@@ -8,7 +8,7 @@
 #ifndef HPX_UTIL_DETAIL_VTABLE_VTABLE_HPP
 #define HPX_UTIL_DETAIL_VTABLE_VTABLE_HPP
 
-#include <hpx/config/forceinline.hpp>
+#include <hpx/config.hpp>
 
 #include <memory>
 #include <typeinfo>
@@ -16,8 +16,11 @@
 
 namespace hpx { namespace util { namespace detail
 {
+    ///////////////////////////////////////////////////////////////////////////
     struct vtable
     {
+        static const std::size_t function_storage_size = 3*sizeof(void*);
+
         template <typename T>
         HPX_FORCEINLINE static std::type_info const& get_type()
         {
@@ -28,7 +31,7 @@ namespace hpx { namespace util { namespace detail
         template <typename T>
         HPX_FORCEINLINE static T& get(void** v)
         {
-            if (sizeof(T) <= sizeof(void*))
+            if (sizeof(T) <= function_storage_size)
             {
                 return *reinterpret_cast<T*>(v);
             } else {
@@ -39,7 +42,7 @@ namespace hpx { namespace util { namespace detail
         template <typename T>
         HPX_FORCEINLINE static T const& get(void* const* v)
         {
-            if (sizeof(T) <= sizeof(void*))
+            if (sizeof(T) <= function_storage_size)
             {
                 return *reinterpret_cast<T const*>(v);
             } else {
@@ -50,9 +53,9 @@ namespace hpx { namespace util { namespace detail
         template <typename T>
         HPX_FORCEINLINE static void default_construct(void** v)
         {
-            if (sizeof(T) <= sizeof(void*))
+            if (sizeof(T) <= function_storage_size)
             {
-                ::new (static_cast<void*>(v)) T;
+                ::new (static_cast<void*>(v)) T; //-V206
             } else {
                 *v = new T;
             }
@@ -61,9 +64,9 @@ namespace hpx { namespace util { namespace detail
         template <typename T, typename Arg>
         HPX_FORCEINLINE static void construct(void** v, Arg&& arg)
         {
-            if (sizeof(T) <= sizeof(void*))
+            if (sizeof(T) <= function_storage_size)
             {
-                ::new (static_cast<void*>(v)) T(std::forward<Arg>(arg));
+                ::new (static_cast<void*>(v)) T(std::forward<Arg>(arg)); //-V206
             } else {
                 *v = new T(std::forward<Arg>(arg));
             }
@@ -86,7 +89,7 @@ namespace hpx { namespace util { namespace detail
         template <typename T>
         HPX_FORCEINLINE static void delete_(void** v)
         {
-            if (sizeof(T) <= sizeof(void*))
+            if (sizeof(T) <= function_storage_size)
             {
                 destruct<T>(v);
             } else {

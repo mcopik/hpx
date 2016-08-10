@@ -7,16 +7,16 @@
 #define HPX_UTIL_DETAIL_COLOCATED_HELPERS_FEB_04_2014_0828PM
 
 #include <hpx/config.hpp>
-#include <hpx/exception.hpp>
-#include <hpx/runtime/naming/name.hpp>
 #include <hpx/runtime/agas/response.hpp>
+#include <hpx/runtime/naming/name.hpp>
 #include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/serialization/unique_ptr.hpp>
-#include <hpx/util/result_of.hpp>
+#include <hpx/throw_exception.hpp>
 #include <hpx/util/decay.hpp>
-#include <hpx/util/move.hpp>
+#include <hpx/util/result_of.hpp>
 
 #include <memory>
+#include <utility>
 
 #include <boost/format.hpp>
 
@@ -26,8 +26,6 @@ namespace hpx { namespace util { namespace functional
     ///////////////////////////////////////////////////////////////////////////
     struct extract_locality
     {
-        typedef naming::id_type result_type;
-
         extract_locality() {}
 
         naming::id_type operator()(agas::response const& rep,
@@ -52,22 +50,15 @@ namespace hpx { namespace util { namespace functional
         template <typename Bound>
         struct apply_continuation_impl
         {
-            HPX_MOVABLE_BUT_NOT_COPYABLE(apply_continuation_impl)
+            HPX_MOVABLE_ONLY(apply_continuation_impl);
         public:
             typedef typename util::decay<Bound>::type bound_type;
 
-            template <typename T>
-            struct result;
-
-            template <typename F, typename T1, typename T2>
-            struct result<F(T1, T2)>
-              : util::result_of<F(T1, T2)>
-            {};
-
-            apply_continuation_impl() {}
+            apply_continuation_impl()
+              : bound_(), cont_() {}
 
             explicit apply_continuation_impl(Bound && bound)
-              : bound_(std::move(bound))
+              : bound_(std::move(bound)), cont_()
             {}
 
             template <typename Continuation>
@@ -161,22 +152,16 @@ namespace hpx { namespace util { namespace functional
         template <typename Bound>
         struct async_continuation_impl
         {
-            HPX_MOVABLE_BUT_NOT_COPYABLE(async_continuation_impl)
+            HPX_MOVABLE_ONLY(async_continuation_impl);
         public:
             typedef typename util::decay<Bound>::type bound_type;
 
-            template <typename T>
-            struct result;
-
-            template <typename F, typename T1, typename T2>
-            struct result<F(T1, T2)>
-              : util::result_of<F(T1, T2)>
-            {};
-
-            async_continuation_impl() {}
+            async_continuation_impl()
+              : bound_(), cont_()
+            {}
 
             explicit async_continuation_impl(Bound && bound)
-              : bound_(std::move(bound))
+              : bound_(std::move(bound)), cont_()
             {}
 
             template <typename Continuation>

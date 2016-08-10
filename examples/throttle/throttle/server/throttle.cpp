@@ -3,16 +3,23 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
+// hpxinspect:nodeprecatedinclude:boost/chrono/chrono.hpp
+// hpxinspect:nodeprecatedname:boost::chrono
+
+#include <hpx/hpx.hpp>
 #include <hpx/runtime/actions/continuation.hpp>
 #include <hpx/runtime/components/component_factory.hpp>
 #include <hpx/runtime.hpp>
 #include <hpx/util/assert.hpp>
+#include <hpx/util/bind.hpp>
 #include <hpx/util/unlock_guard.hpp>
 
-#include <boost/bind.hpp>
+#include <boost/chrono/chrono.hpp>
 #include <boost/thread.hpp>
-#include <boost/thread/locks.hpp>
+
+#include <mutex>
+
+#include <string>
 
 #include "throttle.hpp"
 
@@ -43,7 +50,7 @@ namespace throttle { namespace server
             return;
         }
 
-        boost::lock_guard<mutex_type> l(mtx_);
+        std::lock_guard<mutex_type> l(mtx_);
 
         if (shepherd >= blocked_os_threads_.size()) {
             HPX_THROW_EXCEPTION(hpx::bad_parameter, "throttle::suspend",
@@ -59,7 +66,7 @@ namespace throttle { namespace server
 
     void throttle::resume(std::size_t shepherd)
     {
-        boost::lock_guard<mutex_type> l(mtx_);
+        std::lock_guard<mutex_type> l(mtx_);
 
         if (shepherd >= blocked_os_threads_.size()) {
             HPX_THROW_EXCEPTION(hpx::bad_parameter, "throttle::resume",
@@ -71,7 +78,7 @@ namespace throttle { namespace server
 
     bool throttle::is_suspended(std::size_t shepherd) const
     {
-        boost::lock_guard<mutex_type> l(mtx_);
+        std::lock_guard<mutex_type> l(mtx_);
 
         if (shepherd >= blocked_os_threads_.size()) {
             HPX_THROW_EXCEPTION(hpx::bad_parameter, "throttle::is_suspended",
@@ -84,17 +91,15 @@ namespace throttle { namespace server
     // do the requested throttling
     void throttle::throttle_controller(std::size_t shepherd)
     {
-        boost::unique_lock<mutex_type> l(mtx_);
+        std::unique_lock<mutex_type> l(mtx_);
         if (!blocked_os_threads_[shepherd])
             return;     // nothing more to do
 
         {
             // put this shepherd thread to sleep for 100ms
-            boost::system_time xt(boost::get_system_time() +
-                boost::posix_time::milliseconds(100));
+            hpx::util::unlock_guard<std::unique_lock<mutex_type> > ul(l);
 
-            hpx::util::unlock_guard<boost::unique_lock<mutex_type> > ul(l);
-            boost::thread::sleep(xt);
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
         }
 
         // if this thread still needs to be suspended, re-schedule this routine
@@ -108,10 +113,10 @@ namespace throttle { namespace server
     void throttle::register_thread(std::size_t shepherd)
     {
         std::string description("throttle controller for shepherd thread (" +
-            boost::lexical_cast<std::string>(shepherd) + ")");
+            std::to_string(shepherd) + ")");
 
         hpx::applier::register_thread(
-            boost::bind(&throttle::throttle_controller, this, shepherd),
+            hpx::util::bind(&throttle::throttle_controller, this, shepherd),
             description.c_str(),
             hpx::threads::pending, true,
             hpx::threads::thread_priority_critical,
@@ -122,10 +127,10 @@ namespace throttle { namespace server
     void throttle::register_suspend_thread(std::size_t shepherd)
     {
         std::string description("suspend shepherd thread (" +
-            boost::lexical_cast<std::string>(shepherd) + ")");
+            std::to_string(shepherd) + ")");
 
         hpx::applier::register_thread(
-            boost::bind(&throttle::suspend, this, shepherd),
+            hpx::util::bind(&throttle::suspend, this, shepherd),
             description.c_str(),
             hpx::threads::pending, true,
             hpx::threads::thread_priority_critical,

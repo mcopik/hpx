@@ -4,14 +4,12 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/config/defines.hpp>
-#include <hpx/config/warnings_prefix.hpp>
+#include <hpx/config.hpp>
+#include <hpx/traits/plugin_config_data.hpp>
 
 #if defined(HPX_HAVE_PARCELPORT_MPI)
 #include <mpi.h>
 #endif
-
-#include <hpx/hpx_fwd.hpp>
 
 #include <hpx/plugins/parcelport/mpi/mpi_environment.hpp>
 #include <hpx/plugins/parcelport_factory.hpp>
@@ -33,7 +31,15 @@
 #include <hpx/util/runtime_configuration.hpp>
 #include <hpx/util/safe_lexical_cast.hpp>
 
+#include <boost/atomic.hpp>
 #include <boost/archive/basic_archive.hpp>
+#include <boost/exception_ptr.hpp>
+
+#include <memory>
+#include <string>
+#include <type_traits>
+
+#include <hpx/config/warnings_prefix.hpp>
 
 namespace hpx
 {
@@ -51,8 +57,8 @@ namespace hpx { namespace parcelset
     struct connection_handler_traits<policies::mpi::parcelport>
     {
         typedef policies::mpi::sender_connection connection_type;
-        typedef boost::mpl::true_  send_early_parcel;
-        typedef boost::mpl::true_ do_background_work;
+        typedef std::true_type  send_early_parcel;
+        typedef std::true_type do_background_work;
 
         static const char * type()
         {
@@ -77,7 +83,7 @@ namespace hpx { namespace parcelset
             return s->acquire_tag();
         }
 
-        void add_connection(sender * s, boost::shared_ptr<sender_connection> const &ptr)
+        void add_connection(sender * s, std::shared_ptr<sender_connection> const &ptr)
         {
             s->add(ptr);
         }
@@ -151,7 +157,7 @@ namespace hpx { namespace parcelset
                 return util::mpi_environment::get_processor_name();
             }
 
-            boost::shared_ptr<sender_connection> create_connection(
+            std::shared_ptr<sender_connection> create_connection(
                 parcelset::locality const& l, error_code& ec)
             {
                 int dest_rank = l.get<locality>().rank();
@@ -224,7 +230,7 @@ namespace hpx { namespace parcelset
                             "mpi::early_write_handler", __FILE__, __LINE__,
                             "error while handling early parcel: " +
                                 ec.message() + "(" +
-                                boost::lexical_cast<std::string>(ec.value()) +
+                                std::to_string(ec.value()) +
                                 ")" + parcelset::dump_parcel(p));
 
                     hpx::report_error(exception);

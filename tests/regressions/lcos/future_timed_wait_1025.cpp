@@ -9,12 +9,12 @@
 #include <hpx/include/lcos.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
-#include <boost/chrono.hpp>
+#include <chrono>
 
 void wait_for(hpx::lcos::shared_future<int> f)
 {
     try {
-        f.wait_for(boost::chrono::nanoseconds(1));
+        f.wait_for(std::chrono::nanoseconds(1));
         hpx::this_thread::suspend(hpx::threads::suspended);
     }
     catch (hpx::thread_interrupted const&) {
@@ -28,7 +28,7 @@ void wait_for(hpx::lcos::shared_future<int> f)
 void wait_until(hpx::lcos::shared_future<int> f)
 {
     try {
-        f.wait_until(boost::chrono::system_clock::now() + boost::chrono::nanoseconds(1));
+        f.wait_until(std::chrono::system_clock::now() + std::chrono::nanoseconds(1));
         hpx::this_thread::suspend(hpx::threads::suspended);
     }
     catch (hpx::thread_interrupted const&) {
@@ -48,13 +48,13 @@ void test_wait_for()
 
     HPX_TEST(thread.joinable());
 
-    hpx::this_thread::sleep_for(boost::chrono::seconds(10));
+    hpx::this_thread::sleep_for(std::chrono::seconds(10));
     promise.set_value(42);
-    hpx::this_thread::sleep_for(boost::chrono::seconds(10));
+    hpx::this_thread::sleep_for(std::chrono::seconds(10));
 
     hpx::threads::thread_state thread_state =
         hpx::threads::get_thread_state(thread.native_handle());
-    HPX_TEST(thread_state == hpx::threads::suspended);
+    HPX_TEST(thread_state.state() == hpx::threads::suspended);
 
     if (thread.joinable())
     {
@@ -72,13 +72,13 @@ void test_wait_until()
 
     HPX_TEST(thread.joinable());
 
-    hpx::this_thread::sleep_for(boost::chrono::seconds(10));
+    hpx::this_thread::sleep_for(std::chrono::seconds(10));
     promise.set_value(42);
-    hpx::this_thread::sleep_for(boost::chrono::seconds(10));
+    hpx::this_thread::sleep_for(std::chrono::seconds(10));
 
     hpx::threads::thread_state thread_state =
         hpx::threads::get_thread_state(thread.native_handle());
-    HPX_TEST(thread_state == hpx::threads::suspended);
+    HPX_TEST(thread_state.state() == hpx::threads::suspended);
 
     if (thread.joinable())
     {

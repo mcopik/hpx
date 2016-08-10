@@ -15,6 +15,7 @@
 #include <boost/format.hpp>
 #include <boost/thread/thread.hpp>
 
+#include <chrono>
 #include <iostream>
 
 using hpx::util::unwrapped;
@@ -23,11 +24,9 @@ typedef hpx::lcos::shared_future< double > future_type;
 
 struct mul
 {
-    typedef double result_type;
-
     double operator()( double x1 , double x2 ) const
     {
-        hpx::this_thread::sleep_for( boost::chrono::milliseconds(10000) );
+        hpx::this_thread::sleep_for( std::chrono::milliseconds(10000) );
         hpx::cout << boost::format( "func: %f , %f\n" ) % x1 %x2 << hpx::flush;
         return x1*x2;
     }

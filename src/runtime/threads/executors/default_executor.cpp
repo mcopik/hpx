@@ -1,11 +1,23 @@
-//  Copyright (c) 2007-2013 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
 #include <hpx/runtime/threads/executors/default_executor.hpp>
+
+#include <hpx/error_code.hpp>
+#include <hpx/throw_exception.hpp>
+#include <hpx/runtime/threads/thread_enums.hpp>
 #include <hpx/runtime/threads/thread_helpers.hpp>
+#include <hpx/util/assert.hpp>
+#include <hpx/util/steady_clock.hpp>
+#include <hpx/util/thread_description.hpp>
+#include <hpx/util/unique_function.hpp>
+
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
 
 namespace hpx { namespace threads { namespace executors { namespace detail
 {
@@ -25,8 +37,9 @@ namespace hpx { namespace threads { namespace executors { namespace detail
     // Schedule the specified function for execution in this executor.
     // Depending on the subclass implementation, this may block in some
     // situations.
-    void default_executor::add(closure_type && f,
-        char const* desc, threads::thread_state_enum initial_state,
+    void default_executor::add(closure_type&& f,
+        util::thread_description const& desc,
+        threads::thread_state_enum initial_state,
         bool run_now, threads::thread_stacksize stacksize, error_code& ec)
     {
         if (stacksize == threads::thread_stacksize_default)
@@ -40,8 +53,8 @@ namespace hpx { namespace threads { namespace executors { namespace detail
     // than time abs_time. This call never blocks, and may violate
     // bounds on the executor's queue size.
     void default_executor::add_at(
-        boost::chrono::steady_clock::time_point const& abs_time,
-        closure_type && f, char const* description,
+        util::steady_clock::time_point const& abs_time,
+        closure_type&& f, util::thread_description const& description,
         threads::thread_stacksize stacksize, error_code& ec)
     {
         if (stacksize == threads::thread_stacksize_default)
@@ -60,7 +73,7 @@ namespace hpx { namespace threads { namespace executors { namespace detail
     }
 
     // Return an estimate of the number of waiting tasks.
-    boost::uint64_t default_executor::num_pending_closures(error_code& ec) const
+    std::uint64_t default_executor::num_pending_closures(error_code& ec) const
     {
         if (&ec != &throws)
             ec = make_success_code();
@@ -75,7 +88,8 @@ namespace hpx { namespace threads { namespace executors { namespace detail
     }
 
     // Set the new scheduler mode
-    void default_executor::set_scheduler_mode(threads::policies::scheduler_mode mode)
+    void default_executor::set_scheduler_mode(
+        threads::policies::scheduler_mode mode)
     {
         threads::set_scheduler_mode(mode);
     }

@@ -7,21 +7,13 @@
 #if !defined(HPX_LCOS_LOCAL_REINITIALIZABLE_STATIC_JAN_20_2013_0409PM)
 #define HPX_LCOS_LOCAL_REINITIALIZABLE_STATIC_JAN_20_2013_0409PM
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
 #include <hpx/lcos/local/once.hpp>
+#include <hpx/util/bind.hpp>
 #include <hpx/util/static_reinit.hpp>
 
-#include <boost/noncopyable.hpp>
-#include <boost/call_traits.hpp>
-#include <boost/aligned_storage.hpp>
-
-#include <boost/utility/enable_if.hpp>
-#include <boost/utility/addressof.hpp>
-
-#include <boost/type_traits/add_pointer.hpp>
-#include <boost/type_traits/alignment_of.hpp>
-
 #include <memory>   // for placement new
+#include <type_traits>
 
 #if !defined(HPX_WINDOWS)
 #  define HPX_EXPORT_REINITIALIZABLE_STATIC HPX_EXPORT
@@ -50,8 +42,9 @@ namespace hpx { namespace lcos { namespace local
 
     template <typename T, typename Tag, std::size_t N>
     struct HPX_EXPORT_REINITIALIZABLE_STATIC reinitializable_static
-      : private boost::noncopyable
     {
+        HPX_NON_COPYABLE(reinitializable_static);
+
     public:
         typedef T value_type;
 
@@ -87,13 +80,13 @@ namespace hpx { namespace lcos { namespace local
         static void value_constructor(U const* pv)
         {
             value_construct(*pv);
-            util::reinit_register(boost::bind(
+            util::reinit_register(util::bind(
                 &reinitializable_static::value_construct<U>, *pv), &destruct);
         }
 
     public:
-        typedef typename boost::call_traits<T>::reference reference;
-        typedef typename boost::call_traits<T>::const_reference const_reference;
+        typedef T & reference;
+        typedef T const & const_reference;
 
         reinitializable_static()
         {
@@ -107,8 +100,8 @@ namespace hpx { namespace lcos { namespace local
         {
             // do not rely on ADL to find the proper call_once
             lcos::local::call_once(constructed_,
-                boost::bind(&reinitializable_static::value_constructor<U>,
-                    boost::addressof(val)));
+                util::bind(&reinitializable_static::value_constructor<U>,
+                    std::addressof(val)));
         }
 
         operator reference()
@@ -132,7 +125,7 @@ namespace hpx { namespace lcos { namespace local
         }
 
     private:
-        typedef typename boost::add_pointer<value_type>::type pointer;
+        typedef typename std::add_pointer<value_type>::type pointer;
 
         static pointer get_address(std::size_t item)
         {
@@ -140,8 +133,8 @@ namespace hpx { namespace lcos { namespace local
             return static_cast<pointer>(data_[item].address());
         }
 
-        typedef boost::aligned_storage<sizeof(value_type),
-            boost::alignment_of<value_type>::value> storage_type;
+        typedef typename std::aligned_storage<sizeof(value_type),
+            std::alignment_of<value_type>::value>::type storage_type;
 
         static storage_type data_[N];
         static lcos::local::once_flag constructed_;

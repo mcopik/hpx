@@ -15,12 +15,24 @@
 #include <boost/asio/ip/address_v4.hpp>
 #include <boost/asio/ip/address_v6.hpp>
 #include <boost/asio/ip/tcp.hpp>
-#include <boost/system/error_code.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/system/error_code.hpp>
 
 #include <ctime>
-#include <string>
 #include <sstream>
+#include <string>
+
+#if defined(HPX_WINDOWS)
+// Prevent asio from initialising Winsock, the object must be constructed
+// before any Asio's own global objects. With MSVC, this may be accomplished
+// by adding the following code to the DLL:
+
+#pragma warning(push)
+#pragma warning(disable:4073)
+#pragma init_seg(lib)
+boost::asio::detail::winsock_init<>::manual manual_winsock_init;
+#pragma warning(pop)
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace util
@@ -77,7 +89,7 @@ namespace hpx { namespace util
             // resolve the given address
             tcp::resolver resolver(io_service);
             tcp::resolver::query query(hostname,
-                boost::lexical_cast<std::string>(port));
+                std::to_string(port));
 
             boost::asio::ip::tcp::resolver::iterator it =
                 resolver.resolve(query);
@@ -161,6 +173,48 @@ namespace hpx { namespace util
     }
 
 
+    ///////////////////////////////////////////////////////////////////////
+    // Take an ip v4 or v6 address and "standardize" it for comparison checks
+    // note that this code doesn't work as expected if we use the boost
+    // inet_pton functions on linux. see issue #2177 for further info
+    std::string cleanup_ip_address(const std::string &addr)
+    {
+        char buf[sizeof(struct in6_addr)];
+        int i=0, domain[2] = {AF_INET, AF_INET6};
+        char str[INET6_ADDRSTRLEN];
+
+#if defined(HPX_WINDOWS)
+        unsigned long scope_id;
+        boost::system::error_code ec;
+#endif
+
+        for (i=0; i<2; ++i) {
+#if defined(HPX_WINDOWS)
+            int s = boost::asio::detail::socket_ops::inet_pton(
+              domain[i], &addr[0], buf, &scope_id, ec);
+            if (s>0 && !ec) break;
+#else
+            int s = inet_pton(domain[i], &addr[0], buf);
+            if (s>0) break;
+#endif
+        }
+        if (i==2) {
+            HPX_THROW_EXCEPTION(bad_parameter, "cleanup_ip_address",
+                "Invalid IP address string");
+        }
+
+#if defined(HPX_WINDOWS)
+       if (boost::asio::detail::socket_ops::inet_ntop(
+            domain[i], buf, str, INET6_ADDRSTRLEN, scope_id, ec) == 0) {
+#else
+       if (inet_ntop(domain[i], buf, str, INET6_ADDRSTRLEN) == nullptr) {
+#endif
+           HPX_THROW_EXCEPTION(bad_parameter, "cleanup_ip_address",
+               "inet_ntop failure");
+       }
+       return std::string(str);
+    }
+
     endpoint_iterator_type connect_begin(std::string const & address,
         boost::uint16_t port,
         boost::asio::io_service& io_service)
@@ -170,7 +224,7 @@ namespace hpx { namespace util
         // collect errors here
         exception_list errors;
 
-        std::string port_str(boost::lexical_cast<std::string>(port));
+        std::string port_str(std::to_string(port));
 
         // try to directly create an endpoint from the address
         try {
@@ -221,7 +275,7 @@ namespace hpx { namespace util
         // collect errors here
         exception_list errors;
 
-        std::string port_str(boost::lexical_cast<std::string>(port));
+        std::string port_str(std::to_string(port));
 
         // try to directly create an endpoint from the address
         try {

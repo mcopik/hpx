@@ -11,15 +11,12 @@
 #if defined(HPX_HAVE_SECURITY)
 
 #include <hpx/runtime/naming/name.hpp>
-#include <hpx/traits/is_bitwise_serializable.hpp>
-#include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/serialization/array.hpp>
+#include <hpx/runtime/serialization/serialize.hpp>
+#include <hpx/traits/is_bitwise_serializable.hpp>
 
 #include "certificate_signing_request.hpp"
 #include "public_key.hpp"
-
-#include <boost/io/ios_state.hpp>
-#include <boost/mpl/bool.hpp>
 
 namespace hpx { namespace components { namespace security
 {
@@ -124,14 +121,7 @@ namespace hpx { namespace components { namespace security
 #endif
 }}}
 
-namespace hpx { namespace traits
-{
-    template <>
-    struct is_bitwise_serializable<
-            hpx::components::security::certificate>
-       : boost::mpl::true_
-    {};
-}}
+HPX_IS_BITWISE_SERIALIZABLE(hpx::components::security::certificate)
 
 #endif
 

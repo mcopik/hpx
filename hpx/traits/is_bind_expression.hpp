@@ -8,11 +8,10 @@
 
 #include <hpx/config.hpp>
 
-#include <boost/type_traits/integral_constant.hpp>
-
 #ifdef HPX_HAVE_CXX11_STD_IS_BIND_EXPRESSION
 #include <functional>
 #endif
+#include <type_traits>
 
 namespace hpx { namespace traits
 {
@@ -21,9 +20,14 @@ namespace hpx { namespace traits
 #ifdef HPX_HAVE_CXX11_STD_IS_BIND_EXPRESSION
       : std::is_bind_expression<T>
 #else
-      : boost::false_type
+      : std::false_type
 #endif
+    {};
+
+    template <typename T>
+    struct is_bind_expression<T const>
+      : is_bind_expression<T>
     {};
 }}
 
-#endif
+#endif /*HPX_TRAITS_IS_BIND_EXPRESSION_HPP*/

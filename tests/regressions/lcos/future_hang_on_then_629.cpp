@@ -14,6 +14,8 @@
 #include <boost/random.hpp>
 #include <boost/format.hpp>
 
+#include <vector>
+
 using boost::program_options::variables_map;
 using boost::program_options::options_description;
 using boost::program_options::value;
@@ -164,7 +166,8 @@ int hpx_main(
 
         bool verbose = vm.count("verbose") != 0;
 
-        boost::uint32_t num_localities = hpx::get_num_localities_sync();
+        boost::uint32_t num_localities =
+            hpx::get_num_localities(hpx::launch::sync);
 
         hpx::id_type const here = hpx::find_here();
 

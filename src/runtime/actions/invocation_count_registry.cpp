@@ -3,7 +3,7 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
 #include <hpx/exception.hpp>
 #include <hpx/runtime/actions/invocation_count_registry.hpp>
 #include <hpx/performance_counters/registry.hpp>
@@ -40,11 +40,7 @@ namespace hpx { namespace actions { namespace detail
         auto it = map_.find(name);
         if (it == map_.end())
         {
-#if !defined(HPX_GCC_VERSION) || HPX_GCC_VERSION >= 408000
             map_.emplace(name, fun);
-#else
-            map_.insert(map_type::value_type(name, fun));
-#endif
         }
     }
 
@@ -58,7 +54,7 @@ namespace hpx { namespace actions { namespace detail
             HPX_THROW_EXCEPTION(bad_parameter,
                 "invocation_count_registry::get_invocation_counter",
                 "unknown action type");
-            return 0;
+            return nullptr;
         }
         return (*it).second;
     }

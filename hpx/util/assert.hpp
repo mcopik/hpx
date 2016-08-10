@@ -15,8 +15,7 @@
 #   define HPX_ASSERT_MSG(expr, msg) BOOST_ASSERT_MSG(expr, msg)
 #else
 
-#include <hpx/config/branch_hints.hpp>
-#include <hpx/config/compiler_specific.hpp>
+#include <hpx/config.hpp>
 
 //-------------------------------------------------------------------------- //
 //                                     HPX_ASSERT                            //
@@ -41,7 +40,7 @@
 
 namespace hpx
 {
-    HPX_EXPORT void assertion_failed(char const * expr,
+    HPX_ATTRIBUTE_NORETURN HPX_EXPORT void assertion_failed(char const * expr,
         char const * function, char const * file, long line);  // user defined
 } // namespace hpx
 
@@ -77,8 +76,9 @@ namespace hpx
 
 namespace hpx
 {
-    HPX_EXPORT void assertion_failed_msg(char const * expr, char const * msg,
-           char const * function, char const * file, long line); // user defined
+    HPX_ATTRIBUTE_NORETURN HPX_EXPORT void assertion_failed_msg(
+        char const * expr, char const * msg,
+        char const * function, char const * file, long line); // user defined
 } // namespace hpx
 
 #define HPX_ASSERT_MSG(expr, msg) (HPX_LIKELY(!!(expr)) \
@@ -91,10 +91,10 @@ namespace hpx
 #ifndef HPX_ASSERT_HPP
 #define HPX_ASSERT_HPP
 
-#include <cstdlib>
-#include <iostream>
 #include <hpx/config.hpp>
 #include <boost/current_function.hpp>
+#include <cstdlib>
+#include <iostream>
 
 //  IDE's like Visual Studio perform better if output goes to std::cout or
 //  some other stream, so allow user to configure output stream:
@@ -106,9 +106,10 @@ namespace hpx { namespace assertion { namespace detail
 {
     // Note: The template is needed to make the function non-inline and
     // avoid linking errors
-    template< typename CharT >
-    HPX_NOINLINE void assertion_failed_msg(CharT const * expr,
-        char const * msg, char const * function, char const * file, long line)
+    template <typename CharT>
+    HPX_ATTRIBUTE_NORETURN HPX_NOINLINE void assertion_failed_msg(
+        CharT const * expr, char const * msg, char const * function,
+        char const * file, long line)
     {
         HPX_ASSERT_MSG_OSTREAM
             << "***** Internal Program Error - assertion (" << expr

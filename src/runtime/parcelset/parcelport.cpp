@@ -1,15 +1,16 @@
-//  Copyright (c) 2007-2014 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //  Copyright (c) 2013-2014 Thomas Heller
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+// hpxinspect:nodeprecatedinclude:boost/chrono/chrono.hpp
+// hpxinspect:nodeprecatedname:boost::chrono
+
 // This is needed to make everything work with the Intel MPI library header
-#include <hpx/config/defines.hpp>
-
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
 #include <hpx/state.hpp>
-
+#include <hpx/runtime_fwd.hpp>
 #include <hpx/runtime/applier/applier.hpp>
 #include <hpx/runtime/parcelset/parcelport.hpp>
 #include <hpx/runtime/threads/thread.hpp>
@@ -18,12 +19,17 @@
 #include <hpx/util/safe_lexical_cast.hpp>
 #include <hpx/exception.hpp>
 
+#include <boost/chrono/chrono.hpp>
+
+#include <string>
+#include <utility>
+
 namespace hpx { namespace parcelset
 {
     ///////////////////////////////////////////////////////////////////////////
     parcelport::parcelport(util::runtime_configuration const& ini, locality const & here,
             std::string const& type)
-      : applier_(0),
+      : applier_(nullptr),
         here_(here),
         max_inbound_message_size_(ini.get_max_inbound_message_size()),
         max_outbound_message_size_(ini.get_max_outbound_message_size()),
@@ -66,8 +72,8 @@ namespace hpx { namespace parcelset
         {
             while (threads::threadmanager_is(state_starting))
             {
-                boost::this_thread::sleep(boost::get_system_time() +
-                    boost::posix_time::milliseconds(HPX_NETWORK_RETRIES_SLEEP));
+                boost::this_thread::sleep_for(
+                    boost::chrono::milliseconds(HPX_NETWORK_RETRIES_SLEEP));
             }
 
             // Give up if we're shutting down.
@@ -100,8 +106,7 @@ namespace hpx { namespace parcelset
             // We should not allow any exceptions to escape the execution of the
             // action as this would bring down the ASIO thread we execute in.
             try {
-                act->get_thread_function(0)
-                    (threads::thread_state_ex(threads::wait_signaled));
+                act->get_thread_function(0)(threads::wait_signaled);
             }
             catch (...) {
                 hpx::report_error(boost::current_exception());

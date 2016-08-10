@@ -8,6 +8,7 @@
 #include <hpx/include/components.hpp>
 #include <hpx/include/actions.hpp>
 #include <hpx/include/component_storage.hpp>
+#include <hpx/include/serialization.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -90,12 +91,12 @@ bool test_migrate_component_to_storage(hpx::id_type const& source,
             return false;
         }
 
-        HPX_TEST_EQ(storage.size_sync(), std::size_t(1));
+        HPX_TEST_EQ(storage.size(hpx::launch::sync), std::size_t(1));
 
         // make sure all local references go out of scope if t == unmanaged
     }
 
-    HPX_TEST_EQ(storage.size_sync(), std::size_t(1));
+    HPX_TEST_EQ(storage.size(hpx::launch::sync), std::size_t(1));
 
     {
         test_client t1(hpx::components::migrate_from_storage<test_server>(oldid));
@@ -106,7 +107,7 @@ bool test_migrate_component_to_storage(hpx::id_type const& source,
         // the new object should live on the (original) source locality
         HPX_TEST_EQ(t1.call(), source);
 
-        HPX_TEST_EQ(storage.size_sync(), std::size_t(0));
+        HPX_TEST_EQ(storage.size(hpx::launch::sync), std::size_t(0));
     }
 
     return true;
@@ -138,12 +139,12 @@ bool test_migrate_component_to_storage(hpx::id_type const& source,
             return false;
         }
 
-        HPX_TEST_EQ(storage.size_sync(), std::size_t(1));
+        HPX_TEST_EQ(storage.size(hpx::launch::sync), std::size_t(1));
 
         // make sure all local references go out of scope if t == unmanaged
     }
 
-    HPX_TEST_EQ(storage.size_sync(), std::size_t(1));
+    HPX_TEST_EQ(storage.size(hpx::launch::sync), std::size_t(1));
 
     {
         test_client t1(hpx::components::migrate_from_storage<test_server>(
@@ -155,7 +156,7 @@ bool test_migrate_component_to_storage(hpx::id_type const& source,
         // the new object should now live on the target locality
         HPX_TEST_EQ(t1.call(), target);
 
-        HPX_TEST_EQ(storage.size_sync(), std::size_t(0));
+        HPX_TEST_EQ(storage.size(hpx::launch::sync), std::size_t(0));
     }
 
     return true;
@@ -187,10 +188,10 @@ bool test_migrate_component_from_storage(hpx::id_type const& source,
             return false;
         }
 
-        HPX_TEST_EQ(storage.size_sync(), std::size_t(1));
+        HPX_TEST_EQ(storage.size(hpx::launch::sync), std::size_t(1));
     }
 
-    HPX_TEST_EQ(storage.size_sync(), std::size_t(1));
+    HPX_TEST_EQ(storage.size(hpx::launch::sync), std::size_t(1));
 
     // The object is stored in the storage now, apply an action which should
     // transparently bring it back.
@@ -201,7 +202,7 @@ bool test_migrate_component_from_storage(hpx::id_type const& source,
         // transparently resurrect object on the original source locality
         HPX_TEST_EQ(t1.call(), source);
 
-        HPX_TEST_EQ(storage.size_sync(), std::size_t(0));
+        HPX_TEST_EQ(storage.size(hpx::launch::sync), std::size_t(0));
     }
 
     return true;

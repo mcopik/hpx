@@ -10,8 +10,10 @@
 #include <hpx/config.hpp>
 #include <hpx/config/asio.hpp>
 
-#include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/io_service.hpp>
+#include <boost/asio/ip/tcp.hpp>
+
+#include <string>
 
 namespace hpx { namespace util
 {
@@ -36,6 +38,10 @@ namespace hpx { namespace util
     // Addresses are supposed to have the format <hostname>[:port]
     HPX_API_EXPORT bool split_ip_address(std::string const& v,
         std::string& host, boost::uint16_t& port);
+
+    ///////////////////////////////////////////////////////////////////////
+    // Take an ip v4 or v6 address and "standardize" it for comparison checks
+    HPX_API_EXPORT std::string cleanup_ip_address(const std::string &addr);
 
     typedef boost::asio::ip::tcp::resolver::iterator endpoint_iterator_type;
 

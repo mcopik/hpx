@@ -3,10 +3,13 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
+// make inspect happy: hpxinspect:nodeprecatedname:boost::is_any_of
+
+#include <hpx/config.hpp>
 #include <hpx/runtime/components/derived_component_factory.hpp>
 #include <hpx/runtime/actions/continuation.hpp>
 #include <hpx/runtime/agas/interface.hpp>
+#include <hpx/runtime/launch_policy.hpp>
 #include <hpx/util/high_resolution_clock.hpp>
 #include <hpx/performance_counters/counters.hpp>
 #include <hpx/performance_counters/counter_creators.hpp>
@@ -14,7 +17,12 @@
 #include <hpx/performance_counters/server/arithmetics_counter.hpp>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/thread/locks.hpp>
+
+#include <mutex>
+
+#include <string>
+#include <utility>
+#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace performance_counters { namespace server
@@ -76,7 +84,7 @@ namespace hpx { namespace performance_counters { namespace server
         // lock here to avoid checking out multiple reference counted GIDs
         // from AGAS
         {
-            boost::lock_guard<mutex_type> l(mtx_);
+            std::lock_guard<mutex_type> l(mtx_);
 
             for (std::size_t i = 0; i != base_counter_names_.size(); ++i)
             {
@@ -127,7 +135,7 @@ namespace hpx { namespace performance_counters { namespace server
     template <typename Operation>
     bool arithmetics_counter<Operation>::start()
     {
-        boost::lock_guard<mutex_type> l(mtx_);
+        std::lock_guard<mutex_type> l(mtx_);
         for (std::size_t i = 0; i != base_counter_names_.size(); ++i)
         {
             if (!base_counter_ids_[i] &&
@@ -142,7 +150,7 @@ namespace hpx { namespace performance_counters { namespace server
             }
 
             using performance_counters::stubs::performance_counter;
-            if (!performance_counter::start(base_counter_ids_[i]))
+            if (!performance_counter::start(launch::sync, base_counter_ids_[i]))
             {
                 HPX_THROW_EXCEPTION(bad_parameter,
                     "arithmetics_counter<Operation>::stop",
@@ -158,7 +166,7 @@ namespace hpx { namespace performance_counters { namespace server
     template <typename Operation>
     bool arithmetics_counter<Operation>::stop()
     {
-        boost::lock_guard<mutex_type> l(mtx_);
+        std::lock_guard<mutex_type> l(mtx_);
         for (std::size_t i = 0; i != base_counter_names_.size(); ++i)
         {
             if (!base_counter_ids_[i] &&
@@ -173,7 +181,7 @@ namespace hpx { namespace performance_counters { namespace server
             }
 
             using performance_counters::stubs::performance_counter;
-            if (!performance_counter::stop(base_counter_ids_[i]))
+            if (!performance_counter::stop(launch::sync, base_counter_ids_[i]))
             {
                 HPX_THROW_EXCEPTION(bad_parameter,
                     "arithmetics_counter<Operation>::stop",
@@ -189,7 +197,7 @@ namespace hpx { namespace performance_counters { namespace server
     template <typename Operation>
     void arithmetics_counter<Operation>::reset_counter_value()
     {
-        boost::lock_guard<mutex_type> l(mtx_);
+        std::lock_guard<mutex_type> l(mtx_);
         for (std::size_t i = 0; i != base_counter_names_.size(); ++i)
         {
             if (!base_counter_ids_[i] &&
@@ -204,7 +212,7 @@ namespace hpx { namespace performance_counters { namespace server
             }
 
             using performance_counters::stubs::performance_counter;
-            performance_counter::reset(base_counter_ids_[i]);
+            performance_counter::reset(launch::sync, base_counter_ids_[i]);
         }
     }
 
@@ -240,7 +248,7 @@ namespace hpx { namespace performance_counters { namespace server
         if (!base_counter_id && !ensure_base_counter(base_counter_id, name))
             return false;
 
-        value = stubs::performance_counter::get_value(base_counter_id);
+        value = stubs::performance_counter::get_value(launch::sync, base_counter_id);
         return true;
     }
 }}}

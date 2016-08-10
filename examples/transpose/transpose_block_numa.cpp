@@ -9,12 +9,17 @@
 #include <hpx/include/parallel_algorithm.hpp>
 #include <hpx/include/parallel_numeric.hpp>
 #include <hpx/include/serialization.hpp>
+#include <hpx/util/safe_lexical_cast.hpp>
 
 #include <hpx/parallel/util/numa_allocator.hpp>
 
 #include <boost/range/irange.hpp>
 
 #include <algorithm>
+#include <memory>
+#include <numeric>
+#include <string>
+#include <utility>
 #include <vector>
 
 #define COL_SHIFT 1000.00           // Constant to shift column index
@@ -41,7 +46,7 @@ struct sub_block
 
     sub_block()
       : size_(0)
-      , data_(0)
+      , data_(nullptr)
       , mode_(reference)
     {}
 
@@ -64,7 +69,7 @@ struct sub_block
       , data_(other.data_)
       , mode_(other.mode_)
     {
-        if(mode_ == owning) { other.data_ = 0; other.size_ = 0; }
+        if(mode_ == owning) { other.data_ = nullptr; other.size_ = 0; }
     }
 
     sub_block & operator=(sub_block && other)
@@ -72,7 +77,7 @@ struct sub_block
         size_ = other.size_;
         data_ = other.data_;
         mode_ = other.mode_;
-        if(mode_ == owning) { other.data_ = 0; other.size_ = 0; }
+        if(mode_ == owning) { other.data_ = nullptr; other.size_ = 0; }
 
         return *this;
     }
@@ -118,7 +123,7 @@ struct sub_block
     double * data_;
     mode mode_;
 
-    HPX_MOVABLE_BUT_NOT_COPYABLE(sub_block);
+    HPX_MOVABLE_ONLY(sub_block);
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -352,9 +357,9 @@ int hpx_main(boost::program_options::variables_map& vm)
         for_each(par, boost::begin(range), boost::end(range),
             [&](boost::uint64_t b)
             {
-                boost::shared_ptr<block_component> A_ptr =
+                std::shared_ptr<block_component> A_ptr =
                     hpx::get_ptr<block_component>(A[b].get_id()).get();
-                boost::shared_ptr<block_component> B_ptr =
+                std::shared_ptr<block_component> B_ptr =
                     hpx::get_ptr<block_component>(B[b].get_id()).get();
 
                 for(boost::uint64_t i = 0; i != order; ++i)
@@ -561,18 +566,13 @@ int main(int argc, char* argv[])
 
     // Initialize and run HPX, this example requires to run hpx_main on all
     // localities
-    std::vector<std::string> cfg;
-    cfg.push_back("hpx.run_hpx_main!=1");
-
-    cfg.push_back("hpx.numa_sensitive=2");  // no-cross NUMA stealing
-
-    // block all cores of requested number of NUMA-domains
-    cfg.push_back(boost::str(
-        boost::format("hpx.cores=%d") % (numa_nodes * num_cores)
-    ));
-    cfg.push_back(boost::str(
-        boost::format("hpx.os_threads=%d") % (numa_nodes * pus.second)
-    ));
+    std::vector<std::string> cfg = {
+        "hpx.run_hpx_main!=1",
+        "hpx.numa_sensitive=2",  // no-cross NUMA stealing
+        // block all cores of requested number of NUMA-domains
+        boost::str(boost::format("hpx.cores=%d") % (numa_nodes * num_cores)),
+        boost::str(boost::format("hpx.os_threads=%d") % (numa_nodes * pus.second))
+    };
 
     std::string node_name("numanode");
     if (topo.get_number_of_numa_nodes() == 0)

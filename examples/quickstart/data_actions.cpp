@@ -1,10 +1,12 @@
-//  Copyright (c) 2014 Hartmut Kaiser
+//  Copyright (c) 2014-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include <hpx/hpx_main.hpp>
 #include <hpx/hpx.hpp>
+
+#include <type_traits>
 
 ///////////////////////////////////////////////////////////////////////////////
 /// placeholder type allowing to integrate the data action templates below
@@ -22,44 +24,26 @@ struct plain_data
     }
 
     static bool is_target_valid(hpx::naming::id_type const& id) { return true; }
-
-    /// This is the default hook implementation for decorate_action which
-    /// does no hooking at all.
-    template <typename F>
-    static hpx::threads::thread_function_type
-    decorate_action(hpx::naming::address::address_type, F && f)
-    {
-        return std::forward<F>(f);
-    }
-
-    /// This is the default hook implementation for schedule_thread which
-    /// forwards to the default scheduler.
-    static void schedule_thread(hpx::naming::address::address_type,
-        hpx::threads::thread_init_data& data,
-        hpx::threads::thread_state_enum initial_state)
-    {
-        hpx::threads::register_work_plain(data, initial_state);
-    }
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 template <typename T, typename Derived>
 struct data_get_action_base
     : public hpx::actions::basic_action<plain_data<Derived>,
-        typename boost::remove_pointer<T>::type(), Derived>
+        typename std::remove_pointer<T>::type(), Derived>
 {};
 
 template <typename T, T Data, typename Derived = hpx::actions::detail::this_type>
 struct data_get_action
     : public data_get_action_base<
-        typename boost::remove_pointer<T>::type,
+        typename std::remove_pointer<T>::type,
         typename hpx::actions::detail::action_type<
             data_get_action<T, Data, Derived>, Derived
         >::type>
 {
-    typedef boost::mpl::false_ direct_execution;
+    typedef std::false_type direct_execution;
 
-    typedef typename boost::remove_pointer<T>::type data_type;
+    typedef typename std::remove_pointer<T>::type data_type;
 
     // Return the referenced data
     static data_type invoke(
@@ -79,14 +63,14 @@ struct data_set_action_base
 template <typename T, T Data, typename Derived = hpx::actions::detail::this_type>
 struct data_set_action
     : public data_set_action_base<
-        typename boost::remove_pointer<T>::type,
+        typename std::remove_pointer<T>::type,
         typename hpx::actions::detail::action_type<
             data_set_action<T, Data, Derived>, Derived
         >::type>
 {
-    typedef typename boost::remove_pointer<T>::type data_type;
+    typedef typename std::remove_pointer<T>::type data_type;
 
-    typedef boost::mpl::false_ direct_execution;
+    typedef std::false_type direct_execution;
 
     // Return the referenced data
     static void invoke(

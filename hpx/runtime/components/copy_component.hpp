@@ -8,15 +8,15 @@
 #if !defined(HPX_RUNTIME_COMPONENTS_COPY_COMPONENT_SEP_20_2013_0828PM)
 #define HPX_RUNTIME_COMPONENTS_COPY_COMPONENT_SEP_20_2013_0828PM
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
+#include <hpx/lcos/async.hpp>
+#include <hpx/lcos/future.hpp>
 #include <hpx/runtime/actions/plain_action.hpp>
 #include <hpx/runtime/components/server/copy_component.hpp>
 #include <hpx/runtime/naming/name.hpp>
-#include <hpx/lcos/future.hpp>
-#include <hpx/lcos/async.hpp>
 #include <hpx/traits/is_component.hpp>
 
-#include <boost/utility/enable_if.hpp>
+#include <type_traits>
 
 namespace hpx { namespace components
 {
@@ -42,8 +42,8 @@ namespace hpx { namespace components
 #if defined(DOXYGEN)
     future<naming::id_type>
 #else
-    inline typename boost::enable_if<
-        traits::is_component<Component>, future<naming::id_type>
+    inline typename std::enable_if<
+        traits::is_component<Component>::value, future<naming::id_type>
     >::type
 #endif
     copy(naming::id_type const& to_copy)
@@ -73,8 +73,8 @@ namespace hpx { namespace components
 #if defined(DOXYGEN)
     future<naming::id_type>
 #else
-    inline typename boost::enable_if<
-        traits::is_component<Component>, future<naming::id_type>
+    inline typename std::enable_if<
+        traits::is_component<Component>::value, future<naming::id_type>
     >::type
 #endif
     copy(naming::id_type const& to_copy, naming::id_type const& target_locality)

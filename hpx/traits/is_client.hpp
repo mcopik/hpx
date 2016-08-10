@@ -7,19 +7,18 @@
 #define HPX_TRAITS_IS_CLIENT_AUG_15_2015_0818AM
 
 #include <hpx/config.hpp>
-#include <hpx/traits.hpp>
 
-#include <boost/mpl/bool.hpp>
+#include <type_traits>
 
 namespace hpx { namespace traits
 {
     ///////////////////////////////////////////////////////////////////////////
-    template <typename T, typename Enable>
+    template <typename T, typename Enable = void>
     struct is_client
-      : boost::mpl::false_
+      : std::false_type
     {};
 
-    template <typename T, typename Enable>
+    template <typename T, typename Enable = void>
     struct is_client_or_client_array
       : is_client<T>
     {};

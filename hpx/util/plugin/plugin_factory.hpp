@@ -4,23 +4,29 @@
 // (See accompanying file LICENSE_1_0.txt
 // or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+// hpxinspect:nodeprecatedinclude:boost/shared_ptr.hpp
+// hpxinspect:nodeprecatedname:boost::shared_ptr
+
 #ifndef HPX_PLUGIN_FACTORY_VP_2004_08_25
 #define HPX_PLUGIN_FACTORY_VP_2004_08_25
 
+#include <hpx/config.hpp>
+#include <hpx/error_code.hpp>
+#include <hpx/throw_exception.hpp>
 #include <hpx/util/function.hpp>
-#include <hpx/util/plugin/virtual_constructor.hpp>
 #include <hpx/util/plugin/abstract_factory.hpp>
 #include <hpx/util/plugin/dll.hpp>
 #include <hpx/util/plugin/export_plugin.hpp>
-
-#include <hpx/exception.hpp>
+#include <hpx/util/plugin/virtual_constructor.hpp>
 
 #include <boost/algorithm/string/case_conv.hpp>
-#include <boost/type_traits/remove_pointer.hpp>
+#include <boost/shared_ptr.hpp>
 
-#include <stdexcept>
+#include <sstream>
 #include <string>
 #include <utility>
+#include <type_traits>
+#include <vector>
 
 namespace hpx { namespace util { namespace plugin {
 
@@ -33,7 +39,7 @@ namespace hpx { namespace util { namespace plugin {
             std::string const &class_name, std::string const& libname = "",
             error_code& ec = throws)
         {
-            typedef typename boost::remove_pointer<get_plugins_list_type>
+            typedef typename std::remove_pointer<get_plugins_list_type>
                 ::type PointedType;
 
             exported_plugins_type& e = *f();
@@ -195,7 +201,7 @@ namespace hpx { namespace util { namespace plugin {
                 std::pair<abstract_factory<BasePlugin> *, dll_handle> r =
                     get_abstract_factory<BasePlugin>(this->m_dll, name,
                         this->m_basename, ec);
-                if (ec) return 0;
+                if (ec) return nullptr;
 
                 return r.first->create(r.second, parameters...);
             }
@@ -253,7 +259,7 @@ namespace hpx { namespace util { namespace plugin {
                 std::pair<abstract_factory<BasePlugin> *, dll_handle> r =
                     get_abstract_factory_static<BasePlugin>(
                         this->f, &empty_deleter, name, "", ec);
-                if (ec) return 0;
+                if (ec) return nullptr;
 
                 return r.first->create(r.second, parameters...);
             }

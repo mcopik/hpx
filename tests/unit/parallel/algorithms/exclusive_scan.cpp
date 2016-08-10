@@ -11,7 +11,47 @@
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/range/functions.hpp>
 
+#include <string>
+#include <vector>
+
 #include "test_utils.hpp"
+
+///////////////////////////////////////////////////////////////////////////////
+void exclusive_scan_benchmark()
+{
+    try {
+      std::vector<double> c(100000000);
+      std::vector<double> d(c.size());
+      std::fill(boost::begin(c), boost::end(c), 1.0);
+
+      double const val(0);
+      auto op =
+        [val](double v1, double v2) {
+          return v1 + v2;
+      };
+
+      hpx::util::high_resolution_timer t;
+      hpx::parallel::exclusive_scan(hpx::parallel::par,
+        boost::begin(c), boost::end(c), boost::begin(d),
+        val, op);
+      double elapsed = t.elapsed();
+
+      // verify values
+      std::vector<double> e(c.size());
+      hpx::parallel::v1::detail::sequential_exclusive_scan(
+          boost::begin(c), boost::end(c), boost::begin(e), val, op);
+
+      bool ok = std::equal(boost::begin(d), boost::end(d), boost::begin(e));
+      HPX_TEST(ok);
+      if (ok) {
+          std::cout << "<DartMeasurement name=\"ExclusiveScanTime\" \n"
+              << "type=\"numeric/double\">" << elapsed << "</DartMeasurement> \n";
+      }
+    }
+    catch (...) {
+      HPX_TEST(false);
+    }
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 template <typename ExPolicy, typename IteratorTag>
@@ -88,12 +128,14 @@ void test_exclusive_scan1()
     test_exclusive_scan1_async(seq(task), IteratorTag());
     test_exclusive_scan1_async(par(task), IteratorTag());
 
+#if defined(HPX_HAVE_GENERIC_EXECUTION_POLICY)
     test_exclusive_scan1(execution_policy(seq), IteratorTag());
     test_exclusive_scan1(execution_policy(par), IteratorTag());
     test_exclusive_scan1(execution_policy(par_vec), IteratorTag());
 
     test_exclusive_scan1(execution_policy(seq(task)), IteratorTag());
     test_exclusive_scan1(execution_policy(par(task)), IteratorTag());
+#endif
 }
 
 void exclusive_scan_test1()
@@ -106,14 +148,23 @@ void exclusive_scan_test1()
 ///////////////////////////////////////////////////////////////////////////////
 int hpx_main(boost::program_options::variables_map& vm)
 {
-    unsigned int seed = (unsigned int)std::time(0);
+    unsigned int seed = (unsigned int)std::time(nullptr);
     if (vm.count("seed"))
         seed = vm["seed"].as<unsigned int>();
 
     std::cout << "using seed: " << seed << std::endl;
     std::srand(seed);
 
-    exclusive_scan_test1();
+    // if benchmark is requested we run it even in debug mode
+    if (vm.count("benchmark")) {
+        exclusive_scan_benchmark();
+    }
+    else {
+        exclusive_scan_test1();
+#ifndef HPX_DEBUG
+        exclusive_scan_benchmark();
+#endif
+    }
 
   return hpx::finalize();
 }
@@ -130,9 +181,9 @@ int main(int argc, char* argv[])
         "the random number generator seed to use for this run")
         ;
     // By default this test should run on all available cores
-    std::vector<std::string> cfg;
-    cfg.push_back("hpx.os_threads=" +
-        boost::lexical_cast<std::string>(hpx::threads::hardware_concurrency()));
+    std::vector<std::string> const cfg = {
+        "hpx.os_threads=all"
+    };
 
     // Initialize and run HPX
     HPX_TEST_EQ_MSG(hpx::init(desc_commandline, argc, argv, cfg), 0,

@@ -1,4 +1,4 @@
-//  Copyright (c) 2007-2015 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -6,14 +6,13 @@
 #if !defined(HPX_TRAITS_FUTURE_ACCESS_JUN_24_2015_0930AM)
 #define HPX_TRAITS_FUTURE_ACCESS_JUN_24_2015_0930AM
 
-#include <hpx/traits.hpp>
+#include <hpx/config.hpp>
 #include <hpx/traits/future_traits.hpp>
-#include <hpx/util/move.hpp>
 
 #include <boost/intrusive_ptr.hpp>
-#include <boost/mpl/bool.hpp>
 
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace hpx { namespace lcos
@@ -38,7 +37,7 @@ namespace hpx { namespace traits
             typedef boost::intrusive_ptr<lcos::detail::future_data<R> > type;
         };
 
-        template <typename Future>
+        template <typename Future, typename Enable = void>
         struct shared_state_ptr_for
           : shared_state_ptr<typename traits::future_traits<Future>::type>
         {};
@@ -69,17 +68,28 @@ namespace hpx { namespace traits
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    template <typename T, typename Enable>
+    template <typename T, typename Enable = void>
     struct is_shared_state
-      : boost::mpl::false_
+      : std::false_type
     {};
 
     template <typename R>
     struct is_shared_state<boost::intrusive_ptr<lcos::detail::future_data<R> > >
-      : boost::mpl::true_
+      : std::true_type
     {};
 
     ///////////////////////////////////////////////////////////////////////////
+    namespace detail
+    {
+        template <typename T, typename Enable = void>
+        struct future_access_customization_point;
+    }
+
+    template <typename T>
+    struct future_access
+      : detail::future_access_customization_point<T>
+    {};
+
     template <typename R>
     struct future_access<lcos::future<R> >
     {

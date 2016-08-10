@@ -1,4 +1,4 @@
-//  Copyright (c) 2007-2015 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -9,20 +9,25 @@
 #define HPX_COMPONENTS_BINPACKING_DISTRIBUTION_POLICY_APR_10_2015_0344PM
 
 #include <hpx/config.hpp>
-#include <hpx/traits/is_distribution_policy.hpp>
+#include <hpx/dataflow.hpp>
+#include <hpx/lcos/future.hpp>
+#include <hpx/performance_counters/performance_counter.hpp>
 #include <hpx/runtime/components/stubs/stub_base.hpp>
 #include <hpx/runtime/components/unique_component_name.hpp>
-#include <hpx/runtime/naming/name.hpp>
 #include <hpx/runtime/naming/id_type.hpp>
-#include <hpx/performance_counters/performance_counter.hpp>
-#include <hpx/lcos/future.hpp>
-#include <hpx/dataflow.hpp>
-#include <hpx/util/move.hpp>
+#include <hpx/runtime/naming/name.hpp>
+#include <hpx/runtime/serialization/serialization_fwd.hpp>
+#include <hpx/runtime/serialization/string.hpp>
+#include <hpx/runtime/serialization/vector.hpp>
+#include <hpx/traits/is_distribution_policy.hpp>
 #include <hpx/util/unwrapped.hpp>
 
 #include <algorithm>
-#include <vector>
 #include <iterator>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace hpx { namespace components
 {
@@ -232,15 +237,9 @@ namespace hpx { namespace components
 
                         for (std::size_t i = 0; i != v.size(); ++i)
                         {
-#if !defined(HPX_GCC_VERSION) || HPX_GCC_VERSION >= 408000
                             result.emplace_back(
                                     std::move(localities_[i]), v[i].get()
                                 );
-#else
-                            result.push_back(std::make_pair(
-                                    std::move(localities_[i]), v[i].get()
-                                ));
-#endif
                         }
                         return result;
                     },
@@ -289,6 +288,30 @@ namespace hpx { namespace components
             }
 #endif
             return binpacking_distribution_policy(locs, counter_name);
+        }
+
+        /// Create a new \a default_distribution policy representing the given
+        /// set of localities.
+        ///
+        /// \param locs     [in] The list of localities the new instance should
+        ///                 represent
+        /// \param counter_name  [in] The name of the performance counter which
+        ///                      should be used as the distribution criteria
+        ///                      (by default the overall number of existing
+        ///                      instances of the given component type will be
+        ///                      used).
+        ///
+        binpacking_distribution_policy operator()(
+            std::vector<id_type> && locs,
+            char const* counter_name = default_binpacking_counter_name) const
+        {
+#if defined(HPX_DEBUG)
+            for (id_type const& loc: locs)
+            {
+                HPX_ASSERT(naming::is_locality(loc));
+            }
+#endif
+            return binpacking_distribution_policy(std::move(locs), counter_name);
         }
 
         /// Create a new \a default_distribution policy representing the given
@@ -402,11 +425,7 @@ namespace hpx { namespace components
                     -> std::vector<bulk_locality_result>
                 {
                     std::vector<bulk_locality_result> result;
-#if !defined(HPX_GCC_VERSION) || HPX_GCC_VERSION >= 408000
                     result.emplace_back(id, f.get());
-#else
-                    result.push_back(std::make_pair(id, f.get()));
-#endif
                     return result;
                 });
         }
@@ -437,11 +456,25 @@ namespace hpx { namespace components
             counter_name_(counter_name)
         {}
 
+        binpacking_distribution_policy(std::vector<id_type> && localities,
+                char const* counter_name)
+          : localities_(std::move(localities)),
+            counter_name_(counter_name)
+        {}
+
         binpacking_distribution_policy(id_type const& locality,
                 char const* counter_name)
           : counter_name_(counter_name)
         {
             localities_.push_back(locality);
+        }
+
+        friend class hpx::serialization::access;
+
+        template <typename Archive>
+        void serialize(Archive& ar, unsigned int const)
+        {
+            ar & counter_name_ & localities_;
         }
 
         std::vector<id_type> localities_;   // localities to create things on

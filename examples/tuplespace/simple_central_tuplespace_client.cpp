@@ -8,10 +8,12 @@
 #include <hpx/include/actions.hpp>
 #include <hpx/include/iostreams.hpp>
 
-#include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/algorithm/string/classification.hpp>
+
+#include <string>
+#include <vector>
 
 #include "central_tuplespace/simple_central_tuplespace.hpp"
 #include "small_big_object.hpp"
@@ -158,8 +160,9 @@ int main(int argc, char* argv[])
 {
     // We force this example to use 2 threads by default as one of the threads
     // will be sitting most of the time in the kernel waiting for user input.
-    std::vector<std::string> cfg;
-    cfg.push_back("hpx.os_threads=2");
+    std::vector<std::string> const cfg = {
+        "hpx.os_threads=2"
+    };
 
     // Initialize and run HPX.
     return hpx::init(argc, argv, cfg);

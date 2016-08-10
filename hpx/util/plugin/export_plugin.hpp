@@ -10,15 +10,18 @@
 #define HPX_EXPORT_PLUGIN_VP_2004_08_25
 
 #include <hpx/config.hpp>
-#include <hpx/util/plugin/config.hpp>
+#include <hpx/util/plugin/abstract_factory.hpp>
 #include <hpx/util/plugin/concrete_factory.hpp>
+#include <hpx/util/plugin/config.hpp>
 
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/any.hpp>
 #include <boost/preprocessor/cat.hpp>
-#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/preprocessor/stringize.hpp>
 
-#include <string>
 #include <map>
+#include <string>
+#include <utility>
 
 ///////////////////////////////////////////////////////////////////////////////
 #define HPX_PLUGIN_NAME_2(name1, name2)                                       \

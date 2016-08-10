@@ -15,26 +15,24 @@
 #define HPX_UTIL_ANY_HPP
 
 #include <hpx/config.hpp>
-#include <hpx/util/assert.hpp>
-#include <hpx/util/decay.hpp>
-#include <hpx/util/move.hpp>
-#include <hpx/traits/supports_streaming_with_any.hpp>
-#include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/serialization/base_object.hpp>
 #include <hpx/runtime/serialization/detail/raw_ptr.hpp>
+#include <hpx/runtime/serialization/serialize.hpp>
+#include <hpx/traits/supports_streaming_with_any.hpp>
+#include <hpx/util/assert.hpp>
+#include <hpx/util/decay.hpp>
 
-#include <boost/type_traits/is_reference.hpp>
-#include <boost/type_traits/remove_const.hpp>
-#include <boost/type_traits/remove_reference.hpp>
-#include <boost/throw_exception.hpp>
-#include <boost/mpl/bool.hpp>
 #include <boost/detail/sp_typeinfo.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/throw_exception.hpp>
 
-#include <stdexcept>
-#include <typeinfo>
 #include <algorithm>
 #include <iosfwd>
+#include <stdexcept>
+#include <type_traits>
+#include <typeinfo>
+#include <utility>
+#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 #if BOOST_WORKAROUND(HPX_MSVC, >= 1400)
@@ -115,7 +113,7 @@ namespace hpx { namespace util
         struct streaming_base;
 
         template <typename T>
-        struct streaming_base<T, boost::mpl::true_, boost::mpl::true_>
+        struct streaming_base<T, std::true_type, std::true_type>
         {
             template <typename Char>
             static std::basic_istream<Char>&
@@ -135,7 +133,7 @@ namespace hpx { namespace util
         };
 
         template <typename T>
-        struct streaming_base<T, boost::mpl::false_, boost::mpl::true_>
+        struct streaming_base<T, std::false_type, std::true_type>
         {
             template <typename Char>
             static std::basic_istream<Char>&
@@ -155,7 +153,7 @@ namespace hpx { namespace util
         };
 
         template <typename T, typename Small>
-        struct streaming_base<T, Small, boost::mpl::false_>
+        struct streaming_base<T, Small, std::false_type>
         {
             template <typename Char>
             static std::basic_istream<Char>&
@@ -177,10 +175,10 @@ namespace hpx { namespace util
         struct fxns;
 
         template <>
-        struct fxns<boost::mpl::true_>
+        struct fxns<std::true_type>
         {
             template<typename T, typename IArchive, typename OArchive, typename Char>
-            struct type : public streaming_base<T, boost::mpl::true_>
+            struct type : public streaming_base<T, std::true_type>
             {
                 static fxn_ptr_table<IArchive, OArchive, Char> *get_ptr()
                 {
@@ -233,10 +231,10 @@ namespace hpx { namespace util
 
         // static functions for big value-types (bigger than a void*)
         template <>
-        struct fxns<boost::mpl::false_>
+        struct fxns<std::false_type>
         {
             template<typename T, typename IArchive, typename OArchive, typename Char>
-            struct type : public streaming_base<T, boost::mpl::false_>
+            struct type : public streaming_base<T, std::false_type>
             {
                 static fxn_ptr_table<IArchive, OArchive, Char> *get_ptr()
                 {
@@ -355,7 +353,7 @@ namespace hpx { namespace util
         template <typename T>
         struct get_table
         {
-            typedef boost::mpl::bool_<(sizeof(T) <= sizeof(void*))> is_small;
+            typedef std::integral_constant<bool, (sizeof(T) <= sizeof(void*))> is_small;
 
             template <typename IArchive, typename OArchive, typename Char>
             static fxn_ptr_table<IArchive, OArchive, Char>* get()
@@ -432,14 +430,14 @@ namespace hpx { namespace util
         basic_any() HPX_NOEXCEPT
           : table(detail::any::get_table<detail::any::empty>::
                 template get<IArchive, OArchive, Char>()),
-            object(0)
+            object(nullptr)
         {
         }
 
         basic_any(basic_any const& x)
           : table(detail::any::get_table<detail::any::empty>::
                 template get<IArchive, OArchive, Char>()),
-            object(0)
+            object(nullptr)
         {
             assign(x);
         }
@@ -449,7 +447,7 @@ namespace hpx { namespace util
           : table(detail::any::get_table<
                       typename util::decay<T>::type
                   >::template get<IArchive, OArchive, Char>()),
-            object(0)
+            object(nullptr)
         {
             typedef typename util::decay<T>::type value_type;
 
@@ -466,21 +464,21 @@ namespace hpx { namespace util
         {
             x.table = detail::any::get_table<detail::any::empty>::
                 template get<IArchive, OArchive, Char>();
-            x.object = 0;
+            x.object = nullptr;
         }
 
         // Perfect forwarding of T
         template <typename T>
         explicit basic_any(T&& x,
-            typename boost::disable_if<
-                boost::is_same<
+            typename std::enable_if<
+                !std::is_same<
                     basic_any,
                     typename util::decay<T>::type
-                > >::type* = 0)
+                >::value>::type* = nullptr)
           : table(detail::any::get_table<
                       typename util::decay<T>::type
                   >::template get<IArchive, OArchive, Char>()),
-            object(0)
+            object(nullptr)
         {
             typedef typename util::decay<T>::type value_type;
 
@@ -624,7 +622,7 @@ namespace hpx { namespace util
                 table->static_delete(&object);
                 table = detail::any::get_table<detail::any::empty>::
                     template get<IArchive, OArchive, Char>();
-                object = 0;
+                object = nullptr;
             }
         }
 
@@ -657,7 +655,9 @@ namespace hpx { namespace util
             }
             else
             {
-                typename detail::any::fxn_ptr_table<IArchive, OArchive, Char> *p = 0;
+                typename detail::any::fxn_ptr_table<
+                        IArchive, OArchive, Char
+                > *p = nullptr;
                 ar >> hpx::serialization::detail::raw_ptr(p);
                 table = p->get_ptr();
                 delete p;
@@ -713,14 +713,14 @@ namespace hpx { namespace util
         basic_any() HPX_NOEXCEPT
           : table(detail::any::get_table<
                 detail::any::empty>::template get<void, void, Char>()),
-            object(0)
+            object(nullptr)
         {
         }
 
         basic_any(basic_any const& x)
           : table(detail::any::get_table<
                 detail::any::empty>::template get<void, void, Char>()),
-            object(0)
+            object(nullptr)
         {
             assign(x);
         }
@@ -730,7 +730,7 @@ namespace hpx { namespace util
           : table(detail::any::get_table<
                       typename util::decay<T>::type
                   >::template get<void, void, Char>()),
-            object(0)
+            object(nullptr)
         {
             typedef typename util::decay<T>::type value_type;
 
@@ -745,7 +745,7 @@ namespace hpx { namespace util
           : table(x.table),
             object(x.object)
         {
-            x.object = 0;
+            x.object = nullptr;
             x.table = detail::any::get_table<detail::any::empty>::
                 template get<void, void, Char>();
         }
@@ -753,15 +753,15 @@ namespace hpx { namespace util
         // Perfect forwarding of T
         template <typename T>
         explicit basic_any(T&& x,
-            typename boost::disable_if<
-                boost::is_same<
+            typename std::enable_if<
+                !std::is_same<
                     basic_any,
                     typename util::decay<T>::type
-                > >::type* = 0)
+                >::value>::type* = nullptr)
           : table(detail::any::get_table<
                       typename util::decay<T>::type
                   >::template get<void, void, Char>()),
-            object(0)
+            object(nullptr)
         {
             typedef typename util::decay<T>::type value_type;
 
@@ -904,7 +904,7 @@ namespace hpx { namespace util
                 table->static_delete(&object);
                 table = detail::any::get_table<detail::any::empty>::
                     template get<void, void, Char>();
-                object = 0;
+                object = nullptr;
             }
         }
 
@@ -948,7 +948,7 @@ namespace hpx { namespace util
                 reinterpret_cast<T*>(reinterpret_cast<void*>(&operand->object)) :
                 reinterpret_cast<T*>(reinterpret_cast<void*>(operand->object));
         }
-        return 0;
+        return nullptr;
     }
 
     template <typename T, typename IArchive, typename OArchive, typename Char>
@@ -961,7 +961,7 @@ namespace hpx { namespace util
     template <typename T, typename IArchive, typename OArchive, typename Char>
     T any_cast(basic_any<IArchive, OArchive, Char>& operand)
     {
-        typedef typename boost::remove_reference<T>::type nonref;
+        typedef typename std::remove_reference<T>::type nonref;
 
         nonref* result = any_cast<nonref>(&operand);
         if(!result)
@@ -972,7 +972,7 @@ namespace hpx { namespace util
     template <typename T, typename IArchive, typename OArchive, typename Char>
     T const& any_cast(basic_any<IArchive, OArchive, Char> const& operand)
     {
-        typedef typename boost::remove_reference<T>::type nonref;
+        typedef typename std::remove_reference<T>::type nonref;
 
         return any_cast<nonref const&>(const_cast<basic_any<IArchive, OArchive,
             Char> &>(operand));
@@ -1041,7 +1041,7 @@ namespace hpx { namespace util
             {
                 std::vector<char> data;
                 serialization::output_archive ar (
-                        data, 0U, ~0U, 0, &hasher);
+                        data, 0U, ~0U, nullptr, &hasher);
                 ar << elem;
             }  // let archive go out of scope
 

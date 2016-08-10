@@ -11,6 +11,14 @@
 #include <hpx/config.hpp>
 #include <hpx/runtime/threads/detail/periodic_maintenance.hpp>
 #include <hpx/runtime/threads/policies/local_priority_queue_scheduler.hpp>
+#include <hpx/runtime/threads_fwd.hpp>
+
+#include <boost/atomic.hpp>
+
+#include <string>
+#include <type_traits>
+
+#include <hpx/config/warnings_prefix.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace threads { namespace policies
@@ -34,7 +42,7 @@ namespace hpx { namespace threads { namespace policies
           >
     {
     public:
-        typedef boost::mpl::true_ has_periodic_maintenance;
+        typedef std::true_type has_periodic_maintenance;
 
         void start_periodic_maintenance(
             boost::atomic<hpx::state>& global_state)

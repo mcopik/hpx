@@ -11,7 +11,12 @@
 #include <hpx/include/parallel_uninitialized_copy.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
+#include <boost/atomic.hpp>
 #include <boost/range/functions.hpp>
+
+#include <numeric>
+#include <utility>
+#include <vector>
 
 #include "test_utils.hpp"
 

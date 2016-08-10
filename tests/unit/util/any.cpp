@@ -9,10 +9,13 @@
 #include <hpx/util/any.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
-#include <boost/unordered_map.hpp>
 #include <hpx/util/storage/tuple.hpp>
 
 #include <boost/any.hpp>
+
+#include <string>
+#include <unordered_map>
+#include <utility>
 
 #include "small_big_object.hpp"
 
@@ -44,7 +47,7 @@ int hpx_main(variables_map& vm)
             typedef hpx::util::any elem_type;
             typedef hpx::util::hash_any hash_elem_functor;
 
-            typedef boost::unordered_multimap<elem_type, index_type,
+            typedef std::unordered_multimap<elem_type, index_type,
                 hash_elem_functor> field_index_map_type;
             typedef field_index_map_type::iterator field_index_map_iterator_type;
 

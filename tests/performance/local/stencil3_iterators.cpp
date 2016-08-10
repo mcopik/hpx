@@ -5,9 +5,15 @@
 
 #include <hpx/hpx_init.hpp>
 #include <hpx/hpx.hpp>
+#include <hpx/traits/is_iterator.hpp>
 #include <hpx/util/high_resolution_clock.hpp>
 #include <hpx/util/transform_iterator.hpp>
 #include <hpx/include/iostreams.hpp>
+
+#include <numeric>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include <boost/cstdint.hpp>
 #include <boost/range/irange.hpp>
@@ -21,23 +27,15 @@ int partition_size = 10000;
 namespace hpx { namespace experimental { namespace detail
 {
     template <typename Iterator>
-    struct is_random_access_iterator
-        : boost::is_same<
-            std::random_access_iterator_tag,
-            typename std::iterator_traits<Iterator>::iterator_category
-            >
-    {};
-
-    template <typename Iterator>
     HPX_FORCEINLINE
-    Iterator previous(Iterator it, boost::mpl::false_)
+    Iterator previous(Iterator it, std::false_type)
     {
         return --it;
     }
 
     template <typename Iterator>
     HPX_FORCEINLINE
-    Iterator previous(Iterator const& it, boost::mpl::true_)
+    Iterator previous(Iterator const& it, std::true_type)
     {
         return it - 1;
     }
@@ -46,19 +44,19 @@ namespace hpx { namespace experimental { namespace detail
     HPX_FORCEINLINE
     Iterator previous(Iterator const& it)
     {
-        return previous(it, is_random_access_iterator<Iterator>());
+        return previous(it, hpx::traits::is_random_access_iterator<Iterator>());
     }
 
     template <typename Iterator>
     HPX_FORCEINLINE
-    Iterator next(Iterator it, boost::mpl::false_)
+    Iterator next(Iterator it, std::false_type)
     {
         return ++it;
     }
 
     template <typename Iterator>
     HPX_FORCEINLINE
-    Iterator next(Iterator const& it, boost::mpl::true_)
+    Iterator next(Iterator const& it, std::true_type)
     {
         return it + 1;
     }
@@ -67,7 +65,7 @@ namespace hpx { namespace experimental { namespace detail
     HPX_FORCEINLINE
     Iterator next(Iterator const& it)
     {
-        return next(it, is_random_access_iterator<Iterator>());
+        return next(it, hpx::traits::is_random_access_iterator<Iterator>());
     }
 }}}
 
@@ -87,15 +85,6 @@ namespace hpx { namespace experimental
         template <typename IteratorBase, typename IteratorValue>
         struct previous_transformer
         {
-            template <typename T>
-            struct result;
-
-            template <typename This, typename Iterator>
-            struct result<This(Iterator)>
-            {
-                typedef typename std::iterator_traits<Iterator>::reference type;
-            };
-
             previous_transformer() {}
 
             // at position 'begin' it will dereference 'value', otherwise 'it-1'
@@ -129,15 +118,6 @@ namespace hpx { namespace experimental
         template <typename IteratorBase, typename IteratorValue>
         struct next_transformer
         {
-            template <typename T>
-            struct result;
-
-            template <typename This, typename Iterator>
-            struct result<This(Iterator)>
-            {
-                typedef typename std::iterator_traits<Iterator>::reference type;
-            };
-
             next_transformer() {}
 
             // at position 'end' it will dereference 'value', otherwise 'it+1'
@@ -234,7 +214,7 @@ namespace hpx { namespace experimental
         {}
 
     private:
-        friend class boost::iterator_core_access;
+        friend class hpx::util::iterator_core_access;
 
         bool equal(stencil3_iterator_full const& other) const
         {
@@ -329,7 +309,7 @@ namespace hpx { namespace experimental
         {}
 
     private:
-        friend class boost::iterator_core_access;
+        friend class hpx::util::iterator_core_access;
 
         bool equal(stencil3_iterator_v1 const& other) const
         {
@@ -394,11 +374,8 @@ namespace hpx { namespace experimental
     {
         struct stencil_transformer_v2
         {
-            template <typename T>
-            struct result;
-
-            template <typename This, typename Iterator>
-            struct result<This(Iterator)>
+            template <typename Iterator>
+            struct result
             {
                 typedef typename std::iterator_traits<Iterator>::reference
                     element_type;
@@ -409,12 +386,10 @@ namespace hpx { namespace experimental
 
             // it will dereference tuple(it-1, it, it+1)
             template <typename Iterator>
-            typename result<stencil_transformer_v2(Iterator)>::type
+            typename result<Iterator>::type
             operator()(Iterator const& it) const
             {
-                typedef typename result<
-                        stencil_transformer_v2(Iterator)
-                    >::type type;
+                typedef typename result<Iterator>::type type;
                 return type(*detail::previous(it), *it, *detail::next(it));
             }
         };

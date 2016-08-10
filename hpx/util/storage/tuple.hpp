@@ -6,12 +6,13 @@
 #if !defined(HPX_UTIL_STORAGE_TUPLE_HPP_APR_11_2013_1010AM)
 #define HPX_UTIL_STORAGE_TUPLE_HPP_APR_11_2013_1010AM
 
-#include <vector>
-
 #include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/serialization/vector.hpp>
 #include <hpx/util/any.hpp>
 #include <hpx/util/decay.hpp>
+
+#include <type_traits>
+#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace util { namespace storage
@@ -76,10 +77,10 @@ namespace hpx { namespace util { namespace storage
 
             template <typename T>
             tuple& push_back(const T& field,
-                    typename boost::disable_if<boost::is_same<
+                    typename std::enable_if<!std::is_same<
                         elem_type,
                         typename util::decay<T>::type
-                    > >::type* = 0)
+                    >::value>::type* = nullptr)
             {
                 tuple_.push_back(elem_type(field)); // insert an any object
                 return *this;

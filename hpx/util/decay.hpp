@@ -11,9 +11,8 @@
 
 #include <boost/ref.hpp>
 
-#if defined(HPX_HAVE_CXX11_STD_REFERENCE_WRAPPER)
 #include <functional>
-#endif
+#include <type_traits>
 #include <utility>
 
 namespace hpx { namespace util
@@ -22,6 +21,7 @@ namespace hpx { namespace util
     struct decay : std::decay<T>
     {};
 
+    ///////////////////////////////////////////////////////////////////////////
     namespace detail
     {
         template <typename TD>
@@ -36,19 +36,28 @@ namespace hpx { namespace util
             typedef X& type;
         };
 
-#if defined(HPX_HAVE_CXX11_STD_REFERENCE_WRAPPER)
         template <typename X>
         struct decay_unwrap_impl< ::std::reference_wrapper<X> >
         {
             typedef X& type;
         };
-#endif
     }
 
     template <typename T>
     struct decay_unwrap
       : detail::decay_unwrap_impl<typename std::decay<T>::type>
     {};
+
+    ///////////////////////////////////////////////////////////////////////////
+    namespace detail
+    {
+        template <typename T>
+        HPX_FORCEINLINE typename decay<T>::type
+        decay_copy(T&& v)
+        {
+            return std::forward<T>(v);
+        }
+    }
 }}
 
 #endif

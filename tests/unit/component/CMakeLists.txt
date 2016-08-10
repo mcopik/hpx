@@ -1,20 +1,23 @@
-#  Copyright (c) 2014-2015 Hartmut Kaiser
+#  Copyright (c) 2014-2016 Hartmut Kaiser
 #  Copyright (c) 2011 Thomas Heller
 #
 #  Distributed under the Boost Software License, Version 1.0. (See accompanying
 #  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+add_subdirectory(components)
+
 set(tests
-    #action_invoke_no_more_than
+    action_invoke_no_more_than
     copy_component
     distribution_policy_executor
     get_gid
     get_ptr
-    #inheritance_2_classes_abstract
-    #inheritance_2_classes_concrete
-    #inheritance_3_classes_1_abstract
-    #inheritance_3_classes_2_abstract
-    #inheritance_3_classes_concrete
+    inheritance_2_classes_abstract
+    inheritance_2_classes_concrete
+    inheritance_3_classes_1_abstract
+    inheritance_3_classes_2_abstract
+    inheritance_3_classes_concrete
+    launch_process
     migrate_component
     migrate_component_to_storage
     new_
@@ -27,8 +30,16 @@ set(tests
     partitioned_vector_iter
     partitioned_vector_move
     partitioned_vector_transform_reduce
+    partitioned_vector_fill
    )
 
+# add executable needed for launch_process_test
+add_hpx_executable(launched_process_test
+  SOURCES launched_process.cpp
+  EXCLUDE_FROM_ALL
+  HPX_PREFIX ${HPX_BUILD_PREFIX}
+  FOLDER "Tests/Unit/Components"
+  COMPONENT_DEPENDENCIES launch_process_test_server)
 
 set(action_invoke_no_more_than_PARAMETERS
     LOCALITIES 2
@@ -48,9 +59,18 @@ set(get_ptr_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
 
+set(launch_process_FLAGS
+    DEPENDENCIES iostreams_component process_component
+                 launch_process_test_server_component)
+set(launch_process_PARAMETERS
+  --launch=$<TARGET_FILE:launched_process_test_exe>
+)
+
 set(migrate_component_PARAMETERS
     LOCALITIES 2
     THREADS_PER_LOCALITY 2)
+set(migrate_component_FLAGS
+    DEPENDENCIES iostreams_component)
 
 set(inheritance_2_classes_abstract_FLAGS
     DEPENDENCIES iostreams_component)
@@ -115,4 +135,6 @@ foreach(test ${tests})
                               ${test}_test_exe)
 
 endforeach()
+
+add_hpx_pseudo_dependencies(tests.unit.component.launch_process launched_process_test_exe)
 

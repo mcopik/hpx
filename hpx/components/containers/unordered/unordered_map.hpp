@@ -1,4 +1,4 @@
-//  Copyright (c) 2014-2015 Hartmut Kaiser
+//  Copyright (c) 2014-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,20 +8,33 @@
 #if !defined(HPX_UNORDERED_MAP_NOV_11_2014_0852PM)
 #define HPX_UNORDERED_MAP_NOV_11_2014_0852PM
 
-#include <hpx/include/lcos.hpp>
-#include <hpx/include/util.hpp>
-#include <hpx/include/components.hpp>
+#include <hpx/config.hpp>
+#include <hpx/lcos/wait_all.hpp>
+#include <hpx/runtime/components/client_base.hpp>
+#include <hpx/runtime/components/component_type.hpp>
+#include <hpx/runtime/components/copy_component.hpp>
+#include <hpx/runtime/components/new.hpp>
+#include <hpx/runtime/components/server/distributed_metadata_base.hpp>
+#include <hpx/runtime/get_ptr.hpp>
 #include <hpx/runtime/serialization/serialize.hpp>
+#include <hpx/runtime/serialization/unordered_map.hpp>
 #include <hpx/runtime/serialization/vector.hpp>
+#include <hpx/traits/is_distribution_policy.hpp>
+#include <hpx/util/assert.hpp>
+#include <hpx/util/bind.hpp>
 
 #include <hpx/components/containers/container_distribution_policy.hpp>
 #include <hpx/components/containers/unordered/partition_unordered_map_component.hpp>
+#include <hpx/components/containers/unordered/unordered_map_segmented_iterator.hpp>
+
+#include <boost/cstdint.hpp>
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <type_traits>
-
-#include <boost/cstdint.hpp>
+#include <utility>
+#include <vector>
 
 /// The hpx::unordered_map and its API's are defined here.
 ///
@@ -92,10 +105,6 @@ HPX_DISTRIBUTED_METADATA_DECLARATION(hpx::server::unordered_map_config_data,
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx
 {
-    template <typename Key, typename T, typename Hash = std::hash<Key>,
-        typename KeyEqual = std::equal_to<Key> >
-    class unordered_map;
-
     namespace detail
     {
         ///////////////////////////////////////////////////////////////////////
@@ -110,13 +119,13 @@ namespace hpx
 
             operator T() const
             {
-                return um_.get_value_sync(key_);
+                return um_.get_value(launch::sync, key_);
             }
 
             template <typename T_>
             unordered_map_value_proxy& operator=(T_ && value)
             {
-                um_.set_value_sync(key_, std::forward<T_>(value));
+                um_.set_value(launch::sync, key_, std::forward<T_>(value));
                 return *this;
             }
 
@@ -228,7 +237,7 @@ namespace hpx
         typedef T reference;
         typedef T const const_reference;
 
-#if (defined(HPX_GCC_VERSION) && HPX_GCC_VERSION < 40700) || defined(HPX_NATIVE_MIC)
+#if defined(HPX_NATIVE_MIC)
         typedef T* pointer;
         typedef T const* const_pointer;
 #else
@@ -264,7 +273,25 @@ namespace hpx
               : base_type(std::move(base))
             {}
 
-            boost::shared_ptr<partition_unordered_map_server> local_data_;
+            hpx::future<typename partition_unordered_map_server::data_type>
+                get_data() const
+            {
+                typedef
+                    typename partition_unordered_map_server::get_copied_data_action
+                    action_type;
+                return hpx::async<action_type>(this->partition_.get());
+            }
+
+            hpx::future<void>
+            set_data(typename partition_unordered_map_server::data_type && d)
+            {
+                typedef
+                    typename partition_unordered_map_server::set_copied_data_action
+                    action_type;
+                return hpx::async<action_type>(this->partition_.get(), std::move(d));
+            }
+
+            std::shared_ptr<partition_unordered_map_server> local_data_;
         };
 
         // The list of partitions belonging to this unordered_map.
@@ -274,7 +301,7 @@ namespace hpx
         typedef std::vector<partition_data> partitions_vector_type;
 
         // This is the vector representing the base_index and corresponding
-        // global ID's of the underlying partition_vectors.
+        // global ID's of the underlying partitioned_vector_partitions.
         partitions_vector_type partitions_;
 
         ///////////////////////////////////////////////////////////////////////
@@ -321,7 +348,7 @@ namespace hpx
         ///////////////////////////////////////////////////////////////////////
         static void get_ptr_helper(std::size_t loc,
             partitions_vector_type& partitions,
-            future<boost::shared_ptr<partition_unordered_map_server> > && f)
+            future<std::shared_ptr<partition_unordered_map_server> > && f)
         {
             partitions[loc].local_data_ = f.get();
         }
@@ -476,7 +503,7 @@ namespace hpx
         unordered_map(DistPolicy const& policy,
             typename std::enable_if<
                     traits::is_distribution_policy<DistPolicy>::value
-                >::type* = 0)
+                >::type* = nullptr)
         {
             create(policy);
         }
@@ -492,7 +519,7 @@ namespace hpx
         unordered_map(std::size_t bucket_count, DistPolicy const& policy,
             typename std::enable_if<
                     traits::is_distribution_policy<DistPolicy>::value
-                >::type* = 0)
+                >::type* = nullptr)
         {
             create(policy, bucket_count, Hash(), KeyEqual());
         }
@@ -502,7 +529,7 @@ namespace hpx
                 Hash const& hash, DistPolicy const& policy,
                 typename std::enable_if<
                     traits::is_distribution_policy<DistPolicy>::value
-                >::type* = 0)
+                >::type* = nullptr)
           : hash_base_type(hash, KeyEqual())
         {
             create(policy, bucket_count, hash, KeyEqual());
@@ -514,7 +541,7 @@ namespace hpx
                 DistPolicy const& policy,
                 typename std::enable_if<
                     traits::is_distribution_policy<DistPolicy>::value
-                >::type* = 0)
+                >::type* = nullptr)
           : hash_base_type(hash, equal)
         {
             create(policy, bucket_count, hash, equal);
@@ -550,6 +577,16 @@ namespace hpx
             return *this;
         }
 
+        // the type every partition stores its data in
+        typedef
+            typename partition_unordered_map_server::data_type
+            partition_data_type;
+
+        std::size_t get_num_partitions() const
+        {
+            return partitions_.size();
+        }
+
         /// \brief Array subscript operator. This does not throw any exception.
         ///
         /// \param pos Position of the element in the unordered_map
@@ -569,7 +606,7 @@ namespace hpx
         }
         T operator[](Key const& pos) const
         {
-            return get_value_sync(pos);
+            return get_value(launch::sync, pos);
         }
 
         /// Returns the element at position \a pos in the unordered_map container.
@@ -579,10 +616,17 @@ namespace hpx
         /// \return Returns the value of the element at position represented by
         ///         \a pos.
         ///
+        T get_value(launch::sync_policy, Key const& pos, bool erase = false) const
+        {
+            return get_value(launch::sync, get_partition(pos), pos, erase);
+        }
+#if defined(HPX_HAVE_ASYNC_FUNCTION_COMPATIBILITY)
+        HPX_DEPRECATED(HPX_DEPRECATED_MSG)
         T get_value_sync(Key const& pos, bool erase = false) const
         {
-            return get_value_sync(get_partition(pos), pos, erase);
+            return get_value(launch::sync, get_partition(pos), pos, erase);
         }
+#endif
 
         /// Returns the element at position \a pos in the unordered_map container.
         ///
@@ -592,7 +636,8 @@ namespace hpx
         /// \return Returns the value of the element at position represented by
         ///         \a pos.
         ///
-        T get_value_sync(size_type part, Key const& pos, bool erase = false) const
+        T get_value(launch::sync_policy, size_type part, Key const& pos,
+            bool erase = false) const
         {
             HPX_ASSERT(part < partitions_.size());
 
@@ -601,8 +646,15 @@ namespace hpx
                 return part_data.local_data_->get_value(pos, erase);
 
             return partition_unordered_map_client(part_data.partition_)
-                .get_value_sync(pos, erase);
+                .get_value(launch::sync, pos, erase);
         }
+#if defined(HPX_HAVE_ASYNC_FUNCTION_COMPATIBILITY)
+        HPX_DEPRECATED(HPX_DEPRECATED_MSG)
+        T get_value_sync(size_type part, Key const& pos, bool erase = false) const
+        {
+            return get_value(launch::sync, part, pos, erase);
+        }
+#endif
 
         /// Returns the element at position \a pos in the unordered_map container
         /// asynchronously.
@@ -648,11 +700,20 @@ namespace hpx
         /// \param val   The value to be copied
         ///
         template <typename T_>
-        void set_value_sync(Key const& pos, T_ && val)
+        void set_value(launch::sync_policy, Key const& pos, T_ && val)
         {
-            return set_value_sync(get_partition(pos), pos,
+            return set_value(launch::sync, get_partition(pos), pos,
                 std::forward<T_>(val));
         }
+#if defined(HPX_HAVE_ASYNC_FUNCTION_COMPATIBILITY)
+        template <typename T_>
+        HPX_DEPRECATED(HPX_DEPRECATED_MSG)
+        void set_value_sync(Key const& pos, T_ && val)
+        {
+            return set_value(launch::sync, get_partition(pos), pos,
+                std::forward<T_>(val));
+        }
+#endif
 
         /// Copy the value of \a val in the element at position \a pos in
         /// the unordered_map container.
@@ -662,7 +723,8 @@ namespace hpx
         /// \param val   The value to be copied
         ///
         template <typename T_>
-        void set_value_sync(size_type part, Key const& pos, T_ && val)
+        void set_value(launch::sync_policy, size_type part, Key const& pos,
+            T_ && val)
         {
             HPX_ASSERT(part < partitions_.size());
 
@@ -674,9 +736,17 @@ namespace hpx
             else
             {
                 partition_unordered_map_client(part_data.partition_)
-                    .set_value_sync(pos, std::forward<T_>(val));
+                    .set_value(launch::sync, pos, std::forward<T_>(val));
             }
         }
+#if defined(HPX_HAVE_ASYNC_FUNCTION_COMPATIBILITY)
+        template <typename T_>
+        HPX_DEPRECATED(HPX_DEPRECATED_MSG)
+        void set_value_sync(size_type part, Key const& pos, T_ && val)
+        {
+            set_value(launch::sync, part, pos, std::forward<T_>(val));
+        }
+#endif
 
         /// Asynchronous set the element at position \a pos of the partition
         /// \a part to the given value \a val.
@@ -750,12 +820,19 @@ namespace hpx
         ///
         /// \return Returns the number of elements erased
         ///
-        std::size_t erase_sync(Key const& key)
+        std::size_t erase(launch::sync_policy, Key const& key)
         {
             return erase(key).get();
         }
+#if defined(HPX_HAVE_ASYNC_FUNCTION_COMPATIBILITY)
+        HPX_DEPRECATED(HPX_DEPRECATED_MSG)
+        std::size_t erase_sync(Key const& key)
+        {
+            return erase(launch::sync, key);
+        }
+#endif
 
-        std::size_t erase_sync(size_type part, Key const& key)
+        std::size_t erase(launch::sync_policy, size_type part, Key const& key)
         {
             HPX_ASSERT(part < partitions_.size());
 
@@ -764,8 +841,16 @@ namespace hpx
                 return part_data.local_data_->erase(key);
 
             return partition_unordered_map_client(
-                part_data.partition_).erase_sync(key);
+                part_data.partition_).erase(launch::sync, key);
         }
+#if defined(HPX_HAVE_ASYNC_FUNCTION_COMPATIBILITY)
+        HPX_DEPRECATED(HPX_DEPRECATED_MSG)
+        std::size_t erase_sync(size_type part, Key const& key)
+        {
+            return erase(launch::sync, part, key);
+        }
+#endif
+
         /// Erase all values with the given key from the partition_unordered_map
         /// container.
         ///
@@ -789,6 +874,47 @@ namespace hpx
 
             return partition_unordered_map_client(
                 part_data.partition_).erase(key);
+        }
+
+        ///////////////////////////////////////////////////////////////////////
+        typedef segment_unordered_map_iterator<
+                Key, T, Hash, KeyEqual,
+                typename partitions_vector_type::iterator
+            > segment_iterator;
+        typedef const_segment_unordered_map_iterator<
+                Key, T, Hash, KeyEqual,
+                typename partitions_vector_type::const_iterator
+            > const_segment_iterator;
+
+        // Return global segment iterator
+        segment_iterator segment_begin()
+        {
+            return segment_iterator(partitions_.begin(), this);
+        }
+
+        const_segment_iterator segment_begin() const
+        {
+            return const_segment_iterator(partitions_.cbegin(), this);
+        }
+
+        const_segment_iterator segment_cbegin() const //-V524
+        {
+            return const_segment_iterator(partitions_.cbegin(), this);
+        }
+
+        segment_iterator segment_end()
+        {
+            return segment_iterator(partitions_.end(), this);
+        }
+
+        const_segment_iterator segment_end() const
+        {
+            return const_segment_iterator(partitions_.cend(), this);
+        }
+
+        const_segment_iterator segment_cend() const //-V524
+        {
+            return const_segment_iterator(partitions_.cend(), this);
         }
     };
 }

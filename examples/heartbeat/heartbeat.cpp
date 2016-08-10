@@ -15,10 +15,12 @@
 #include <hpx/lcos/future.hpp>
 #include <hpx/state.hpp>
 
-#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/format.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/format.hpp>
+
+#include <memory>
+#include <string>
+#include <vector>
 
 // include Windows specific performance counter binding
 #if defined(HPX_WINDOWS) && HPX_USE_WINDOWS_PERFORMANCE_COUNTERS != 0
@@ -26,7 +28,7 @@
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
-void stop_monitor(boost::shared_ptr<hpx::promise<void> > p)
+void stop_monitor(std::shared_ptr<hpx::promise<void> > p)
 {
     p->set_value();      // Kill the monitor.
 }
@@ -57,8 +59,8 @@ int monitor(double runfor, std::string const& name, boost::uint64_t pause)
         return 1;
     }
 
-    boost::shared_ptr<hpx::promise<void> > stop_flag =
-        boost::make_shared<hpx::promise<void> >();
+    std::shared_ptr<hpx::promise<void> > stop_flag =
+        std::make_shared<hpx::promise<void> >();
     hpx::future<void> f = stop_flag->get_future();
 
     hpx::register_shutdown_function(
@@ -75,7 +77,8 @@ int monitor(double runfor, std::string const& name, boost::uint64_t pause)
 
         // Query the performance counter.
         using namespace hpx::performance_counters;
-        counter_value value = stubs::performance_counter::get_value(id);
+        counter_value value =
+            stubs::performance_counter::get_value(hpx::launch::sync, id);
 
         if (status_is_valid(value.status_))
         {
@@ -138,8 +141,9 @@ int main(int argc, char* argv[])
 
     // Initialize and run HPX, enforce connect mode as we connect to an existing
     // application.
-    std::vector<std::string> cfg;
-    cfg.push_back("hpx.run_hpx_main!=1");
+    std::vector<std::string> const cfg = {
+        "hpx.run_hpx_main!=1"
+    };
 
     hpx::util::function_nonser<void()> const empty;
     return hpx::init(desc_commandline, argc, argv, cfg, empty,

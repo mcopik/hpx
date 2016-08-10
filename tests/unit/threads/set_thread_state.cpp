@@ -10,14 +10,18 @@
 #include <hpx/include/async.hpp>
 #include <hpx/runtime/applier/applier.hpp>
 #include <hpx/runtime/threads/thread_helpers.hpp>
+#include <hpx/util/bind.hpp>
 
 #include <boost/dynamic_bitset.hpp>
+
+#include <chrono>
+#include <vector>
 
 using boost::program_options::variables_map;
 using boost::program_options::options_description;
 using boost::program_options::value;
 
-using boost::chrono::milliseconds;
+using std::chrono::milliseconds;
 
 using hpx::naming::id_type;
 
@@ -198,7 +202,7 @@ int hpx_main(variables_map& vm)
         id_type const prefix = find_here();
 
         thread_id_type thread = register_thread_nullary
-            (boost::bind(&test_dummy_thread, futures));
+            (hpx::util::bind(&test_dummy_thread, futures));
 
         tree_boot(futures, grain_size, prefix,
             reinterpret_cast<boost::uint64_t>(thread.get()));

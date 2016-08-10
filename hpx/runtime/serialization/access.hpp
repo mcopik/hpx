@@ -8,22 +8,19 @@
 #define HPX_SERIALIZATION_ACCESS_HPP
 
 #include <hpx/runtime/serialization/serialization_fwd.hpp>
+#include <hpx/traits/has_member_xxx.hpp>
 #include <hpx/traits/polymorphic_traits.hpp>
-#include <hpx/traits/has_serialize.hpp>
 #include <hpx/util/decay.hpp>
 
-#include <boost/type_traits/is_empty.hpp>
-#include <boost/mpl/eval_if.hpp>
-#include <boost/mpl/and.hpp>
-#include <boost/mpl/not.hpp>
-#include <boost/mpl/identity.hpp>
-
 #include <string>
+#include <type_traits>
 
 namespace hpx { namespace serialization
 {
     namespace detail
     {
+        HPX_HAS_MEMBER_XXX_TRAIT_DEF(serialize);
+
         template <class T> HPX_FORCEINLINE
         void serialize_force_adl(output_archive& ar, const T& t, unsigned)
         {
@@ -94,18 +91,18 @@ namespace hpx { namespace serialization
             };
 
         public:
-            typedef typename boost::mpl::eval_if<
-                hpx::traits::is_intrusive_polymorphic<T>,
-                    boost::mpl::identity<intrusive_polymorphic>,
-                        boost::mpl::eval_if<
-                            hpx::traits::has_serialize<T>,
-                                boost::mpl::identity<intrusive_usual>,
-                                boost::mpl::eval_if<
-                                    boost::is_empty<T>,
-                                        boost::mpl::identity<empty>,
-                                        boost::mpl::identity<non_intrusive>
-                                >
-                        >
+            typedef typename std::conditional<
+                hpx::traits::is_intrusive_polymorphic<T>::value,
+                intrusive_polymorphic,
+                typename std::conditional<
+                    detail::has_serialize<T>::value,
+                    intrusive_usual,
+                    typename std::conditional<
+                        std::is_empty<T>::value,
+                        empty,
+                        non_intrusive
+                    >::type
+                >::type
             >::type type;
         };
 

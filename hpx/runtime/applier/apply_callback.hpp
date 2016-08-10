@@ -6,12 +6,22 @@
 #if !defined(HPX_APPLIER_APPLY_CALLBACK_DEC_16_2012_1228PM)
 #define HPX_APPLIER_APPLY_CALLBACK_DEC_16_2012_1228PM
 
-#include <hpx/hpx_fwd.hpp>
-#include <hpx/exception.hpp>
+#include <hpx/config.hpp>
+#include <hpx/throw_exception.hpp>
+#include <hpx/traits/action_is_target_valid.hpp>
+#include <hpx/traits/action_priority.hpp>
+#include <hpx/traits/extract_action.hpp>
+#include <hpx/traits/is_continuation.hpp>
+#include <hpx/traits/is_distribution_policy.hpp>
 #include <hpx/util/detail/pack.hpp>
 #include <hpx/util/tuple.hpp>
 
 #include <hpx/runtime/applier/apply.hpp>
+
+#include <boost/format.hpp>
+
+#include <type_traits>
+#include <utility>
 
 namespace hpx
 {
@@ -72,7 +82,7 @@ namespace hpx
 
     template <typename Action, typename DistPolicy, typename Callback,
         typename ...Ts>
-    inline typename boost::enable_if_c<
+    inline typename std::enable_if<
         traits::is_distribution_policy<DistPolicy>::value, bool
     >::type
     apply_p_cb(DistPolicy const& policy, threads::thread_priority priority,
@@ -84,7 +94,7 @@ namespace hpx
 
     template <typename Action, typename DistPolicy, typename Callback,
         typename ...Ts>
-    inline typename boost::enable_if_c<
+    inline typename std::enable_if<
         traits::is_distribution_policy<DistPolicy>::value, bool
     >::type
     apply_cb(DistPolicy const& policy, Callback && cb, Ts&&... vs)
@@ -95,7 +105,7 @@ namespace hpx
 
     template <typename Component, typename Signature, typename Derived,
         typename DistPolicy, typename Callback, typename ...Ts>
-    inline typename boost::enable_if_c<
+    inline typename std::enable_if<
         traits::is_distribution_policy<DistPolicy>::value, bool
     >::type
     apply_cb(
@@ -205,7 +215,7 @@ namespace hpx
     template <typename Action, typename Continuation, typename DistPolicy,
         typename Callback,
         typename ...Ts>
-    inline typename boost::enable_if_c<
+    inline typename std::enable_if<
         traits::is_continuation<Continuation>::value &&
         traits::is_distribution_policy<DistPolicy>::value, bool
     >::type
@@ -219,7 +229,7 @@ namespace hpx
     template <typename Action, typename Continuation, typename DistPolicy,
         typename Callback,
         typename ...Ts>
-    inline typename boost::enable_if_c<
+    inline typename std::enable_if<
         traits::is_continuation<Continuation>::value &&
         traits::is_distribution_policy<DistPolicy>::value, bool
     >::type
@@ -234,7 +244,7 @@ namespace hpx
     template <typename Component, typename Continuation, typename Signature,
         typename Derived,
         typename DistPolicy, typename Callback, typename ...Ts>
-    inline typename boost::enable_if_c<
+    inline typename std::enable_if<
         traits::is_distribution_policy<DistPolicy>::value, bool
     >::type
     apply_cb(Continuation && c,
@@ -256,11 +266,15 @@ namespace hpx
             Callback && cb, Ts&&... vs)
         {
             typedef
-                typename hpx::actions::extract_action<Action>::result_type
-                result_type;
+                typename hpx::traits::extract_action<Action>::remote_result_type
+                remote_result_type;
+            typedef
+                typename hpx::traits::extract_action<Action>::local_result_type
+                local_result_type;
 
             return apply_r_p_cb<Action>(std::move(addr),
-                actions::typed_continuation<result_type>(contgid),
+                actions::typed_continuation<
+                    local_result_type, remote_result_type>(contgid),
                 gid, priority, std::forward<Callback>(cb),
                 std::forward<Ts>(vs)...);
         }
@@ -271,11 +285,15 @@ namespace hpx
             naming::id_type const& gid, Callback && cb, Ts&&... vs)
         {
             typedef
-                typename hpx::actions::extract_action<Action>::result_type
-                result_type;
+                typename hpx::traits::extract_action<Action>::remote_result_type
+                remote_result_type;
+            typedef
+                typename hpx::traits::extract_action<Action>::local_result_type
+                local_result_type;
 
             return apply_r_p_cb<Action>(std::move(addr),
-                actions::typed_continuation<result_type>(contgid),
+                actions::typed_continuation<
+                    local_result_type, remote_result_type>(contgid),
                 gid, actions::action_priority<Action>(),
                 std::forward<Callback>(cb),
                 std::forward<Ts>(vs)...);
@@ -289,11 +307,14 @@ namespace hpx
         threads::thread_priority priority, Callback && cb, Ts&&... vs)
     {
         typedef
-            typename hpx::actions::extract_action<Action>::result_type
-            result_type;
+            typename hpx::traits::extract_action<Action>::remote_result_type
+            remote_result_type;
+        typedef
+            typename hpx::traits::extract_action<Action>::local_result_type
+            local_result_type;
 
         return apply_p_cb<Action>(
-            actions::typed_continuation<result_type>(contgid),
+            actions::typed_continuation<local_result_type, remote_result_type>(contgid),
             gid, priority, std::forward<Callback>(cb),
             std::forward<Ts>(vs)...);
     }
@@ -304,11 +325,14 @@ namespace hpx
         Callback && cb, Ts&&... vs)
     {
         typedef
-            typename hpx::actions::extract_action<Action>::result_type
-            result_type;
+            typename hpx::traits::extract_action<Action>::remote_result_type
+            remote_result_type;
+        typedef
+            typename hpx::traits::extract_action<Action>::local_result_type
+            local_result_type;
 
         return apply_p_cb<Action>(
-            actions::typed_continuation<result_type>(contgid),
+            actions::typed_continuation<local_result_type, remote_result_type>(contgid),
             gid, actions::action_priority<Action>(),
             std::forward<Callback>(cb), std::forward<Ts>(vs)...);
     }
@@ -320,11 +344,14 @@ namespace hpx
         Callback && cb, Ts&&... vs)
     {
         typedef
-            typename hpx::actions::extract_action<Action>::result_type
-            result_type;
+            typename hpx::traits::extract_action<Action>::remote_result_type
+            remote_result_type;
+        typedef
+            typename hpx::traits::extract_action<Action>::local_result_type
+            local_result_type;
 
         return apply_p_cb<Action>(
-            actions::typed_continuation<result_type>(contgid),
+            actions::typed_continuation<local_result_type, remote_result_type>(contgid),
             std::move(addr), gid, priority, std::forward<Callback>(cb),
             std::forward<Ts>(vs)...);
     }
@@ -335,11 +362,14 @@ namespace hpx
         naming::id_type const& gid, Callback && cb, Ts&&... vs)
     {
         typedef
-            typename hpx::actions::extract_action<Action>::result_type
-            result_type;
+            typename hpx::traits::extract_action<Action>::remote_result_type
+            remote_result_type;
+        typedef
+            typename hpx::traits::extract_action<Action>::local_result_type
+            local_result_type;
 
         return apply_p_cb<Action>(
-            actions::typed_continuation<result_type>(contgid),
+            actions::typed_continuation<local_result_type, remote_result_type>(contgid),
             std::move(addr), gid, actions::action_priority<Action>(),
             std::forward<Callback>(cb), std::forward<Ts>(vs)...);
     }
@@ -350,7 +380,7 @@ namespace hpx
         struct apply_c_p_cb_impl
         {
         private:
-            HPX_MOVABLE_BUT_NOT_COPYABLE(apply_c_p_cb_impl)
+            HPX_MOVABLE_ONLY(apply_c_p_cb_impl);
 
         public:
             typedef util::tuple<Ts...> tuple_type;

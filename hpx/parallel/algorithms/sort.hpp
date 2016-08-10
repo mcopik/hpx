@@ -9,25 +9,31 @@
 #define HPX_PARALLEL_ALGORITHM_SORT_OCT_2015
 
 #include <hpx/config.hpp>
-#include <hpx/traits/concepts.hpp>
-#include <hpx/util/invoke.hpp>
-#include <hpx/util/move.hpp>
-#include <hpx/util/bind.hpp>
 #include <hpx/dataflow.hpp>
+#include <hpx/traits/concepts.hpp>
+#include <hpx/traits/is_iterator.hpp>
+#include <hpx/util/assert.hpp>
+#include <hpx/util/decay.hpp>
+#include <hpx/util/invoke.hpp>
 
-#include <hpx/parallel/executors/executor_traits.hpp>
-#include <hpx/parallel/execution_policy.hpp>
+#include <hpx/parallel/algorithms/detail/dispatch.hpp>
 #include <hpx/parallel/config/inline_namespace.hpp>
 #include <hpx/parallel/execution_policy.hpp>
-#include <hpx/parallel/algorithms/detail/dispatch.hpp>
+#include <hpx/parallel/execution_policy.hpp>
+#include <hpx/parallel/executors/executor_traits.hpp>
+#include <hpx/parallel/traits/projected.hpp>
+#include <hpx/parallel/util/compare_projected.hpp>
 #include <hpx/parallel/util/detail/algorithm_result.hpp>
 #include <hpx/parallel/util/detail/handle_local_exceptions.hpp>
 #include <hpx/parallel/util/projection_identity.hpp>
-#include <hpx/parallel/traits/projected.hpp>
+
+#include <boost/exception_ptr.hpp>
 
 #include <algorithm>
 #include <iterator>
+#include <list>
 #include <type_traits>
+#include <utility>
 
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 {
@@ -37,28 +43,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     {
         /// \cond NOINTERNAL
         static const std::size_t sort_limit_per_task = 65536ul;
-
-        ///////////////////////////////////////////////////////////////////////
-        template <typename Compare, typename Proj>
-        struct compare_projected
-        {
-            template <typename Compare_, typename Proj_>
-            compare_projected(Compare_ && comp, Proj_ && proj)
-              : comp_(std::forward<Compare>(comp)),
-                proj_(std::forward<Proj>(proj))
-            {}
-
-            template <typename T>
-            inline bool operator()(T const& t1, T const& t2)
-            {
-                return hpx::util::invoke(comp_,
-                    hpx::util::invoke(proj_, t1),
-                    hpx::util::invoke(proj_, t2));
-            }
-
-            Compare comp_;
-            Proj proj_;
-        };
 
         ///////////////////////////////////////////////////////////////////////
         template <typename ExPolicy, typename R>
@@ -133,10 +117,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         /// \remarks
         //------------------------------------------------------------------------
         template <typename ExPolicy, typename RandomIt, typename Compare>
-        hpx::future<RandomIt> sort_thread(ExPolicy policy,
+        hpx::future<RandomIt> sort_thread(ExPolicy& policy,
             RandomIt first, RandomIt last, Compare comp)
         {
-            typedef typename ExPolicy::executor_type executor_type;
+            typedef typename hpx::util::decay<ExPolicy>::type::executor_type
+                executor_type;
             typedef typename hpx::parallel::executor_traits<executor_type>
                 executor_traits;
 
@@ -169,14 +154,16 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             RandomIt it_c = last - 1;
 
             if (comp(*it_b, *it_a))
-                std::swap(*it_a, *it_b);
+                std::iter_swap(it_a, it_b);
+
             if (comp(*it_c, *it_b))
             {
-                std::swap(*it_c, *it_b);
+                std::iter_swap(it_c, it_b);
                 if (comp(*it_b, *it_a))
-                    std::swap(*it_a, *it_b);
+                    std::iter_swap(it_a, it_b);
             }
-            std::swap(*first, *it_b);
+
+            std::iter_swap(first, it_b);
 
             typedef
                 typename std::iterator_traits<RandomIt>::reference
@@ -191,30 +178,27 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 --c_last;
             while (!(c_first > c_last))
             {
-                std::swap(*(c_first++), *(c_last--));
+                std::iter_swap(c_first++, c_last--);
                 while (comp(*c_first, val))
                     ++c_first;
                 while (comp(val, *c_last))
                     --c_last;
             } // End while
-            std::swap(*first, *c_last);
+
+            std::iter_swap(first, c_last);
 
             // spawn tasks for each sub section
             hpx::future<RandomIt> left =
                 executor_traits::async_execute(
                     policy.executor(),
-                    hpx::util::bind(
                         &sort_thread<ExPolicy, RandomIt, Compare>,
-                        policy, first, c_last, comp
-                    ));
+                        std::ref(policy), first, c_last, comp);
 
             hpx::future<RandomIt> right =
                 executor_traits::async_execute(
                     policy.executor(),
-                    hpx::util::bind(
                         &sort_thread<ExPolicy, RandomIt, Compare>,
-                        policy, c_first, last, comp
-                    ));
+                        std::ref(policy), c_first, last, comp);
 
             return hpx::dataflow(
                 [last](hpx::future<RandomIt> && left,
@@ -247,7 +231,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         /// @remarks
         template <typename ExPolicy, typename RandomIt, typename Compare>
         hpx::future<RandomIt>
-        parallel_sort_async(ExPolicy policy, RandomIt first, RandomIt last,
+        parallel_sort_async(ExPolicy && policy, RandomIt first, RandomIt last,
             Compare comp)
         {
             hpx::future<RandomIt> result;
@@ -265,16 +249,15 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 if (detail::is_sorted_sequential(first, last, comp))
                     return hpx::make_ready_future(last);
 
-                typedef typename ExPolicy::executor_type executor_type;
+                typedef typename hpx::util::decay<ExPolicy>::type::executor_type
+                    executor_type;
                 typedef typename hpx::parallel::executor_traits<executor_type>
                     executor_traits;
 
                 result = executor_traits::async_execute(
                     policy.executor(),
-                    hpx::util::bind(
                         &sort_thread<ExPolicy, RandomIt, Compare>,
-                        policy, first, last, comp
-                    ));
+                        std::ref(policy), first, last, comp);
             }
             catch (...) {
                 return detail::handle_sort_exception<ExPolicy, RandomIt>::call(
@@ -305,7 +288,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 Compare && comp, Proj && proj)
             {
                 std::sort(first, last,
-                    compare_projected<Compare, Proj>(
+                    util::compare_projected<Compare, Proj>(
                             std::forward<Compare>(comp),
                             std::forward<Proj>(proj)
                         ));
@@ -316,14 +299,15 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             static typename util::detail::algorithm_result<
                 ExPolicy, RandomIt
             >::type
-            parallel(ExPolicy policy, RandomIt first, RandomIt last,
+            parallel(ExPolicy && policy, RandomIt first, RandomIt last,
                 Compare && comp, Proj && proj)
             {
                 // call the sort routine and return the right type,
                 // depending on execution policy
                 return util::detail::algorithm_result<ExPolicy, RandomIt>::get(
-                    parallel_sort_async(policy, first, last,
-                        compare_projected<Compare, Proj>(
+                    parallel_sort_async(std::forward<ExPolicy>(policy),
+                        first, last,
+                        util::compare_projected<Compare, Proj>(
                             std::forward<Compare>(comp),
                             std::forward<Proj>(proj)
                         )));
@@ -391,12 +375,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     /// threads, and indeterminately sequenced within each thread.
     ///
     /// \returns  The \a sort algorithm returns a
-    ///           \a hpx::future<Iter> if the execution policy is of
+    ///           \a hpx::future<RandomIt> if the execution policy is of
     ///           type
     ///           \a sequential_task_execution_policy or
-    ///           \a parallel_task_execution_policy and returns \a Iter
+    ///           \a parallel_task_execution_policy and returns \a RandomIt
     ///           otherwise.
-    ///           It returns \a last.
+    ///           The algorithm returns an iterator pointing to the first
+    ///           element after the last element in the input sequence.
     //-----------------------------------------------------------------------------
     template <typename ExPolicy, typename RandomIt,
         typename Proj = util::projection_identity,
@@ -407,7 +392,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         >,
     HPX_CONCEPT_REQUIRES_(
         is_execution_policy<ExPolicy>::value &&
-        traits::detail::is_iterator<RandomIt>::value &&
+        hpx::traits::is_iterator<RandomIt>::value &&
         traits::is_projected<Proj, RandomIt>::value &&
         traits::is_indirect_callable<
             Compare,
@@ -418,13 +403,8 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     sort(ExPolicy && policy, RandomIt first, RandomIt last,
         Compare && comp = Compare(), Proj && proj = Proj())
     {
-        typedef typename std::iterator_traits<RandomIt>::iterator_category
-            iterator_category;
-
         static_assert(
-            (boost::is_base_of<
-                std::random_access_iterator_tag, iterator_category
-            >::value),
+            (hpx::traits::is_random_access_iterator<RandomIt>::value),
             "Requires a random access iterator.");
 
         typedef is_sequential_execution_policy<ExPolicy> is_seq;

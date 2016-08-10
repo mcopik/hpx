@@ -11,9 +11,7 @@
 // macros to facilitate handling of compiler-specific issues
 #  define HPX_GCC_VERSION (__GNUC__*10000 + __GNUC_MINOR__*100 + __GNUC_PATCHLEVEL__)
 
-#  if HPX_GCC_VERSION >= 40600
-#    define HPX_GCC_DIAGNOSTIC_PRAGMA_CONTEXTS 1
-#  endif
+#  define HPX_GCC_DIAGNOSTIC_PRAGMA_CONTEXTS 1
 
 #  undef HPX_CLANG_VERSION
 #  undef HPX_INTEL_VERSION
@@ -41,6 +39,14 @@
 # define HPX_INTEL_VERSION __INTEL_COMPILER
 # if defined(_WIN32) || (_WIN64)
 #  define HPX_INTEL_WIN HPX_INTEL_VERSION
+// suppress a couple of benign warnings
+   // template parameter "..." is not used in declaring the parameter types of
+   // function template "..."
+#  pragma warning disable 488
+   // invalid redeclaration of nested class
+#  pragma warning disable 1170
+   // decorated name length exceeded, name was truncated
+#  pragma warning disable 2586
 # endif
 #else
 
@@ -56,10 +62,26 @@
 #if defined(_MSC_VER)
 #   define HPX_MSVC _MSC_VER
 #   define HPX_WINDOWS
+#   if defined(__NVCC__)
+#       define HPX_SINGLE_INHERITANCE __single_inheritance
+#   endif
 #endif
 
 #if defined(__MINGW32__)
 #   define HPX_WINDOWS
+#endif
+
+#if defined(__CUDACC__)
+#define HPX_DEVICE __device__
+#define HPX_HOST __host__
+#else
+#define HPX_DEVICE
+#define HPX_HOST
+#endif
+#define HPX_HOST_DEVICE HPX_HOST HPX_DEVICE
+
+#if !defined(HPX_SINGLE_INHERITANCE)
+#define HPX_SINGLE_INHERITANCE /* empty */
 #endif
 
 #endif

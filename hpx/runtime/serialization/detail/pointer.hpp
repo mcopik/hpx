@@ -7,21 +7,40 @@
 #ifndef HPX_SERIALIZATION_DETAIL_POINTER_HPP
 #define HPX_SERIALIZATION_DETAIL_POINTER_HPP
 
-#include <hpx/runtime/serialization/serialization_fwd.hpp>
 #include <hpx/runtime/serialization/access.hpp>
 #include <hpx/runtime/serialization/basic_archive.hpp>
-#include <hpx/runtime/serialization/detail/polymorphic_intrusive_factory.hpp>
 #include <hpx/runtime/serialization/detail/polymorphic_id_factory.hpp>
+#include <hpx/runtime/serialization/detail/polymorphic_intrusive_factory.hpp>
 #include <hpx/runtime/serialization/detail/polymorphic_nonintrusive_factory.hpp>
+#include <hpx/runtime/serialization/serialization_fwd.hpp>
 #include <hpx/runtime/serialization/string.hpp>
 #include <hpx/traits/polymorphic_traits.hpp>
+#include <hpx/util/identity.hpp>
+#include <hpx/util/lazy_conditional.hpp>
 
-#include <boost/shared_ptr.hpp>
 #include <boost/intrusive_ptr.hpp>
-#include <boost/mpl/eval_if.hpp>
+
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 namespace hpx { namespace serialization
 {
+    namespace detail
+    {
+        struct ptr_helper;
+
+        typedef std::unique_ptr<ptr_helper> ptr_helper_ptr;
+    }
+
+    HPX_FORCEINLINE
+        void register_pointer(input_archive & ar, boost::uint64_t pos,
+            detail::ptr_helper_ptr helper);
+
+    template <typename Helper>
+    Helper & tracked_pointer(input_archive & ar, boost::uint64_t pos);
+
     namespace detail
     {
         template <class Pointer>
@@ -61,12 +80,24 @@ namespace hpx { namespace serialization
             {
                 static Pointer call(input_archive& ar)
                 {
+#if !defined(HPX_DEBUG)
                     boost::uint32_t id;
                     ar >> id;
 
                     Pointer t(polymorphic_id_factory::create<referred_type>(id));
                     ar >> *t;
                     return t;
+#else
+                    boost::uint32_t id;
+                    std::string name;
+                    ar >> name;
+                    ar >> id;
+
+                    Pointer t(
+                        polymorphic_id_factory::create<referred_type>(id, &name));
+                    ar >> *t;
+                    return t;
+#endif
                 }
             };
 
@@ -89,19 +120,19 @@ namespace hpx { namespace serialization
             };
 
         public:
-            typedef typename boost::mpl::eval_if<
-                hpx::traits::is_serialized_with_id<referred_type>,
-                    boost::mpl::identity<polymorphic_with_id>,
-                    boost::mpl::eval_if<
-                        hpx::traits::is_intrusive_polymorphic<referred_type>,
-                            boost::mpl::identity<intrusive_polymorphic>,
-                            boost::mpl::eval_if<
-                                hpx::traits::is_nonintrusive_polymorphic<referred_type>,
-                                    boost::mpl::identity<nonintrusive_polymorphic>,
-                                    boost::mpl::identity<usual>
-                        >
-                    >
-                >::type type;
+            typedef typename util::lazy_conditional<
+                hpx::traits::is_serialized_with_id<referred_type>::value,
+                hpx::util::identity<polymorphic_with_id>,
+                std::conditional<
+                    hpx::traits::is_intrusive_polymorphic<referred_type>::value,
+                    intrusive_polymorphic,
+                    typename std::conditional<
+                        hpx::traits::is_nonintrusive_polymorphic<referred_type>::value,
+                        nonintrusive_polymorphic,
+                        usual
+                    >::type
+                >
+            >::type type;
         };
 
         template <class Pointer>
@@ -123,11 +154,20 @@ namespace hpx { namespace serialization
             {
                 static void call(output_archive& ar, const Pointer& ptr)
                 {
+#if !defined(HPX_DEBUG)
                     const boost::uint32_t id =
                         polymorphic_id_factory::get_id(
                             access::get_name(ptr.get()));
                     ar << id;
                     ar << *ptr;
+#else
+                    std::string const name(access::get_name(ptr.get()));
+                    const boost::uint32_t id =
+                        polymorphic_id_factory::get_id(name);
+                    ar << name;
+                    ar << id;
+                    ar << *ptr;
+#endif
                 }
             };
 
@@ -140,15 +180,15 @@ namespace hpx { namespace serialization
             };
 
         public:
-            typedef typename boost::mpl::if_<
-                hpx::traits::is_serialized_with_id<referred_type>,
-                    polymorphic_with_id,
-                    typename boost::mpl::if_<
-                        hpx::traits::is_intrusive_polymorphic<referred_type>,
-                            intrusive_polymorphic,
-                            usual
-                    >::type
-                >::type type;
+            typedef typename std::conditional<
+                hpx::traits::is_serialized_with_id<referred_type>::value,
+                polymorphic_with_id,
+                typename std::conditional<
+                    hpx::traits::is_intrusive_polymorphic<referred_type>::value,
+                    intrusive_polymorphic,
+                    usual
+                >::type
+            >::type type;
         };
 
         // forwarded serialize pointer functions

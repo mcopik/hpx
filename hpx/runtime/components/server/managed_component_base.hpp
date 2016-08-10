@@ -1,4 +1,4 @@
-//  Copyright (c) 2007-2014 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //  Copyright (c)      2011 Thomas Heller
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -8,45 +8,23 @@
 #define HPX_COMPONENTS_MANAGED_COMPONENT_BASE_JUN_04_2008_0902PM
 
 #include <hpx/config.hpp>
-#include <hpx/exception.hpp>
-#include <hpx/traits/is_component.hpp>
-#include <hpx/runtime/components_fwd.hpp>
+
 #include <hpx/runtime/components/component_type.hpp>
+#include <hpx/runtime/components/server/create_component_fwd.hpp>
 #include <hpx/runtime/components/server/wrapper_heap.hpp>
 #include <hpx/runtime/components/server/wrapper_heap_list.hpp>
-#include <hpx/runtime/components/server/create_component_fwd.hpp>
+#include <hpx/runtime/components_fwd.hpp>
+#include <hpx/throw_exception.hpp>
+#include <hpx/traits/is_component.hpp>
+#include <hpx/traits/managed_component_policies.hpp>
 #include <hpx/util/reinitializable_static.hpp>
 #include <hpx/util/unique_function.hpp>
 
-#include <boost/throw_exception.hpp>
-#include <boost/noncopyable.hpp>
-#include <boost/mpl/if.hpp>
-#include <boost/mpl/bool.hpp>
-#include <boost/detail/atomic_count.hpp>
-#include <boost/type_traits/is_same.hpp>
-#include <boost/intrusive_ptr.hpp>
-#include <utility>
+#include <boost/cstdint.hpp>
 
 #include <stdexcept>
-
-///////////////////////////////////////////////////////////////////////////////
-namespace hpx { namespace traits
-{
-    template <typename Component>
-    struct managed_component_ctor_policy<
-        Component, typename Component::has_managed_component_base>
-    {
-        typedef typename Component::ctor_policy type;
-    };
-
-    ///////////////////////////////////////////////////////////////////////////
-    template <typename Component>
-    struct managed_component_dtor_policy<
-        Component, typename Component::has_managed_component_base>
-    {
-        typedef typename Component::dtor_policy type;
-    };
-}}
+#include <type_traits>
+#include <utility>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace components
@@ -158,7 +136,7 @@ namespace hpx { namespace components
             template <typename Component>
             static void call(Component* component)
             {
-                // The managed_component's controls the lifetime of the
+                // The managed_component controls the lifetime of the
                 // component implementation.
                 component->finalize();
                 delete component;
@@ -180,11 +158,23 @@ namespace hpx { namespace components
     template <typename Component, typename Wrapper,
         typename CtorPolicy, typename DtorPolicy>
     class managed_component_base
-      : public traits::detail::managed_component_tag, boost::noncopyable
+      : public traits::detail::managed_component_tag
     {
+        HPX_NON_COPYABLE(managed_component_base);
+
+    private:
+        Component& derived()
+        {
+            return static_cast<Component&>(*this);
+        }
+        Component const& derived() const
+        {
+            return static_cast<Component const&>(*this);
+        }
+
     public:
-        typedef typename boost::mpl::if_<
-            boost::is_same<Component, detail::this_type>,
+        typedef typename std::conditional<
+            std::is_same<Component, detail::this_type>::value,
             managed_component_base, Component
         >::type this_component_type;
 
@@ -197,15 +187,15 @@ namespace hpx { namespace components
         // make sure that we have a back_ptr whenever we need to control the
         // lifetime of the managed_component
         static_assert((
-            boost::is_same<ctor_policy, traits::construct_without_back_ptr>::value ||
-            boost::is_same<dtor_policy,
+            std::is_same<ctor_policy, traits::construct_without_back_ptr>::value ||
+            std::is_same<dtor_policy,
             traits::managed_object_controls_lifetime>::value),
-            "boost::is_same<ctor_policy, traits::construct_without_back_ptr>::value || "
-            "boost::is_same<dtor_policy, "
+            "std::is_same<ctor_policy, traits::construct_without_back_ptr>::value || "
+            "std::is_same<dtor_policy, "
             "traits::managed_object_controls_lifetime>::value");
 
         managed_component_base()
-          : back_ptr_(0)
+          : back_ptr_(nullptr)
         {}
 
         managed_component_base(managed_component<Component, Wrapper>* back_ptr)
@@ -255,32 +245,6 @@ namespace hpx { namespace components
         naming::gid_type get_base_gid() const;
 
     public:
-        /// This is the default hook implementation for decorate_action which
-        template <typename F>
-        static threads::thread_function_type
-        decorate_action(naming::address::address_type, F && f)
-        {
-            return std::forward<F>(f);
-        }
-
-        /// This is the default hook implementation for schedule_thread which
-        /// forwards to the default scheduler.
-        static void schedule_thread(naming::address::address_type,
-            threads::thread_init_data& data,
-            threads::thread_state_enum initial_state)
-        {
-            hpx::threads::register_work_plain(data, initial_state); //-V106
-        }
-
-        // This component type requires valid id for its actions to be invoked
-        static bool is_target_valid(naming::id_type const& id)
-        {
-            return !naming::is_locality(id);
-        }
-
-        // This component type does not support migration.
-        static HPX_CONSTEXPR bool supports_migration() { return false; }
-
         // Pinning functionality
         void pin() {}
         void unpin() {}
@@ -300,7 +264,7 @@ namespace hpx { namespace components
 
         void set_back_ptr(components::managed_component<Component, Wrapper>* bp)
         {
-            HPX_ASSERT(0 == back_ptr_);
+            HPX_ASSERT(nullptr == back_ptr_);
             HPX_ASSERT(bp);
             back_ptr_ = bp;
         }
@@ -384,11 +348,13 @@ namespace hpx { namespace components
     /// \tparam Derived
     ///
     template <typename Component, typename Derived>
-    class managed_component : boost::noncopyable
+    class managed_component
     {
+        HPX_NON_COPYABLE(managed_component);
+
     public:
-        typedef typename boost::mpl::if_<
-                boost::is_same<Derived, detail::this_type>,
+        typedef typename std::conditional<
+                std::is_same<Derived, detail::this_type>::value,
                 managed_component, Derived
             >::type derived_type;
 
@@ -419,7 +385,7 @@ namespace hpx { namespace components
         ///        instance
         template <typename ...Ts>
         managed_component(Ts&&... vs)
-          : component_(0)
+          : component_(nullptr)
         {
             detail_adl_barrier::init<
                 typename traits::managed_component_ctor_policy<Component>::type
@@ -465,7 +431,7 @@ namespace hpx { namespace components
         {
             if (!component_) {
                 std::ostringstream strm;
-                strm << "component is NULL ("
+                strm << "component is nullptr ("
                      << components::get_component_type_name(
                         components::get_component_type<wrapped_type>())
                      << ") gid(" << get_base_gid() << ")";
@@ -480,7 +446,7 @@ namespace hpx { namespace components
         {
             if (!component_) {
                 std::ostringstream strm;
-                strm << "component is NULL ("
+                strm << "component is nullptr ("
                      << components::get_component_type_name(
                         components::get_component_type<wrapped_type>())
                      << ") gid(" << get_base_gid() << ")";
@@ -505,7 +471,7 @@ namespace hpx { namespace components
             if (size > sizeof(managed_component))
                 return ::operator new(size);
             void* p = heap_type::alloc();
-            if (NULL == p) {
+            if (nullptr == p) {
                 HPX_THROW_STD_EXCEPTION(std::bad_alloc(),
                     "managed_component::operator new(std::size_t size)");
             }
@@ -513,8 +479,8 @@ namespace hpx { namespace components
         }
         static void operator delete(void* p, std::size_t size)
         {
-            if (NULL == p)
-                return;     // do nothing if given a NULL pointer
+            if (nullptr == p)
+                return;     // do nothing if given a nullptr pointer
 
             if (size != sizeof(managed_component)) {
                 ::operator delete(p);
@@ -541,7 +507,7 @@ namespace hpx { namespace components
         {
             // allocate the memory
             void* p = heap_type::alloc(count);
-            if (NULL == p) {
+            if (nullptr == p) {
                 HPX_THROW_STD_EXCEPTION(std::bad_alloc(),
                     "managed_component::create");
             }
@@ -578,8 +544,8 @@ namespace hpx { namespace components
         //          de-allocation of arrays of wrappers
         static void destroy(value_type* p, std::size_t count = 1)
         {
-            if (NULL == p || 0 == count)
-                return;     // do nothing if given a NULL pointer
+            if (nullptr == p || 0 == count)
+                return;     // do nothing if given a nullptr pointer
 
             // call destructors for all managed_component instances
             value_type* curr = p;
@@ -640,7 +606,7 @@ namespace hpx { namespace components
         }
 #endif
 
-#if defined(HPX_HAVE_CXX11_EXTENDED_FRIEND_DECLARATIONS)
+#if defined(HPX_HAVE_CXX11_EXTENDED_FRIEND_DECLARATIONS) && !defined(__CUDACC__)
     private:
         // declare friends which are allowed to access get_base_gid()
         friend Component;
@@ -704,7 +670,7 @@ namespace hpx { namespace components
         get_id() const
     {
         // all credits should have been taken already
-        naming::gid_type gid = get_base_gid();
+        naming::gid_type gid = derived().get_base_gid();
 
         // The underlying heap will always give us a full set of credits, but
         // those are valid for the first invocation of get_base_gid() only.

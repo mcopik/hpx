@@ -6,14 +6,18 @@
 
 #include <hpx/lcos/local/mutex.hpp>
 
-#include <hpx/exception.hpp>
-#include <hpx/lcos/local/spinlock.hpp>
+#include <hpx/error_code.hpp>
 #include <hpx/lcos/local/detail/condition_variable.hpp>
-#include <hpx/runtime/threads/thread_data.hpp>
+#include <hpx/lcos/local/spinlock.hpp>
+#include <hpx/runtime/threads/thread_data_fwd.hpp>
+#include <hpx/runtime/threads/thread_enums.hpp>
 #include <hpx/util/assert.hpp>
-#include <hpx/util/date_time_chrono.hpp>
 #include <hpx/util/itt_notify.hpp>
 #include <hpx/util/register_locks.hpp>
+#include <hpx/util/steady_clock.hpp>
+
+#include <mutex>
+#include <utility>
 
 namespace hpx { namespace lcos { namespace local
 {
@@ -32,10 +36,10 @@ namespace hpx { namespace lcos { namespace local
 
     void mutex::lock(char const* description, error_code& ec)
     {
-        HPX_ASSERT(threads::get_self_ptr() != 0);
+        HPX_ASSERT(threads::get_self_ptr() != nullptr);
 
         HPX_ITT_SYNC_PREPARE(this);
-        boost::unique_lock<mutex_type> l(mtx_);
+        std::unique_lock<mutex_type> l(mtx_);
 
         threads::thread_id_repr_type self_id = threads::get_self_id().get();
         if(owner_id_ == self_id)
@@ -60,10 +64,10 @@ namespace hpx { namespace lcos { namespace local
 
     bool mutex::try_lock(char const* description, error_code& ec)
     {
-        HPX_ASSERT(threads::get_self_ptr() != 0);
+        HPX_ASSERT(threads::get_self_ptr() != nullptr);
 
         HPX_ITT_SYNC_PREPARE(this);
-        boost::unique_lock<mutex_type> l(mtx_);
+        std::unique_lock<mutex_type> l(mtx_);
 
         if (owner_id_ != threads::invalid_thread_id_repr)
         {
@@ -80,10 +84,10 @@ namespace hpx { namespace lcos { namespace local
 
     void mutex::unlock(error_code& ec)
     {
-        HPX_ASSERT(threads::get_self_ptr() != 0);
+        HPX_ASSERT(threads::get_self_ptr() != nullptr);
 
         HPX_ITT_SYNC_RELEASING(this);
-        boost::unique_lock<mutex_type> l(mtx_);
+        std::unique_lock<mutex_type> l(mtx_);
 
         threads::thread_id_repr_type self_id = threads::get_self_id().get();
         if (HPX_UNLIKELY(owner_id_ != self_id))
@@ -113,10 +117,10 @@ namespace hpx { namespace lcos { namespace local
     bool timed_mutex::try_lock_until(util::steady_time_point const& abs_time,
         char const* description, error_code& ec)
     {
-        HPX_ASSERT(threads::get_self_ptr() != 0);
+        HPX_ASSERT(threads::get_self_ptr() != nullptr);
 
         HPX_ITT_SYNC_PREPARE(this);
-        boost::unique_lock<mutex_type> l(mtx_);
+        std::unique_lock<mutex_type> l(mtx_);
 
         threads::thread_id_repr_type self_id = threads::get_self_id().get();
         if (owner_id_ != threads::invalid_thread_id_repr)

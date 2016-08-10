@@ -7,12 +7,13 @@
 #define HPX_RUNTIME_PARCELSET_POLICIES_COALESCING_MESSAGE_BUFFER_MAR_07_2013_1250PM
 
 #include <hpx/config.hpp>
-#include <hpx/util/assert.hpp>
-#include <hpx/runtime/parcelset_fwd.hpp>
 #include <hpx/runtime/parcelset/locality.hpp>
 #include <hpx/runtime/parcelset/parcel.hpp>
 #include <hpx/runtime/parcelset/parcelport.hpp>
+#include <hpx/runtime/parcelset_fwd.hpp>
+#include <hpx/util/assert.hpp>
 
+#include <utility>
 #include <vector>
 
 namespace hpx { namespace plugins { namespace parcel { namespace detail
@@ -34,10 +35,13 @@ namespace hpx { namespace plugins { namespace parcel { namespace detail
 
         message_buffer(std::size_t max_messages)
           : max_messages_(max_messages)
-        {}
+        {
+            messages_.reserve(max_messages);
+            handlers_.reserve(max_messages);
+        }
 
         message_buffer(message_buffer && rhs)
-          : dests_(std::move(rhs.dests_)),
+          : dest_(std::move(rhs.dest_)),
             messages_(std::move(rhs.messages_)),
             handlers_(std::move(rhs.handlers_)),
             max_messages_(rhs.max_messages_)
@@ -47,31 +51,56 @@ namespace hpx { namespace plugins { namespace parcel { namespace detail
         {
             if (&rhs != this) {
                 max_messages_ = rhs.max_messages_;
-                dests_    = std::move(rhs.dests_);
+                dest_ = std::move(rhs.dest_);
                 messages_ = std::move(rhs.messages_);
                 handlers_ = std::move(rhs.handlers_);
             }
             return *this;
         }
 
-        void operator()(parcelset::parcelport* set)
+        void operator()(parcelset::parcelport* pp)
         {
             if (!messages_.empty())
-                set->put_parcels(dests_, std::move(messages_), std::move(handlers_));
+            {
+                if (nullptr == threads::get_self_ptr())
+                {
+                    // reschedule this call on a new HPX thread
+                    using parcelset::parcelport;
+                    void (parcelport::*put_parcel_ptr) (
+                            parcelset::locality const&,
+                            std::vector<parcelset::parcel>,
+                            std::vector<parcelset::write_handler_type>
+                        ) = &parcelport::put_parcels;
+
+                    threads::register_thread_nullary(
+                        util::deferred_call(put_parcel_ptr, pp,
+                            dest_, std::move(messages_), std::move(handlers_)),
+                        "parcelhandler::put_parcel", threads::pending, true,
+                        threads::thread_priority_boost);
+                    return;
+                }
+
+                pp->put_parcels(dest_, std::move(messages_), std::move(handlers_));
+            }
         }
 
         message_buffer_append_state append(parcelset::locality const & dest,
-            parcelset::parcel p,
-            parcelset::write_handler_type f)
+            parcelset::parcel p, parcelset::write_handler_type f)
         {
-            HPX_ASSERT(messages_.size() == handlers_.size());
-            HPX_ASSERT(dests_.size() == handlers_.size());
-
             int result = normal;
             if (messages_.empty())
-                result = first_message;
+            {
+                HPX_ASSERT(handlers_.empty());
 
-            dests_.push_back(dest);
+                result = first_message;
+                dest_ = dest;
+            }
+            else
+            {
+                HPX_ASSERT(messages_.size() == handlers_.size());
+                HPX_ASSERT(dest_ == dest);
+            }
+
             messages_.push_back(std::move(p));
             handlers_.push_back(std::move(f));
 
@@ -84,21 +113,22 @@ namespace hpx { namespace plugins { namespace parcel { namespace detail
         bool empty() const
         {
             HPX_ASSERT(messages_.size() == handlers_.size());
-            HPX_ASSERT(dests_.size() == handlers_.size());
             return messages_.empty();
         }
 
         void clear()
         {
-            dests_.clear();
+            dest_ = parcelset::locality();
             messages_.clear();
             handlers_.clear();
+
+            messages_.reserve(max_messages_);
+            handlers_.reserve(max_messages_);
         }
 
         std::size_t size() const
         {
             HPX_ASSERT(messages_.size() == handlers_.size());
-            HPX_ASSERT(dests_.size() == handlers_.size());
             return messages_.size();
         }
 
@@ -110,7 +140,7 @@ namespace hpx { namespace plugins { namespace parcel { namespace detail
         void swap(message_buffer& o)
         {
             std::swap(max_messages_, o.max_messages_);
-            std::swap(dests_, o.dests_);
+            std::swap(dest_, o.dest_);
             std::swap(messages_, o.messages_);
             std::swap(handlers_, o.handlers_);
         }
@@ -118,7 +148,7 @@ namespace hpx { namespace plugins { namespace parcel { namespace detail
         std::size_t capacity() const { return max_messages_; }
 
     private:
-        std::vector<parcelset::locality> dests_;
+        parcelset::locality dest_;
         std::vector<parcelset::parcel> messages_;
         std::vector<parcelset::write_handler_type> handlers_;
         std::size_t max_messages_;

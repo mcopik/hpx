@@ -7,11 +7,8 @@
 #define HPX_TRAITS_IS_COMPONENT_OCT_10_2012_0221PM
 
 #include <hpx/config.hpp>
-#include <hpx/traits.hpp>
 
-#include <boost/mpl/bool.hpp>
-#include <boost/utility/enable_if.hpp>
-#include <boost/type_traits/is_base_and_derived.hpp>
+#include <type_traits>
 
 namespace hpx { namespace traits
 {
@@ -19,13 +16,14 @@ namespace hpx { namespace traits
     {
         struct fixed_component_tag {};
         struct simple_component_tag {};
+        struct component_tag : simple_component_tag {};
         struct managed_component_tag {};
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    template <typename Component, typename Enable>
+    template <typename Component, typename Enable = void>
     struct is_component
-      : boost::mpl::false_
+      : std::false_type
     {};
 
     template <typename Component>
@@ -37,35 +35,35 @@ namespace hpx { namespace traits
     // Simple components are components
     template <typename Component>
     struct is_component<Component,
-            typename boost::enable_if<
-                boost::is_base_and_derived<
+            typename std::enable_if<
+                std::is_base_of<
                     detail::simple_component_tag, Component
-                > >::type>
-      : boost::mpl::true_
+                >::value>::type>
+      : std::true_type
     {};
 
     // Fixed components are components
     template <typename Component>
     struct is_component<Component,
-            typename boost::enable_if<
-                boost::is_base_and_derived<
+            typename std::enable_if<
+                std::is_base_of<
                     detail::fixed_component_tag, Component
-                > >::type>
-      : boost::mpl::true_
+                >::value>::type>
+      : std::true_type
     {};
 
     // Managed components are components
     template <typename Component>
     struct is_component<Component,
-            typename boost::enable_if<
-                boost::is_base_and_derived<
+            typename std::enable_if<
+                std::is_base_of<
                     detail::managed_component_tag, Component
-                > >::type>
-      : boost::mpl::true_
+                >::value>::type>
+      : std::true_type
     {};
 
     ///////////////////////////////////////////////////////////////////////////
-    template <typename T, typename Enable>
+    template <typename T, typename Enable = void>
     struct is_component_or_component_array
       : is_component<T>
     {};

@@ -6,9 +6,13 @@
 #if !defined(HPX_LCOS_QUEUE_FEB_10_2011_1232PM)
 #define HPX_LCOS_QUEUE_FEB_10_2011_1232PM
 
-#include <hpx/exception.hpp>
-#include <hpx/include/client.hpp>
+#include <hpx/config.hpp>
 #include <hpx/lcos/server/queue.hpp>
+#include <hpx/runtime/components/client_base.hpp>
+
+#include <boost/exception_ptr.hpp>
+
+#include <utility>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace lcos
@@ -73,32 +77,52 @@ namespace hpx { namespace lcos
 
             HPX_ASSERT(this->get_gid());
             boost::exception_ptr exception =
-                hpx::detail::get_exception(
-                    hpx::exception(hpx::no_success), "queue::abort_pending",
-                    __FILE__, __LINE__);
+                HPX_GET_EXCEPTION(hpx::no_success, "queue::abort_pending", "");
             return hpx::async<action_type>(this->get_gid(), exception);
         }
 
         ///////////////////////////////////////////////////////////////////////
-        ValueType get_value_sync()
+        ValueType get_value(launch::sync_policy)
         {
             return get_value().get();
         }
 
-        void set_value_sync(RemoteType const& val)
+        void set_value(launch::sync_policy, RemoteType const& val)
         {
             set_value(val).get();
         }
 
-        void set_value_sync(RemoteType && val) //-V659
+        void set_value(launch::sync_policy, RemoteType && val) //-V659
         {
             set_value(std::move(val)).get();
         }
 
-        void abort_pending_sync()
+        void abort_pending(launch::sync_policy)
         {
             abort_pending().get();
         }
+
+#if defined(HPX_HAVE_ASYNC_FUNCTION_COMPATIBILITY)
+        ValueType get_value_sync()
+        {
+            return get_value(launch::sync);
+        }
+
+        void set_value_sync(RemoteType const& val)
+        {
+            set_value(launch::sync, val);
+        }
+
+        void set_value_sync(RemoteType && val) //-V659
+        {
+            set_value(launch::sync, std::move(val));
+        }
+
+        void abort_pending_sync()
+        {
+            abort_pending(launch::sync);
+        }
+#endif
     };
 }}
 

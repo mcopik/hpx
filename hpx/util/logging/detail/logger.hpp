@@ -23,11 +23,12 @@
 #endif
 
 #include <hpx/util/logging/detail/fwd.hpp>
-#include <hpx/util/logging/detail/forward_constructor.hpp>
-#include <hpx/util/logging/detail/find_gather.hpp>
 #include <hpx/util/logging/detail/cache_before_init.hpp>
-#include <boost/type_traits/remove_pointer.hpp>
+#include <hpx/util/logging/detail/find_gather.hpp>
+#include <hpx/util/logging/detail/forward_constructor.hpp>
 #include <hpx/util/logging/detail/logger_base.hpp>
+
+#include <type_traits>
 
 namespace hpx { namespace util { namespace logging {
 
@@ -135,11 +136,11 @@ namespace hpx { namespace util { namespace logging {
 
         // ... might be called for a specialization of logger
         // - for logger<gather_msg,write_msg*>
-        typedef typename boost::remove_pointer<write_msg>::type write_type;
+        typedef typename std::remove_pointer<write_msg>::type write_type;
 
         typedef logger<gather_msg, write_msg> original_logger_type;
-        forward_to_logger(original_logger_type *original_logger = 0)
-          : m_writer(0), m_original_logger( original_logger)
+        forward_to_logger(original_logger_type *original_logger = nullptr)
+          : m_writer(nullptr), m_original_logger( original_logger)
         {
             if ( m_original_logger)
                 m_writer = &m_original_logger->writer();
@@ -299,7 +300,7 @@ namespace hpx { namespace util { namespace logging {
 
         typedef logger<gather_msg, write_msg*> self_type;
 
-        logger(write_msg * writer_ = 0) : m_writer(writer_) {
+        logger(write_msg * writer_ = nullptr) : m_writer(writer_) {
             logger_base_type::m_base.forward_to(this);
         }
         ~logger() {
@@ -376,7 +377,7 @@ namespace hpx { namespace util { namespace logging {
         : logger<gather_msg, default_> {
         typedef typename gather_msg::msg_type msg_type;
 
-        implement_default_logger(write_msg * writer = 0) : m_writer(writer) {
+        implement_default_logger(write_msg * writer = nullptr) : m_writer(writer) {
         }
 
         void set_writer(write_msg* writer) {

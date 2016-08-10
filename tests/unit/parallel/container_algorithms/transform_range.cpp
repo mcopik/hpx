@@ -10,6 +10,10 @@
 
 #include <boost/range/functions.hpp>
 
+#include <numeric>
+#include <string>
+#include <vector>
+
 #include "test_utils.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -21,21 +25,20 @@ void test_transform(ExPolicy policy, IteratorTag)
     typedef std::vector<std::size_t>::iterator base_iterator;
     typedef test::test_iterator<base_iterator, IteratorTag> iterator;
 
-    std::vector<std::size_t> c(10007);
+    typedef test::test_container<std::vector<int>, IteratorTag> test_vector;
+
+    test_vector c(10007);
     std::vector<std::size_t> d(c.size());
     std::iota(boost::begin(c), boost::end(c), std::rand());
 
     auto result =
         hpx::parallel::transform(policy,
-            boost::make_iterator_range(
-                iterator(boost::begin(c)), iterator(boost::end(c))
-            ),
-            boost::begin(d),
+            c, boost::begin(d),
             [](std::size_t v) {
                 return v + 1;
             });
 
-    HPX_TEST(hpx::util::get<0>(result) == iterator(boost::end(c)));
+    HPX_TEST(hpx::util::get<0>(result) == boost::end(c));
     HPX_TEST(hpx::util::get<1>(result) == boost::end(d));
 
     // verify values
@@ -55,23 +58,24 @@ void test_transform_async(ExPolicy p, IteratorTag)
     typedef std::vector<std::size_t>::iterator base_iterator;
     typedef test::test_iterator<base_iterator, IteratorTag> iterator;
 
-    std::vector<std::size_t> c(10007);
+    typedef test::test_container<
+            std::vector<std::size_t>, IteratorTag
+        > test_vector;
+
+    test_vector c(10007);
     std::vector<std::size_t> d(c.size());
     std::iota(boost::begin(c), boost::end(c), std::rand());
 
     auto f =
         hpx::parallel::transform(p,
-            boost::make_iterator_range(
-                iterator(boost::begin(c)), iterator(boost::end(c))
-            ),
-            boost::begin(d),
+            c, boost::begin(d),
             [](std::size_t& v) {
                 return v + 1;
             });
     f.wait();
 
-    hpx::util::tuple<iterator, base_iterator> result = f.get();
-    HPX_TEST(hpx::util::get<0>(result) == iterator(boost::end(c)));
+    auto result = f.get();
+    HPX_TEST(hpx::util::get<0>(result) == boost::end(c));
     HPX_TEST(hpx::util::get<1>(result) == boost::end(d));
 
     // verify values
@@ -97,12 +101,14 @@ void test_transform()
     test_transform_async(seq(task), IteratorTag());
     test_transform_async(par(task), IteratorTag());
 
+#if defined(HPX_HAVE_GENERIC_EXECUTION_POLICY)
     test_transform(execution_policy(seq), IteratorTag());
     test_transform(execution_policy(par), IteratorTag());
     test_transform(execution_policy(par_vec), IteratorTag());
 
     test_transform(execution_policy(seq(task)), IteratorTag());
     test_transform(execution_policy(par(task)), IteratorTag());
+#endif
 }
 
 void transform_test()
@@ -202,11 +208,13 @@ void test_transform_exception()
     test_transform_exception_async(seq(task), IteratorTag());
     test_transform_exception_async(par(task), IteratorTag());
 
+#if defined(HPX_HAVE_GENERIC_EXECUTION_POLICY)
     test_transform_exception(execution_policy(seq), IteratorTag());
     test_transform_exception(execution_policy(par), IteratorTag());
 
     test_transform_exception(execution_policy(seq(task)), IteratorTag());
     test_transform_exception(execution_policy(par(task)), IteratorTag());
+#endif
 }
 
 void transform_exception_test()
@@ -304,11 +312,13 @@ void test_transform_bad_alloc()
     test_transform_bad_alloc_async(seq(task), IteratorTag());
     test_transform_bad_alloc_async(par(task), IteratorTag());
 
+#if defined(HPX_HAVE_GENERIC_EXECUTION_POLICY)
     test_transform_bad_alloc(execution_policy(seq), IteratorTag());
     test_transform_bad_alloc(execution_policy(par), IteratorTag());
 
     test_transform_bad_alloc(execution_policy(seq(task)), IteratorTag());
     test_transform_bad_alloc(execution_policy(par(task)), IteratorTag());
+#endif
 }
 
 void transform_bad_alloc_test()
@@ -321,7 +331,7 @@ void transform_bad_alloc_test()
 ///////////////////////////////////////////////////////////////////////////////
 int hpx_main(boost::program_options::variables_map& vm)
 {
-    unsigned int seed = (unsigned int)std::time(0);
+    unsigned int seed = (unsigned int)std::time(nullptr);
     if (vm.count("seed"))
         seed = vm["seed"].as<unsigned int>();
 
@@ -347,9 +357,9 @@ int main(int argc, char* argv[])
         ;
 
     // By default this test should run on all available cores
-    std::vector<std::string> cfg;
-    cfg.push_back("hpx.os_threads=" +
-        boost::lexical_cast<std::string>(hpx::threads::hardware_concurrency()));
+    std::vector<std::string> const cfg = {
+        "hpx.os_threads=all"
+    };
 
     // Initialize and run HPX
     HPX_TEST_EQ_MSG(hpx::init(desc_commandline, argc, argv, cfg), 0,

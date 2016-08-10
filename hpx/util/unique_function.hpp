@@ -11,13 +11,14 @@
 #include <hpx/config.hpp>
 #include <hpx/runtime/serialization/serialization_fwd.hpp>
 #include <hpx/traits/needs_automatic_registration.hpp>
-#include <hpx/util/detail/basic_function.hpp>
-#include <hpx/util/detail/unique_function_template.hpp>
-#include <hpx/util/detail/pp_strip_parens.hpp>
 #include <hpx/util/decay.hpp>
+#include <hpx/util/detail/basic_function.hpp>
+#include <hpx/util/detail/pp_strip_parens.hpp>
+#include <hpx/util/detail/unique_function_template.hpp>
 
 #include <boost/preprocessor/cat.hpp>
 
+#include <type_traits>
 #include <utility>
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -53,7 +54,7 @@
         struct needs_automatic_registration<                                  \
             BOOST_PP_CAT(BOOST_PP_CAT(util::detail::__,                       \
                 BOOST_PP_CAT(hpx_unique_function_serialization_, Name)), _type)>\
-          : boost::mpl::false_                                                \
+          : std::false_type                                                   \
         {};                                                                   \
     }}                                                                        \
 /**/

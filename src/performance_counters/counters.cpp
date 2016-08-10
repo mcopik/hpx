@@ -1,17 +1,20 @@
-//  Copyright (c) 2007-2015 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //  Copyright (c)      2011 Bryce Lelbach
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
-#include <hpx/include/performance_counters.hpp>
-#include <hpx/include/runtime.hpp>
+#include <hpx/config.hpp>
+#include <hpx/performance_counters/base_performance_counter.hpp>
+#include <hpx/performance_counters/counters.hpp>
+#include <hpx/performance_counters/counter_creators.hpp>
+#include <hpx/performance_counters/manage_counter_type.hpp>
 #include <hpx/performance_counters/registry.hpp>
+#include <hpx/runtime.hpp>
 #include <hpx/runtime/actions/continuation.hpp>
 #include <hpx/runtime/agas/interface.hpp>
-#include <hpx/runtime/components/base_lco_factory.hpp>
 #include <hpx/runtime/components/stubs/runtime_support.hpp>
+#include <hpx/runtime/get_num_localities.hpp>
 #include <hpx/util/function.hpp>
 
 #include <hpx/util/bind.hpp>
@@ -19,7 +22,6 @@
 #include <hpx/lcos/local/packaged_continuation.hpp>
 
 #include <boost/format.hpp>
-#include <boost/lexical_cast.hpp>
 
 #define BOOST_SPIRIT_USE_PHOENIX_V3
 #include <boost/spirit/include/qi_char.hpp>
@@ -31,6 +33,10 @@
 #include <boost/spirit/include/qi_auxiliary.hpp>
 #include <boost/spirit/include/qi_directive.hpp>
 #include <boost/fusion/include/adapt_struct.hpp>
+
+#include <string>
+#include <utility>
+#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 // Initialization support for the performance counter actions
@@ -44,6 +50,11 @@ HPX_REGISTER_ACTION_ID(
     ::base_performance_counter::get_counter_value_action,
     performance_counter_get_counter_value_action,
     hpx::actions::performance_counter_get_counter_value_action_id)
+HPX_REGISTER_ACTION_ID(
+    hpx::performance_counters::server
+    ::base_performance_counter::get_counter_values_array_action,
+    performance_counter_get_counter_values_array_action,
+    hpx::actions::performance_counter_get_counter_values_array_action_id)
 HPX_REGISTER_ACTION_ID(
     hpx::performance_counters::server
     ::base_performance_counter::set_counter_value_action,
@@ -101,7 +112,7 @@ namespace hpx { namespace performance_counters
                 if (-1 != path.parentinstanceindex_)
                 {
                     result += "#";
-                    result += boost::lexical_cast<std::string>
+                    result += std::to_string
                                 (path.parentinstanceindex_);
                 }
                 if (!path.instancename_.empty())
@@ -112,7 +123,7 @@ namespace hpx { namespace performance_counters
                 if (-1 != path.instanceindex_)
                 {
                     result += "#";
-                    result += boost::lexical_cast<std::string>(path.instanceindex_);
+                    result += std::to_string(path.instanceindex_);
                 }
             }
             result += "}";
@@ -473,13 +484,14 @@ namespace hpx { namespace performance_counters
             "counter_average_count",
             "counter_aggregating",
             "counter_average_timer",
-            "counter_elapsed_time"
+            "counter_elapsed_time",
+            "counter_histogram",
         };
     }
 
     char const* get_counter_type_name(counter_type type)
     {
-        if (type < counter_text || type > counter_elapsed_time)
+        if (type < counter_text || type > counter_histogram)
             return "unknown";
         return strings::counter_type_names[type];
     }
@@ -628,6 +640,26 @@ namespace hpx { namespace performance_counters
             return gid;
         }
 
+        naming::gid_type create_raw_counter(counter_info const& info,
+            hpx::util::function_nonser<std::vector<boost::int64_t>()> const& f,
+            error_code& ec)
+        {
+            naming::gid_type gid;
+            get_runtime().get_counter_registry().create_raw_counter(
+                info, f, gid, ec);
+            return gid;
+        }
+
+        naming::gid_type create_raw_counter(counter_info const& info,
+            hpx::util::function_nonser<std::vector<boost::int64_t>(bool)> const& f,
+            error_code& ec)
+        {
+            naming::gid_type gid;
+            get_runtime().get_counter_registry().create_raw_counter(
+                info, f, gid, ec);
+            return gid;
+        }
+
         // \brief Create a new performance counter instance based on given
         //        counter info
         naming::gid_type create_counter(counter_info const& info, error_code& ec)
@@ -735,6 +767,19 @@ namespace hpx { namespace performance_counters
         }
 
         ///////////////////////////////////////////////////////////////////////
+        inline bool is_node_kind(std::string const& pattern)
+        {
+            std::string::size_type p = pattern.find("-node#*");
+            return p != std::string::npos && p == pattern.size() - 7;
+        }
+
+        inline std::string get_node_kind(std::string const& pattern)
+        {
+            HPX_ASSERT(is_node_kind(pattern));
+            return pattern.substr(0, pattern.find_last_of('-'));
+        }
+
+        ///////////////////////////////////////////////////////////////////////
         /// Expand all wild-cards in a counter base name (for aggregate counters)
         bool expand_basecounter(
             counter_info const& info, counter_path_elements& p,
@@ -775,23 +820,50 @@ namespace hpx { namespace performance_counters
             return true;
         }
 
+        bool expand_counter_info_nodes(
+            counter_info& i, counter_path_elements& p,
+            discover_counter_func const& f, error_code& ec)
+        {
+            std::size_t num_nodes
+                = hpx::threads::get_topology().get_number_of_numa_nodes();
+            for (std::size_t l = 0; l != num_nodes; ++l)
+            {
+                p.instanceindex_ = static_cast<boost::int64_t>(l);
+                counter_status status = get_counter_name(p, i.fullname_, ec);
+                if (!status_is_valid(status) || !f(i, ec) || ec)
+                    return false;
+            }
+            return true;
+        }
+
         bool expand_counter_info_localities(
             counter_info& i, counter_path_elements& p,
             discover_counter_func const& f, error_code& ec)
         {
             bool expand_threads = false;
+            bool expand_nodes = false;
             if (is_thread_kind(p.instancename_))
             {
                 p.instancename_ = get_thread_kind(p.instancename_) + "-thread";
                 expand_threads = true;
             }
+            else if (is_node_kind(p.instancename_))
+            {
+                p.instancename_ = get_node_kind(p.instancename_) + "-node";
+                expand_nodes = true;
+            }
 
-            boost::uint32_t last_locality = get_num_localities_sync();
+            boost::uint32_t last_locality =
+                get_num_localities(hpx::launch::sync);
             for (boost::uint32_t l = 0; l != last_locality; ++l)
             {
                 p.parentinstanceindex_ = static_cast<boost::int32_t>(l);
                 if (expand_threads) {
                     if (!detail::expand_counter_info_threads(i, p, f, ec))
+                        return false;
+                }
+                else if(expand_nodes) {
+                    if (!detail::expand_counter_info_nodes(i, p, f, ec))
                         return false;
                 }
                 else {
@@ -832,6 +904,14 @@ namespace hpx { namespace performance_counters
                 return detail::expand_counter_info_threads(i, p, f, ec);
             }
 
+            // now expand "<...>-node#*"
+            if (detail::is_node_kind(p.instancename_))
+            {
+                counter_info i = info;
+                p.instancename_ = detail::get_node_kind(p.instancename_) + "-node";
+                return detail::expand_counter_info_nodes(i, p, f, ec);
+            }
+
             // handle wild-cards in aggregate counters
             if (p.parentinstance_is_basename_)
             {
@@ -862,7 +942,7 @@ namespace hpx { namespace performance_counters
     {
         // register the canonical name with AGAS
         naming::id_type id = f.get();
-        agas::register_name_sync(fullname, id);
+        agas::register_name(launch::sync, fullname, id);
         return id;
     }
 
@@ -882,7 +962,8 @@ namespace hpx { namespace performance_counters
 
         // ask AGAS for the id of the given counter
         naming::id_type id;
-        bool result = agas::resolve_name_sync(complemented_info.fullname_, id, ec);
+        bool result = agas::resolve_name(launch::sync,
+            complemented_info.fullname_, id, ec);
         if (!result) {
             try {
                 // figure out target locality
@@ -900,8 +981,9 @@ namespace hpx { namespace performance_counters
 
                 if (p.parentinstancename_ == "locality" &&
                         (   p.parentinstanceindex_ < 0 ||
-                            p.parentinstanceindex_ >= static_cast<boost::int32_t>
-                            (get_num_localities_sync())
+                            p.parentinstanceindex_ >=
+                                static_cast<boost::int32_t>(
+                                    get_num_localities(hpx::launch::sync))
                         )
                     )
                 {

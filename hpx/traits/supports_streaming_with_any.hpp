@@ -6,16 +6,17 @@
 #if !defined(HPX_TRAITS_SUPPORTS_STREAMING_WITH_ANY_JUL_18_2013_1005AM)
 #define HPX_TRAITS_SUPPORTS_STREAMING_WITH_ANY_JUL_18_2013_1005AM
 
-#include <hpx/hpx_fwd.hpp>
-#include <boost/mpl/bool.hpp>
+#include <hpx/config.hpp>
+
+#include <type_traits>
 
 namespace hpx { namespace traits
 {
     ///////////////////////////////////////////////////////////////////////////
     // Customization point for streaming with util::any
-    template <typename T, typename Enable>
+    template <typename T, typename Enable = void>
     struct supports_streaming_with_any
-      : boost::mpl::true_       // the default is to support streaming
+      : std::true_type       // the default is to support streaming
     {};
 }}
 

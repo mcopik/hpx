@@ -1,21 +1,27 @@
-//  Copyright (c) 2007-2015 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //  Copyright (c)      2011 Bryce Lelbach
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
 #include <hpx/apply.hpp>
+#include <hpx/async.hpp>
 #include <hpx/runtime/actions/manage_object_action.hpp>
+#include <hpx/runtime/agas/interface.hpp>
 #include <hpx/runtime/applier/detail/apply_colocated.hpp>
 #include <hpx/runtime/components/stubs/runtime_support.hpp>
-#include <hpx/runtime/agas/interface.hpp>
+#include <hpx/runtime/get_colocation_id.hpp>
+#include <hpx/runtime/launch_policy.hpp>
 #include <hpx/runtime/naming/name.hpp>
 #include <hpx/performance_counters/counters.hpp>
-#include <hpx/include/async.hpp>
 #include <hpx/util/ini.hpp>
-#include <hpx/util/move.hpp>
 #include <hpx/runtime.hpp>
+#include <hpx/traits/component_supports_migration.hpp>
+#include <hpx/traits/action_was_object_migrated.hpp>
+
+#include <utility>
+#include <vector>
 
 namespace hpx { namespace components { namespace stubs
 {
@@ -109,44 +115,53 @@ namespace hpx { namespace components { namespace stubs
         call_startup_functions_async(gid, pre_startup).get();
     }
 
-    lcos::future<void>
-    runtime_support::call_shutdown_functions_async(naming::id_type const& gid,
-        bool pre_shutdown)
-    {
-        typedef server::runtime_support::call_shutdown_functions_action action_type;
-        return hpx::async<action_type>(gid, pre_shutdown);
-    }
-
-    void runtime_support::call_shutdown_functions(naming::id_type const& gid,
-        bool pre_shutdown)
-    {
-        call_shutdown_functions_async(gid, pre_shutdown).get();
-    }
-
     void runtime_support::free_component_sync(agas::gva const& g,
         naming::gid_type const& gid, boost::uint64_t count)
     {
+        typedef server::runtime_support::free_component_action action_type;
+
         // Determine whether the gid of the component to delete is local or
         // remote
-        if (g.prefix == hpx::get_locality() ||
-            agas::is_local_address_cached(gid))
-        {
-            // apply locally
-            components::server::runtime_support* p =
-                reinterpret_cast<components::server::runtime_support*>(
-                      hpx::get_runtime().get_runtime_support_lva());
-            p->free_component(g, gid, count);
-        }
-        else {
-            // apply remotely (only if runtime is not stopping)
-            typedef server::runtime_support::free_component_action action_type;
-            naming::id_type id = get_colocation_id_sync(
-                naming::id_type(gid, naming::id_type::unmanaged));
+        std::pair<bool, components::pinned_ptr> r;
 
-            lcos::packaged_action<action_type, void> p;
-            p.apply(id, g, gid, count);
-            p.get_future().get();
+        naming::address addr;
+        if (g.prefix == hpx::get_locality() ||
+            agas::is_local_address_cached(gid, addr))
+        {
+            typedef action_type::component_type component_type;
+            if (traits::component_supports_migration<component_type>::call())
+            {
+                r = traits::action_was_object_migrated<action_type>::call(
+                    hpx::id_type(gid, hpx::id_type::unmanaged), addr.address_);
+                if (!r.first)
+                {
+                    // apply locally
+                    components::server::runtime_support* p =
+                        reinterpret_cast<components::server::runtime_support*>(
+                            hpx::get_runtime().get_runtime_support_lva());
+                    p->free_component(g, gid, count);
+                    return;
+                }
+            }
+            else
+            {
+                // apply locally
+                components::server::runtime_support* p =
+                    reinterpret_cast<components::server::runtime_support*>(
+                        hpx::get_runtime().get_runtime_support_lva());
+                p->free_component(g, gid, count);
+                return;
+            }
         }
+
+        // apply remotely (only if runtime is not stopping)
+        naming::id_type id = get_colocation_id(
+            launch::sync, naming::id_type(gid, naming::id_type::unmanaged));
+
+        lcos::packaged_action<action_type, void> p;
+        lcos::future<void> f = p.get_future();
+        p.apply(id, g, gid, count);
+        f.get();
     }
 
     void runtime_support::free_component_locally(agas::gva const& g,
@@ -169,10 +184,13 @@ namespace hpx { namespace components { namespace stubs
         typedef server::runtime_support::shutdown_action action_type;
 
         lcos::promise<void> value;
+        auto f = value.get_future();
+
         // We need to make it unmanaged to avoid late refcnt requests
         id_type gid(value.get_id().get_gid(), id_type::unmanaged);
         hpx::apply<action_type>(targetgid, timeout, gid);
-        return value.get_future();
+
+        return f;
     }
 
     void runtime_support::shutdown(naming::id_type const& targetgid,
@@ -211,8 +229,10 @@ namespace hpx { namespace components { namespace stubs
         typedef server::runtime_support::terminate_action action_type;
 
         lcos::promise<void> value;
+        auto f = value.get_future();
+
         hpx::apply<action_type>(targetgid, value.get_id());
-        return value.get_future();
+        return f;
     }
 
     void runtime_support::terminate(naming::id_type const& targetgid)

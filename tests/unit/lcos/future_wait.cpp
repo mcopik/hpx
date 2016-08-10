@@ -12,9 +12,10 @@
 #include <hpx/lcos/wait_each.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
-#include <boost/assign.hpp>
 #include <boost/atomic.hpp>
-#include <boost/lexical_cast.hpp>
+
+#include <string>
+#include <vector>
 
 using boost::program_options::variables_map;
 using boost::program_options::options_description;
@@ -188,9 +189,16 @@ int hpx_main(
             futures.reserve(64);
 
             for (std::size_t i = 0; i < 64; ++i)
-                futures.push_back(async(
-                    i % 3 ? hpx::launch::async : hpx::launch::deferred, &null_thread));
-
+            {
+                if (i % 3)
+                {
+                    futures.push_back(async(hpx::launch::async, &null_thread));
+                }
+                else
+                {
+                    futures.push_back(async(hpx::launch::deferred, &null_thread));
+                }
+            }
             wait_each(cb, futures);
 
             HPX_TEST_EQ(64U, cb.count());
@@ -216,10 +224,9 @@ int main(
     options_description cmdline("usage: " HPX_APPLICATION_STRING " [options]");
 
     // We force this test to use several threads by default.
-    using namespace boost::assign;
-    std::vector<std::string> cfg;
-    cfg += "hpx.os_threads=" +
-        boost::lexical_cast<std::string>(hpx::threads::hardware_concurrency());
+    std::vector<std::string> const cfg = {
+        "hpx.os_threads=all"
+    };
 
     // Initialize and run HPX
     return hpx::init(cmdline, argc, argv, cfg);

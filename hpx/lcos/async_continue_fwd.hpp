@@ -8,35 +8,30 @@
 #if !defined(HPX_LCOS_ASYNC_CONTINUE_FWD_JAN_25_2013_0828AM)
 #define HPX_LCOS_ASYNC_CONTINUE_FWD_JAN_25_2013_0828AM
 
-#include <hpx/hpx_fwd.hpp>
-#include <hpx/traits.hpp>
-#include <hpx/util/move.hpp>
+#include <hpx/config.hpp>
+#include <hpx/lcos/future.hpp>
+#include <hpx/traits/action_remote_result.hpp>
+#include <hpx/traits/extract_action.hpp>
+#include <hpx/traits/is_distribution_policy.hpp>
+#include <hpx/traits/promise_local_result.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/result_of.hpp>
-#include <hpx/lcos/future.hpp>
 
 #ifndef HPX_MSVC
-#include <boost/utility/enable_if.hpp>
+#include <type_traits>
 #endif
 
 namespace hpx
 {
     ///////////////////////////////////////////////////////////////////////////
-    namespace actions { namespace detail
-    {
-        template <typename Result>
-        struct remote_action_result;
-    }}
-
-    ///////////////////////////////////////////////////////////////////////////
     namespace detail
     {
         template <typename Action, typename Cont>
         struct result_of_async_continue
-            : actions::detail::remote_action_result<
+            : traits::action_remote_result<
                 typename util::result_of<typename util::decay<Cont>::type(
                     naming::id_type,
-                    typename hpx::actions::extract_action<
+                    typename hpx::traits::extract_action<
                         Action
                     >::remote_result_type
                 )>::type
@@ -80,7 +75,7 @@ namespace hpx
 #ifndef HPX_MSVC
     template <typename Action, typename Cont, typename DistPolicy,
         typename ...Ts>
-    typename boost::enable_if_c<
+    typename std::enable_if<
         traits::is_distribution_policy<DistPolicy>::value,
         lcos::future<
             typename traits::promise_local_result<
@@ -92,7 +87,7 @@ namespace hpx
     template <
         typename Component, typename Signature, typename Derived,
         typename Cont, typename DistPolicy, typename ...Ts>
-    typename boost::enable_if_c<
+    typename std::enable_if<
         traits::is_distribution_policy<DistPolicy>::value,
         lcos::future<
             typename traits::promise_local_result<

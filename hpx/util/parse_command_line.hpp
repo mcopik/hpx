@@ -1,4 +1,4 @@
-//  Copyright (c) 2007-2014 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -6,7 +6,7 @@
 #if !defined(HPX_UTIL_PARSE_COMMAND_LINE_NOV_30_2011_0652PM)
 #define HPX_UTIL_PARSE_COMMAND_LINE_NOV_30_2011_0652PM
 
-#include <hpx/config/export_definitions.hpp>
+#include <hpx/config.hpp>
 #include <hpx/runtime/runtime_mode.hpp>
 #include <hpx/util/ini.hpp>
 
@@ -34,8 +34,8 @@ namespace hpx { namespace util
         std::string const& cmdline, boost::program_options::variables_map& vm,
         std::size_t node, int error_mode = return_on_error,
         hpx::runtime_mode mode = runtime_mode_default,
-        boost::program_options::options_description* visible = 0,
-        std::vector<std::string>* unregistered_options = 0);
+        boost::program_options::options_description* visible = nullptr,
+        std::vector<std::string>* unregistered_options = nullptr);
 
     HPX_API_EXPORT bool parse_commandline(
         hpx::util::section const& rtcfg,
@@ -43,8 +43,8 @@ namespace hpx { namespace util
         int argc, char** argv, boost::program_options::variables_map& vm,
         std::size_t node, int error_mode = return_on_error,
         hpx::runtime_mode mode = runtime_mode_default,
-        boost::program_options::options_description* visible = 0,
-        std::vector<std::string>* unregistered_options = 0);
+        boost::program_options::options_description* visible = nullptr,
+        std::vector<std::string>* unregistered_options = nullptr);
 
     ///////////////////////////////////////////////////////////////////////////
     // retrieve the command line arguments for the current locality
@@ -60,6 +60,17 @@ namespace hpx { namespace util
     ///////////////////////////////////////////////////////////////////////////
     HPX_API_EXPORT std::string reconstruct_command_line(
         boost::program_options::variables_map const &vm);
+
+    ///////////////////////////////////////////////////////////////////////////
+    namespace detail
+    {
+        inline std::string enquote(std::string const& arg)
+        {
+            if (arg.find_first_of(" \t") != std::string::npos)
+                return std::string("\"") + arg + "\"";
+            return arg;
+        }
+    }
 }}
 
 #endif

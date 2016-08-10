@@ -7,7 +7,8 @@
 #include <hpx/include/iostreams.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
-#include <boost/assign/std/vector.hpp>
+#include <string>
+#include <vector>
 
 #include <tests/unit/agas/components/simple_mobile_object.hpp>
 
@@ -92,9 +93,9 @@ int main(
     options_description cmdline("usage: " HPX_APPLICATION_STRING " [options]");
 
     // We need to explicitly enable the test components used by this test.
-    using namespace boost::assign;
-    std::vector<std::string> cfg;
-    cfg += "hpx.components.simple_mobile_object.enabled! = 1";
+    std::vector<std::string> const cfg = {
+        "hpx.components.simple_mobile_object.enabled! = 1"
+    };
 
     // Initialize and run HPX.
     return init(cmdline, argc, argv, cfg);

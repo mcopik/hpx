@@ -10,9 +10,8 @@
 #include <hpx/include/lcos.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
-#include <boost/assign/std/vector.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/thread/locks.hpp>
+#include <chrono>
+#include <mutex>
 
 using boost::program_options::variables_map;
 using boost::program_options::options_description;
@@ -26,8 +25,8 @@ inline void set_description(char const* test_name)
 ///////////////////////////////////////////////////////////////////////////////
 template <typename Clock, typename Duration>
 inline int time_cmp(
-    boost::chrono::time_point<Clock, Duration> const& xt1,
-    boost::chrono::time_point<Clock, Duration> const& xt2)
+    std::chrono::time_point<Clock, Duration> const& xt1,
+    std::chrono::time_point<Clock, Duration> const& xt2)
 {
     if (xt1 == xt2)
         return 0;
@@ -36,11 +35,11 @@ inline int time_cmp(
 
 template <typename Clock, typename Duration, typename Rep, typename Period>
 inline bool in_range(
-    boost::chrono::time_point<Clock, Duration> const& xt,
-    boost::chrono::duration<Rep, Period> const& d)
+    std::chrono::time_point<Clock, Duration> const& xt,
+    std::chrono::duration<Rep, Period> const& d)
 {
-    boost::chrono::time_point<Clock, Duration> const now = Clock::now();
-    boost::chrono::time_point<Clock, Duration> const mint = now - d;
+    std::chrono::time_point<Clock, Duration> const now = Clock::now();
+    std::chrono::time_point<Clock, Duration> const mint = now - d;
     return time_cmp(xt, mint) >= 0 && time_cmp(xt, now) <= 0;
 }
 
@@ -80,13 +79,13 @@ void test_sleep()
 {
     set_description("test_sleep");
 
-    boost::chrono::system_clock::time_point const now =
-        boost::chrono::system_clock::now();
-    hpx::this_thread::sleep_for(boost::chrono::seconds(3));
+    std::chrono::system_clock::time_point const now =
+        std::chrono::system_clock::now();
+    hpx::this_thread::sleep_for(std::chrono::seconds(3));
 
     // Ensure it's in a range instead of checking actual equality due to time
     // lapse
-    HPX_TEST(in_range(now, boost::chrono::seconds(4))); //-V112
+    HPX_TEST(in_range(now, std::chrono::seconds(4))); //-V112
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -123,7 +122,7 @@ void interruption_point_thread(hpx::lcos::local::barrier* b,
     hpx::lcos::local::spinlock* m, bool* failed)
 {
     try {
-        boost::lock_guard<hpx::lcos::local::spinlock> lk(*m);
+        std::lock_guard<hpx::lcos::local::spinlock> lk(*m);
         hpx::this_thread::interruption_point();
         *failed = true;
     }
@@ -139,7 +138,7 @@ void do_test_thread_interrupts_at_interruption_point()
     hpx::lcos::local::spinlock m;
     hpx::lcos::local::barrier b(2);
     bool failed = false;
-    boost::unique_lock<hpx::lcos::local::spinlock> lk(m);
+    std::unique_lock<hpx::lcos::local::spinlock> lk(m);
     hpx::thread thrd(&interruption_point_thread, &b, &m, &failed);
     thrd.interrupt();
     lk.unlock();
@@ -164,7 +163,7 @@ void disabled_interruption_point_thread(hpx::lcos::local::spinlock* m,
     hpx::this_thread::disable_interruption dc;
     b->wait();
     try {
-        boost::lock_guard<hpx::lcos::local::spinlock> lk(*m);
+        std::lock_guard<hpx::lcos::local::spinlock> lk(*m);
         hpx::this_thread::interruption_point();
         *failed = false;
     }
@@ -185,9 +184,9 @@ void do_test_thread_no_interrupt_if_interrupts_disabled_at_interruption_point()
     b.wait();       // Make sure the test thread has been started and marked itself
                     // to disable interrupts.
     try {
-        boost::unique_lock<hpx::lcos::local::spinlock> lk(m);
+        std::unique_lock<hpx::lcos::local::spinlock> lk(m);
         hpx::util::ignore_while_checking<
-            boost::unique_lock<hpx::lcos::local::spinlock> > il(&lk);
+            std::unique_lock<hpx::lcos::local::spinlock> > il(&lk);
         thrd.interrupt();
     }
     catch(hpx::exception& e) {
@@ -212,9 +211,11 @@ void test_thread_no_interrupt_if_interrupts_disabled_at_interruption_point()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-struct non_copyable_functor:
-    boost::noncopyable
+class non_copyable_functor
 {
+    HPX_NON_COPYABLE(non_copyable_functor);
+
+public:
     unsigned value;
 
     non_copyable_functor()
@@ -255,7 +256,7 @@ void test_creation_through_reference_wrapper()
 //
 //     void operator()()
 //     {
-//         boost::lock_guard<boost::mutex> lk(mut);
+//         std::lock_guard<boost::mutex> lk(mut);
 //         while(!done)
 //         {
 //             cond.wait(lk);
@@ -268,24 +269,24 @@ void test_creation_through_reference_wrapper()
 //     long_running_thread f;
 //     hpx::thread thrd(boost::ref(f));
 //     HPX_TEST(thrd.joinable());
-//     boost::chrono::system_clock::time_point xt =
-//         boost::chrono::system_clock::now()
-//       + boost::chrono::seconds(3);
+//     std::chrono::system_clock::time_point xt =
+//         std::chrono::system_clock::now()
+//       + std::chrono::seconds(3);
 //     bool const joined=thrd.timed_join(xt);
-//     HPX_TEST(in_range(xt, boost::chrono::seconds(2)));
+//     HPX_TEST(in_range(xt, std::chrono::seconds(2)));
 //     HPX_TEST(!joined);
 //     HPX_TEST(thrd.joinable());
 //     {
-//         boost::lock_guard<boost::mutex> lk(f.mut);
+//         std::lock_guard<boost::mutex> lk(f.mut);
 //         f.done=true;
 //         f.cond.notify_one();
 //     }
 //
-//     xt = boost::chrono::system_clock::now()
-//       + boost::chrono::seconds(3);
+//     xt = std::chrono::system_clock::now()
+//       + std::chrono::seconds(3);
 //     bool const joined2=thrd.timed_join(xt);
-//     boost::chrono::system_clock::time_point const now =
-//         boost::chrono::system_clock::now();
+//     std::chrono::system_clock::time_point const now =
+//         std::chrono::system_clock::now();
 //     HPX_TEST(xt>now);
 //     HPX_TEST(joined2);
 //     HPX_TEST(!thrd.joinable());

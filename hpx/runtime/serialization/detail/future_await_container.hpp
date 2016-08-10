@@ -9,13 +9,17 @@
 // This 'container' is used to gather futures that need to become
 // ready before the actual serialization process can be started
 
-#include <hpx/lcos/future.hpp>
+#include <hpx/config.hpp>
 #include <hpx/dataflow.hpp>
+#include <hpx/lcos/future.hpp>
+#include <hpx/lcos/local/promise.hpp>
 #include <hpx/util/unwrapped.hpp>
 
-#include <boost/shared_ptr.hpp>
-#include <boost/thread/locks.hpp>
-
+#include <list>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <utility>
 #include <vector>
 
 namespace hpx
@@ -29,7 +33,7 @@ namespace hpx { namespace serialization { namespace detail
     struct access_data;
 
     class future_await_container
-        : public boost::enable_shared_from_this<future_await_container>
+        : public std::enable_shared_from_this<future_await_container>
     {
         typedef hpx::lcos::local::spinlock mutex_type;
         typedef std::list<naming::gid_type> new_gids_type;
@@ -51,7 +55,7 @@ namespace hpx { namespace serialization { namespace detail
             // critical section and trigger the promise outside of it.
             bool set_value = false;
             {
-                boost::lock_guard<mutex_type> l(mtx_);
+                std::lock_guard<mutex_type> l(mtx_);
                 ++triggered_futures_;
                 set_value = (done_ && num_futures_ == triggered_futures_);
             }
@@ -64,13 +68,14 @@ namespace hpx { namespace serialization { namespace detail
         void await_future(hpx::lcos::detail::future_data_refcnt_base & future_data)
         {
             {
-                boost::lock_guard<mutex_type> l(mtx_);
+                std::lock_guard<mutex_type> l(mtx_);
                 ++num_futures_;
             }
+            std::shared_ptr<future_await_container> this_(this->shared_from_this());
             future_data.set_on_completed(
-                [this]()
+                [this_]()
                 {
-                    trigger();
+                    this_->trigger();
                 }
             );
         }
@@ -79,7 +84,7 @@ namespace hpx { namespace serialization { namespace detail
             naming::gid_type const & gid,
             naming::gid_type const & splitted_gid)
         {
-            boost::lock_guard<mutex_type> l(mtx_);
+            std::lock_guard<mutex_type> l(mtx_);
             new_gids_[gid].push_back(splitted_gid);
         }
 
@@ -104,7 +109,7 @@ namespace hpx { namespace serialization { namespace detail
         void operator()(F f)
         {
             {
-                boost::lock_guard<mutex_type> l(mtx_);
+                std::lock_guard<mutex_type> l(mtx_);
                 done_ = true;
                 if(num_futures_ == triggered_futures_)
                 {

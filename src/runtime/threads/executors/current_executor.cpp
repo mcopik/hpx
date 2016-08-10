@@ -1,16 +1,30 @@
-//  Copyright (c) 2007-2015 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
-#include <hpx/runtime/threads/thread_data.hpp>
-#include <hpx/runtime/threads/policies/scheduler_mode.hpp>
+#include <hpx/runtime/threads/executors/current_executor.hpp>
+
+#include <hpx/error_code.hpp>
+#include <hpx/state.hpp>
+#include <hpx/throw_exception.hpp>
+#include <hpx/runtime/get_worker_thread_num.hpp>
 #include <hpx/runtime/threads/detail/create_thread.hpp>
 #include <hpx/runtime/threads/detail/set_thread_state.hpp>
-#include <hpx/runtime/threads/executors/current_executor.hpp>
+#include <hpx/runtime/threads/policies/scheduler_base.hpp>
+#include <hpx/runtime/threads/thread_data_fwd.hpp>
+#include <hpx/runtime/threads/thread_enums.hpp>
+#include <hpx/util/assert.hpp>
 #include <hpx/util/bind.hpp>
 #include <hpx/util/register_locks.hpp>
+#include <hpx/util/steady_clock.hpp>
+
+#include <boost/intrusive_ptr.hpp>
+
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
 
 namespace hpx { namespace threads { namespace executors { namespace detail
 {
@@ -38,8 +52,8 @@ namespace hpx { namespace threads { namespace executors { namespace detail
     // Depending on the subclass implementation, this may block in some
     // situations.
     void current_executor::add(
-        closure_type && f,
-        char const* desc, threads::thread_state_enum initial_state,
+        closure_type&& f, util::thread_description const& desc,
+        threads::thread_state_enum initial_state,
         bool run_now, threads::thread_stacksize stacksize, error_code& ec)
     {
         // create a new thread
@@ -49,7 +63,7 @@ namespace hpx { namespace threads { namespace executors { namespace detail
         data.stacksize = threads::get_stack_size(stacksize);
 
         threads::thread_id_type id = threads::invalid_thread_id;
-        threads::detail::create_thread(scheduler_base_, data, id,
+        threads::detail::create_thread(scheduler_base_, data, id, //-V601
             initial_state, run_now, ec);
         if (ec) return;
 
@@ -58,8 +72,8 @@ namespace hpx { namespace threads { namespace executors { namespace detail
     }
 
     void current_executor::add_at(
-        boost::chrono::steady_clock::time_point const& abs_time,
-        closure_type && f, char const* desc,
+        util::steady_clock::time_point const& abs_time,
+        closure_type&& f, util::thread_description const& desc,
         threads::thread_stacksize stacksize, error_code& ec)
     {
         // create a new suspended thread
@@ -87,16 +101,16 @@ namespace hpx { namespace threads { namespace executors { namespace detail
     // than time rel_time from now. This call never blocks, and may
     // violate bounds on the executor's queue size.
     void current_executor::add_after(
-        boost::chrono::steady_clock::duration const& rel_time,
-        closure_type && f, char const* desc,
+        util::steady_clock::duration const& rel_time,
+        closure_type&& f, util::thread_description const& desc,
         threads::thread_stacksize stacksize, error_code& ec)
     {
-        return add_at(boost::chrono::steady_clock::now() + rel_time,
+        return add_at(util::steady_clock::now() + rel_time,
             std::move(f), desc, stacksize, ec);
     }
 
     // Return an estimate of the number of waiting tasks.
-    boost::uint64_t current_executor::num_pending_closures(
+    std::uint64_t current_executor::num_pending_closures(
         error_code& ec) const
     {
         return scheduler_base_->get_thread_count() -
@@ -146,12 +160,12 @@ namespace hpx { namespace threads { namespace executors
     ///////////////////////////////////////////////////////////////////////////
     // this is just a wrapper around a scheduler_base assuming the wrapped
     // scheduler outlives the wrapper
-    current_executor::current_executor()
+    current_executor::current_executor() //-V730
       : scheduled_executor(new detail::current_executor(
             get_self_id()->get_scheduler_base()))
     {}
 
-    current_executor::current_executor(policies::scheduler_base* scheduler)
+    current_executor::current_executor(policies::scheduler_base* scheduler) //-V730
       : scheduled_executor(new detail::current_executor(scheduler))
     {}
 

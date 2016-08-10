@@ -9,21 +9,20 @@
 #define HPX_RUNTIME_COMPONENTS_NEW_OCT_10_2012_1256PM
 
 #include <hpx/config.hpp>
-#include <hpx/traits/is_distribution_policy.hpp>
-#include <hpx/traits/is_component.hpp>
-#include <hpx/traits/is_client.hpp>
-#include <hpx/runtime/naming/name.hpp>
-#include <hpx/runtime/components/stubs/stub_base.hpp>
-#include <hpx/runtime/components/default_distribution_policy.hpp>
-#include <hpx/runtime/components/client_base.hpp>
 #include <hpx/lcos/future.hpp>
-#include <hpx/util/move.hpp>
+#include <hpx/runtime/components/client_base.hpp>
+#include <hpx/runtime/components/default_distribution_policy.hpp>
+#include <hpx/runtime/components/stubs/stub_base.hpp>
+#include <hpx/runtime/naming/name.hpp>
+#include <hpx/traits/is_client.hpp>
+#include <hpx/traits/is_component.hpp>
+#include <hpx/traits/is_distribution_policy.hpp>
+#include <hpx/util/lazy_enable_if.hpp>
 
-#include <type_traits>
-#include <vector>
 #include <algorithm>
-
-#include <boost/utility/enable_if.hpp>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #if defined(DOXYGEN)
 namespace hpx
@@ -275,7 +274,7 @@ namespace hpx { namespace components
 
     ///////////////////////////////////////////////////////////////////////////
     template <typename Component, typename ...Ts>
-    inline typename boost::lazy_enable_if_c<
+    inline typename util::lazy_enable_if<
         traits::is_component_or_component_array<Component>::value,
         detail::new_component<Component>
     >::type
@@ -286,7 +285,7 @@ namespace hpx { namespace components
     }
 
     template <typename Component, typename DistPolicy, typename ...Ts>
-    inline typename boost::lazy_enable_if_c<
+    inline typename util::lazy_enable_if<
         traits::is_component_or_component_array<Component>::value &&
             traits::is_distribution_policy<DistPolicy>::value,
         detail::new_component<Component>
@@ -342,7 +341,7 @@ namespace hpx { namespace components
                         [](hpx::future<std::vector<hpx::id_type> > && v)
                             -> std::vector<Client>
                         {
-                            return make_client<Client>(v.get());
+                            return make_clients<Client>(v.get());
                         }
                     );
             }
@@ -351,7 +350,7 @@ namespace hpx { namespace components
 
     ///////////////////////////////////////////////////////////////////////////
     template <typename Client, typename ...Ts>
-    inline typename boost::lazy_enable_if_c<
+    inline typename util::lazy_enable_if<
         traits::is_client_or_client_array<Client>::value,
         detail::new_client<Client>
     >::type
@@ -362,7 +361,7 @@ namespace hpx { namespace components
     }
 
     template <typename Client, typename DistPolicy, typename ...Ts>
-    inline typename boost::lazy_enable_if_c<
+    inline typename util::lazy_enable_if<
         traits::is_client_or_client_array<Client>::value &&
             traits::is_distribution_policy<DistPolicy>::value,
         detail::new_client<Client>

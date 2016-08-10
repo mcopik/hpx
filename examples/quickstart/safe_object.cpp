@@ -9,16 +9,17 @@
 
 #include <boost/range/functions.hpp>
 
-#include <vector>
-#include <iostream>
 #include <cstdlib>
+#include <iostream>
+#include <utility>
+#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 template <typename T>
 struct safe_object
 {
 private:
-    HPX_MOVABLE_BUT_NOT_COPYABLE(safe_object);
+    HPX_MOVABLE_ONLY(safe_object);
 
 public:
     safe_object()

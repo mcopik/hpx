@@ -9,20 +9,20 @@
 #ifndef HPX_SERIALIZATION_POLYMORPHIC_NONINTRUSIVE_FACTORY_HPP
 #define HPX_SERIALIZATION_POLYMORPHIC_NONINTRUSIVE_FACTORY_HPP
 
-#include <hpx/exception.hpp>
+#include <hpx/config.hpp>
 #include <hpx/runtime/serialization/serialization_fwd.hpp>
+#include <hpx/throw_exception.hpp>
+#include <hpx/traits/needs_automatic_registration.hpp>
+#include <hpx/traits/polymorphic_traits.hpp>
+#include <hpx/util/demangle_helper.hpp>
 #include <hpx/util/jenkins_hash.hpp>
 #include <hpx/util/static.hpp>
-#include <hpx/util/demangle_helper.hpp>
-#include <hpx/traits/polymorphic_traits.hpp>
-#include <hpx/traits/needs_automatic_registration.hpp>
 
-#include <boost/noncopyable.hpp>
-#include <boost/unordered_map.hpp>
-#include <boost/mpl/bool.hpp>
-#include <boost/type_traits/is_abstract.hpp>
-
+#include <memory>
+#include <string>
 #include <typeinfo>
+#include <type_traits>
+#include <unordered_map>
 
 #include <hpx/config/warnings_prefix.hpp>
 
@@ -76,23 +76,25 @@ namespace hpx { namespace serialization { namespace detail
         }
 
     private:
-        static void load_polymorphic(T *t, input_archive& ar, boost::mpl::true_)
+        static void load_polymorphic(T *t, input_archive& ar, std::true_type)
         {
             serialize(ar, *t, 0);
         }
 
-        static void load_polymorphic(T *t, input_archive& ar, boost::mpl::false_)
+        static void load_polymorphic(T *t, input_archive& ar, std::false_type)
         {
             ar >> *t;
         }
     };
 
-    class polymorphic_nonintrusive_factory : boost::noncopyable
+    class polymorphic_nonintrusive_factory
     {
+        HPX_NON_COPYABLE(polymorphic_nonintrusive_factory);
+
     public:
-        typedef boost::unordered_map<std::string,
+        typedef std::unordered_map<std::string,
                   function_bunch_type, hpx::util::jenkins_hash> serializer_map_type;
-        typedef boost::unordered_map<std::string,
+        typedef std::unordered_map<std::string,
                   std::string, hpx::util::jenkins_hash> serializer_typeinfo_map_type;
 
         HPX_EXPORT static polymorphic_nonintrusive_factory& instance();
@@ -116,18 +118,10 @@ namespace hpx { namespace serialization { namespace detail
             auto it = map_.find(class_name);
             auto jt = typeinfo_map_.find(typeinfo.name());
 
-#if !defined(HPX_GCC_VERSION) || HPX_GCC_VERSION >= 408000
             if(it == map_.end())
                 map_.emplace(class_name, bunch);
             if(jt == typeinfo_map_.end())
                 typeinfo_map_.emplace(typeinfo.name(), class_name);
-#else
-            if(it == map_.end())
-                map_.insert(serializer_map_type::value_type(class_name, bunch));
-            if(jt == typeinfo_map_.end())
-                typeinfo_map_.insert(serializer_typeinfo_map_type::value_type(
-                    typeinfo.name(), class_name));
-#endif
         }
 
         // the following templates are defined in *.ipp file
@@ -209,7 +203,7 @@ namespace hpx { namespace serialization { namespace detail
     namespace hpx { namespace traits {                                        \
         template <>                                                           \
         struct needs_automatic_registration<action>                           \
-          : boost::mpl::false_                                                \
+          : std::false_type                                                   \
         {};                                                                   \
     }}                                                                        \
     HPX_TRAITS_NONINTRUSIVE_POLYMORPHIC(Class);                               \

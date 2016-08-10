@@ -11,19 +11,19 @@
 #include <hpx/config.hpp>
 #include <hpx/lcos/async_fwd.hpp>
 #include <hpx/lcos/future.hpp>
+#include <hpx/runtime/applier/apply.hpp>
+#include <hpx/traits/extract_action.hpp>
 #include <hpx/traits/is_action.hpp>
 #include <hpx/traits/is_bind_expression.hpp>
+#include <hpx/traits/is_continuation.hpp>
 #include <hpx/traits/is_placeholder.hpp>
+#include <hpx/traits/promise_local_result.hpp>
 #include <hpx/util/bind.hpp>
 #include <hpx/util/decay.hpp>
-#include <hpx/util/move.hpp>
 #include <hpx/util/tuple.hpp>
 
-#include <boost/mpl/eval_if.hpp>
-#include <boost/mpl/identity.hpp>
-#include <boost/ref.hpp>
-#include <boost/type_traits/remove_const.hpp>
-#include <boost/utility/enable_if.hpp>
+#include <type_traits>
+#include <utility>
 
 namespace hpx { namespace util
 {
@@ -31,7 +31,7 @@ namespace hpx { namespace util
     namespace detail
     {
         ///////////////////////////////////////////////////////////////////////
-        template <typename Action, typename BoundArgs, typename UnboundArgs>
+        template <typename Action, typename Ts, typename Us>
         struct bind_action_apply_impl
         {
             typedef bool type;
@@ -40,29 +40,30 @@ namespace hpx { namespace util
             static HPX_FORCEINLINE
             type call(
                 detail::pack_c<std::size_t, Is...>
-              , BoundArgs& bound_args, UnboundArgs&& unbound_args
+              , Ts& bound, Us&& unbound
             )
             {
-                return hpx::apply<Action>(bind_eval<Action>(
-                    util::get<Is>(bound_args),
-                    std::forward<UnboundArgs>(unbound_args))...);
+                return hpx::apply<Action>(
+                    bind_eval<Action, typename util::tuple_element<Is, Ts>::type>(
+                        util::get<Is>(bound),
+                        std::forward<Us>(unbound))...);
             }
         };
 
-        template <typename Action, typename BoundArgs, typename UnboundArgs>
+        template <typename Action, typename Ts, typename Us>
         HPX_FORCEINLINE
         bool
-        bind_action_apply(BoundArgs& bound_args, UnboundArgs&& unbound_args)
+        bind_action_apply(Ts& bound, Us&& unbound)
         {
-            return bind_action_apply_impl<Action, BoundArgs, UnboundArgs>::call(
+            return bind_action_apply_impl<Action, Ts, Us>::call(
                 typename detail::make_index_pack<
-                    util::tuple_size<BoundArgs>::value
+                    util::tuple_size<Ts>::value
                 >::type(),
-                bound_args, std::forward<UnboundArgs>(unbound_args));
+                bound, std::forward<Us>(unbound));
         }
 
         ///////////////////////////////////////////////////////////////////////
-        template <typename Action, typename BoundArgs, typename UnboundArgs>
+        template <typename Action, typename Ts, typename Us>
         struct bind_action_apply_cont_impl
         {
             typedef bool type;
@@ -72,33 +73,34 @@ namespace hpx { namespace util
             type call(
                 detail::pack_c<std::size_t, Is...>
               , naming::id_type const& cont
-              , BoundArgs& bound_args, UnboundArgs&& unbound_args
+              , Ts& bound, Us&& unbound
             )
             {
-                return hpx::apply_c<Action>(cont, bind_eval<Action>(
-                    util::get<Is>(bound_args),
-                    std::forward<UnboundArgs>(unbound_args))...);
+                return hpx::apply_c<Action>(cont,
+                    bind_eval<Action, typename util::tuple_element<Is, Ts>::type>(
+                        util::get<Is>(bound),
+                        std::forward<Us>(unbound))...);
             }
         };
 
-        template <typename Action, typename BoundArgs, typename UnboundArgs>
+        template <typename Action, typename Ts, typename Us>
         HPX_FORCEINLINE
         bool
         bind_action_apply_cont(naming::id_type const& cont,
-            BoundArgs& bound_args, UnboundArgs&& unbound_args
+            Ts& bound, Us&& unbound
         )
         {
             return bind_action_apply_cont_impl<
-                    Action, BoundArgs, UnboundArgs
+                    Action, Ts, Us
                 >::call(
                     typename detail::make_index_pack<
-                        util::tuple_size<BoundArgs>::value
+                        util::tuple_size<Ts>::value
                     >::type(), cont,
-                    bound_args, std::forward<UnboundArgs>(unbound_args));
+                    bound, std::forward<Us>(unbound));
         }
 
         ///////////////////////////////////////////////////////////////////////
-        template <typename Action, typename BoundArgs, typename UnboundArgs>
+        template <typename Action, typename Ts, typename Us>
         struct bind_action_apply_cont_impl2
         {
             typedef bool type;
@@ -108,85 +110,83 @@ namespace hpx { namespace util
             type call(
                 detail::pack_c<std::size_t, Is...>
               , Continuation && cont
-              , BoundArgs& bound_args, UnboundArgs&& unbound_args
+              , Ts& bound, Us&& unbound
             )
             {
                 return hpx::apply<Action>(std::forward<Continuation>(cont),
-                    bind_eval<Action>(
-                    util::get<Is>(bound_args),
-                    std::forward<UnboundArgs>(unbound_args))...);
+                    bind_eval<Action, typename util::tuple_element<Is, Ts>::type>(
+                        util::get<Is>(bound),
+                        std::forward<Us>(unbound))...);
             }
         };
 
-        template <typename Action, typename Continuation, typename BoundArgs,
-            typename UnboundArgs>
+        template <typename Action, typename Continuation, typename Ts,
+            typename Us>
         HPX_FORCEINLINE
-        typename boost::enable_if_c<
+        typename std::enable_if<
             traits::is_continuation<Continuation>::value, bool
         >::type
         bind_action_apply_cont2(Continuation && cont,
-            BoundArgs& bound_args, UnboundArgs&& unbound_args)
+            Ts& bound, Us&& unbound)
         {
             return bind_action_apply_cont_impl2<
-                    Action, BoundArgs, UnboundArgs
+                    Action, Ts, Us
                 >::call(
                     typename detail::make_index_pack<
-                        util::tuple_size<BoundArgs>::value
+                        util::tuple_size<Ts>::value
                     >::type(), std::forward<Continuation>(cont),
-                    bound_args, std::forward<UnboundArgs>(unbound_args));
+                    bound, std::forward<Us>(unbound));
         }
 
         ///////////////////////////////////////////////////////////////////////
-        template <typename Action, typename BoundArgs, typename UnboundArgs>
+        template <typename Action, typename Ts, typename Us>
         struct bind_action_async_impl
         {
             typedef lcos::future<typename traits::promise_local_result<
-                typename hpx::actions::extract_action<Action>::remote_result_type
+                typename hpx::traits::extract_action<Action>::remote_result_type
             >::type> type;
 
             template <std::size_t ...Is>
             static HPX_FORCEINLINE
             type call(
                 detail::pack_c<std::size_t, Is...>
-              , BoundArgs& bound_args, UnboundArgs&& unbound_args
+              , Ts& bound, Us&& unbound
             )
             {
-                return hpx::async<Action>(bind_eval<Action>(
-                    util::get<Is>(bound_args),
-                    std::forward<UnboundArgs>(unbound_args))...);
+                return hpx::async<Action>(
+                    bind_eval<Action, typename util::tuple_element<Is, Ts>::type>(
+                        util::get<Is>(bound),
+                        std::forward<Us>(unbound))...);
             }
         };
 
-        template <typename Action, typename BoundArgs, typename UnboundArgs>
+        template <typename Action, typename Ts, typename Us>
         HPX_FORCEINLINE
         lcos::future<typename traits::promise_local_result<
-            typename hpx::actions::extract_action<Action>::remote_result_type
+            typename hpx::traits::extract_action<Action>::remote_result_type
         >::type>
-        bind_action_async(BoundArgs& bound_args, UnboundArgs&& unbound_args)
+        bind_action_async(Ts& bound, Us&& unbound)
         {
-            return bind_action_async_impl<Action, BoundArgs, UnboundArgs>::call(
+            return bind_action_async_impl<Action, Ts, Us>::call(
                 typename detail::make_index_pack<
-                    util::tuple_size<BoundArgs>::value
+                    util::tuple_size<Ts>::value
                 >::type(),
-                bound_args, std::forward<UnboundArgs>(unbound_args));
+                bound, std::forward<Us>(unbound));
         }
 
         ///////////////////////////////////////////////////////////////////////
-        template <typename Action, typename BoundArgs, typename UnboundArgs>
+        template <typename Action, typename Ts, typename Us>
         HPX_FORCEINLINE
         typename traits::promise_local_result<
-            typename hpx::actions::extract_action<Action>::remote_result_type
+            typename hpx::traits::extract_action<Action>::remote_result_type
         >::type
-        bind_action_invoke(
-            BoundArgs& bound_args
-          , UnboundArgs&& unbound_args
-        )
+        bind_action_invoke(Ts& bound, Us&& unbound)
         {
-            return bind_action_async_impl<Action, BoundArgs, UnboundArgs>::call(
+            return bind_action_async_impl<Action, Ts, Us>::call(
                 typename detail::make_index_pack<
-                    util::tuple_size<BoundArgs>::value
+                    util::tuple_size<Ts>::value
                 >::type(),
-                bound_args, std::forward<UnboundArgs>(unbound_args)).get();
+                bound, std::forward<Us>(unbound)).get();
         }
 
         ///////////////////////////////////////////////////////////////////////
@@ -195,7 +195,7 @@ namespace hpx { namespace util
         {
         public:
             typedef typename traits::promise_local_result<
-                typename hpx::actions::extract_action<Action>::remote_result_type
+                typename hpx::traits::extract_action<Action>::remote_result_type
             >::type result_type;
 
         public:
@@ -235,7 +235,7 @@ namespace hpx { namespace util
 
             template <typename Continuation, typename ...Us>
             HPX_FORCEINLINE
-            typename boost::enable_if_c<
+            typename std::enable_if<
                 traits::is_continuation<Continuation>::value, bool
             >::type
             apply_c(Continuation && cont, Us&&... us) const
@@ -270,7 +270,7 @@ namespace hpx { namespace util
 
     ///////////////////////////////////////////////////////////////////////////
     template <typename Action, typename ...Ts>
-    typename boost::enable_if_c<
+    typename std::enable_if<
         traits::is_action<typename util::decay<Action>::type>::value
       , detail::bound_action<
             typename util::decay<Action>::type
@@ -315,12 +315,12 @@ namespace hpx { namespace traits
     ///////////////////////////////////////////////////////////////////////////
     template <typename Action, typename BoundArgs>
     struct is_bind_expression<util::detail::bound_action<Action, BoundArgs> >
-      : boost::mpl::true_
+      : std::true_type
     {};
 
     template <typename Action, typename BoundArgs>
     struct is_bound_action<util::detail::bound_action<Action, BoundArgs> >
-      : boost::mpl::true_
+      : std::true_type
     {};
 }}
 

@@ -7,15 +7,18 @@
 #define HPX_UTIL_MEMORY_CHUNK_POOL_HPP
 
 #include <hpx/config.hpp>
-#include <hpx/traits.hpp>
-
 #include <hpx/traits/is_chunk_allocator.hpp>
 #include <hpx/util/memory_chunk.hpp>
 #include <hpx/util/memory_chunk_pool_allocator.hpp>
 
-#include <boost/thread/locks.hpp>
-//
+#include <boost/atomic.hpp>
+
 #include <cstdlib>
+#include <cstring>
+#include <map>
+#include <mutex>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 // forward declare pool
@@ -37,15 +40,19 @@ namespace hpx { namespace traits
                 T, util::memory_chunk_pool<M>, M
             >
         >
-      : boost::mpl::true_
+      : std::true_type
     {};
 }}
 
 namespace hpx { namespace util
 {
     template <typename Mutex = hpx::lcos::local::spinlock>
-    struct memory_chunk_pool : boost::noncopyable
+    struct memory_chunk_pool
     {
+    private:
+        HPX_NON_COPYABLE(memory_chunk_pool);
+
+    public:
         typedef Mutex mutex_type;
         typedef memory_chunk<mutex_type> memory_chunk_type;
 
@@ -69,7 +76,7 @@ namespace hpx { namespace util
             for (typename backup_chunks_type::value_type& v : backup_chunks_)
             {
                 char *ptr = v.second - offset_;
-#if _POSIX_SOURCE
+#ifdef _POSIX_SOURCE
                 free(ptr);
 #else
                 delete[] ptr;
@@ -82,7 +89,7 @@ namespace hpx { namespace util
             if(size > chunk_size_)
                 return std::make_pair(p, size);
 
-            memory_chunk_type *chunk = 0;
+            memory_chunk_type *chunk = nullptr;
             std::memcpy(&chunk, p - offset_, offset_);
             if(chunk)
             {
@@ -94,7 +101,7 @@ namespace hpx { namespace util
 
         char *allocate(size_type size)
         {
-            char * result = 0;
+            char * result = nullptr;
 
             if(size + offset_ <= chunk_size_)
             {
@@ -113,7 +120,7 @@ namespace hpx { namespace util
                         void * chunk_addr = &chunk;
                         std::memcpy(result, &chunk_addr, offset_);
 #if defined(HPX_DEBUG)
-                        memory_chunk_type *chunk_test = 0;
+                        memory_chunk_type *chunk_test = nullptr;
                         std::memcpy(&chunk_test, result, offset_);
                         HPX_ASSERT(chunk_test == &chunk);
 #endif
@@ -126,7 +133,7 @@ namespace hpx { namespace util
             }
 
             {
-                boost::lock_guard<mutex_type> l(backup_chunks_mtx_);
+                std::lock_guard<mutex_type> l(backup_chunks_mtx_);
                 typename backup_chunks_type::iterator it =
                     backup_chunks_.lower_bound(size);
 
@@ -139,7 +146,7 @@ namespace hpx { namespace util
                 }
             }
 
-#if _POSIX_SOURCE
+#ifdef _POSIX_SOURCE
             int ret = posix_memalign(
                 reinterpret_cast<void **>(&result),
                 EXEC_PAGESIZE, size + offset_);
@@ -154,7 +161,7 @@ namespace hpx { namespace util
 
         void deallocate(char * p, size_type size)
         {
-            memory_chunk_type *chunk = 0;
+            memory_chunk_type *chunk = nullptr;
             std::memcpy(&chunk, p - offset_, offset_);
             if(chunk)
             {
@@ -179,7 +186,7 @@ namespace hpx { namespace util
             }
             else
             {
-                boost::lock_guard<mutex_type> l(backup_chunks_mtx_);
+                std::lock_guard<mutex_type> l(backup_chunks_mtx_);
                 if(backup_size_ <= backup_threshold_)
                 {
                     backup_size_ += size;
@@ -188,7 +195,7 @@ namespace hpx { namespace util
                 else
                 {
                     char *ptr = p - offset_;
-#if _POSIX_SOURCE
+#ifdef _POSIX_SOURCE
                     free(ptr);
 #else
                     delete[] ptr;

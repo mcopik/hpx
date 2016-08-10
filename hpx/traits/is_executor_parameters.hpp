@@ -1,4 +1,5 @@
-//  Copyright (c) 2014-2015 Hartmut Kaiser
+//  Copyright (c) 2014-2016 Hartmut Kaiser
+//  Copyright (c) 2016 Marcin Copik
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -6,14 +7,15 @@
 #if !defined(HPX_TRAITS_IS_EXECUTOR_PARAMETERS_AUG_01_2015_0709AM)
 #define HPX_TRAITS_IS_EXECUTOR_PARAMETERS_AUG_01_2015_0709AM
 
-#include <hpx/traits.hpp>
+#include <hpx/config.hpp>
 #include <hpx/config/inline_namespace.hpp>
 #include <hpx/parallel/config/inline_namespace.hpp>
 #include <hpx/util/decay.hpp>
 
+#include <functional>
 #include <type_traits>
 
-#include <boost/type_traits/is_base_of.hpp>
+#include <boost/ref.hpp>
 
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 {
@@ -25,12 +27,22 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         /// \cond NOINTERNAL
         template <typename T>
         struct is_executor_parameters
-          : boost::is_base_of<executor_parameters_tag, T>
+          : std::is_base_of<executor_parameters_tag, T>
         {};
 
         template <>
         struct is_executor_parameters<executor_parameters_tag>
           : std::false_type
+        {};
+
+        template <typename T>
+        struct is_executor_parameters< ::boost::reference_wrapper<T> >
+          : is_executor_parameters<typename hpx::util::decay<T>::type>
+        {};
+
+        template <typename T>
+        struct is_executor_parameters< ::std::reference_wrapper<T> >
+          : is_executor_parameters<typename hpx::util::decay<T>::type>
         {};
         /// \endcond
     }
@@ -47,7 +59,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 namespace hpx { namespace traits
 {
     // new executor framework
-    template <typename Parameters, typename Enable>
+    template <typename Parameters, typename Enable = void>
     struct is_executor_parameters
       : parallel::v3::is_executor_parameters<Parameters>
     {};

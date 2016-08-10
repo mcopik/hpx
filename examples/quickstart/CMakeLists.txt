@@ -23,15 +23,19 @@ set(example_programs
     fibonacci_futures_distributed
     fractals
     fractals_struct
-    safe_object
+    init_globally
+    sierpinski
     interest_calculator
     interval_timer
     latch_local
     latch_remote
     non_atomic_rma
+    partitioned_vector_spmd_foreach
     pingpong
     print_to_console
     quicksort
+    receive_buffer
+    safe_object
     shared_mutex
     simple_future_continuation
     simplest_hello_world
@@ -52,13 +56,16 @@ set(event_synchronization_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(error_handling_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(fractals_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(interval_timer_FLAGS COMPONENT_DEPENDENCIES iostreams)
+set(sierpinski_FLAGS COMPONENT_DEPENDENCIES iostreams)
+set(partitioned_vector_spmd_foreach_FLAGS
+    COMPONENT_DEPENDENCIES iostreams partitioned_vector)
 set(pingpong_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(shared_mutex_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(simplest_hello_world_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(simple_future_continuation_FLAGS COMPONENT_DEPENDENCIES iostreams)
 set(timed_futures_FLAGS COMPONENT_DEPENDENCIES iostreams)
 
-if(HPX_HAVE_LOCAL_SCHEDULER OR HPX_HAVE_ALL_SCHEDULERS)
+if(HPX_WITH_LOCAL_SCHEDULER OR HPX_WITH_ALL_SCHEDULERS)
   set(example_programs ${example_programs}
       fractals_executor
      )
@@ -83,6 +90,13 @@ if(HPX_WITH_CXX11_LAMBDAS)
   endif()
   set(vector_counting_dotproduct_FLAGS COMPONENT_DEPENDENCIES iostreams)
   set(vector_zip_dotproduct_FLAGS COMPONENT_DEPENDENCIES iostreams)
+endif()
+
+if(HPX_WITH_TUPLE_RVALUE_SWAP)
+  set(example_programs ${example_programs}
+      sort_by_key_demo
+     )
+  set(sort_by_key_demo_FLAGS COMPONENT_DEPENDENCIES iostreams)
 endif()
 
 foreach(example_program ${example_programs})

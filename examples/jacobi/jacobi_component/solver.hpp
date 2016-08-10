@@ -12,6 +12,9 @@
 
 #include <hpx/include/naming.hpp>
 
+#include <utility>
+#include <vector>
+
 namespace jacobi
 {
     struct solver

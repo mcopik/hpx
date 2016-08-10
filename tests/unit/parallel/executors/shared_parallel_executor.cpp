@@ -1,4 +1,4 @@
-//  Copyright (c) 2007-2015 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -10,6 +10,10 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <numeric>
+#include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include <boost/range/functions.hpp>
@@ -24,18 +28,20 @@ struct shared_parallel_executor
         typedef hpx::shared_future<T> type;
     };
 
-    template <typename F>
-    hpx::shared_future<typename hpx::util::result_of<
-        typename hpx::util::decay<F>::type()
-    >::type>
-    async_execute(F && f)
+    template <typename F, typename ... Ts>
+    hpx::shared_future<typename hpx::util::result_of<F&&(Ts &&...)>::type>
+    async_execute(F && f, Ts &&... ts)
     {
-        return hpx::async(std::forward<F>(f));
+        return hpx::async(std::forward<F>(f), std::forward<Ts>(ts)...);
     }
 };
 
 ///////////////////////////////////////////////////////////////////////////////
-hpx::thread::id test() { return hpx::this_thread::get_id(); }
+hpx::thread::id test(int passed_through)
+{
+    HPX_TEST_EQ(passed_through, 42);
+    return hpx::this_thread::get_id();
+}
 
 void test_sync()
 {
@@ -43,7 +49,7 @@ void test_sync()
     typedef hpx::parallel::executor_traits<executor> traits;
 
     executor exec;
-    HPX_TEST(traits::execute(exec, &test) != hpx::this_thread::get_id());
+    HPX_TEST(traits::execute(exec, &test, 42) != hpx::this_thread::get_id());
 }
 
 void test_async()
@@ -54,7 +60,7 @@ void test_async()
     executor exec;
 
     hpx::shared_future<hpx::thread::id> fut =
-        traits::async_execute(exec, &test);
+        traits::async_execute(exec, &test, 42);
 
     HPX_TEST(
         fut.get() !=
@@ -62,9 +68,10 @@ void test_async()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-void bulk_test(hpx::thread::id tid, int value)
+void bulk_test(int value, hpx::thread::id tid, int passed_through) //-V813
 {
     HPX_TEST(tid != hpx::this_thread::get_id());
+    HPX_TEST_EQ(passed_through, 42);
 }
 
 void test_bulk_sync()
@@ -78,9 +85,11 @@ void test_bulk_sync()
     std::iota(boost::begin(v), boost::end(v), std::rand());
 
     using hpx::util::placeholders::_1;
+    using hpx::util::placeholders::_2;
 
     executor exec;
-    traits::execute(exec, hpx::util::bind(&bulk_test, tid, _1), v);
+    traits::bulk_execute(exec, hpx::util::bind(&bulk_test, _1, tid, _2), v, 42);
+    traits::bulk_execute(exec, &bulk_test, v, tid, 42);
 }
 
 void test_bulk_async()
@@ -94,14 +103,44 @@ void test_bulk_async()
     std::iota(boost::begin(v), boost::end(v), std::rand());
 
     using hpx::util::placeholders::_1;
+    using hpx::util::placeholders::_2;
 
     executor exec;
     std::vector<hpx::shared_future<void> > futs =
-        traits::async_execute(exec, hpx::util::bind(&bulk_test, tid, _1), v);
+        traits::bulk_async_execute(exec,
+            hpx::util::bind(&bulk_test, _1, tid, _2), v, 42);
+    hpx::when_all(futs).get();
 
+    futs = traits::bulk_async_execute(exec, &bulk_test, v, tid, 42);
     hpx::when_all(futs).get();
 }
 
+///////////////////////////////////////////////////////////////////////////////
+void void_test(int passed_through)
+{
+    HPX_TEST_EQ(passed_through, 42);
+}
+
+void test_sync_void()
+{
+    typedef shared_parallel_executor executor;
+    typedef hpx::parallel::executor_traits<executor> traits;
+
+    executor exec;
+    traits::execute(exec, &void_test, 42);
+}
+
+void test_async_void()
+{
+    typedef shared_parallel_executor executor;
+    typedef hpx::parallel::executor_traits<executor> traits;
+
+    executor exec;
+    hpx::shared_future<void> fut = traits::async_execute(exec, &void_test, 42);
+    fut.get();
+}
+
+///////////////////////////////////////////////////////////////////////////////
 int hpx_main(int argc, char* argv[])
 {
     test_sync();
@@ -109,15 +148,18 @@ int hpx_main(int argc, char* argv[])
     test_bulk_sync();
     test_bulk_async();
 
+    test_sync_void();
+    test_async_void();
+
     return hpx::finalize();
 }
 
 int main(int argc, char* argv[])
 {
     // By default this test should run on all available cores
-    std::vector<std::string> cfg;
-    cfg.push_back("hpx.os_threads=" +
-        boost::lexical_cast<std::string>(hpx::threads::hardware_concurrency()));
+    std::vector<std::string> const cfg = {
+        "hpx.os_threads=all"
+    };
 
     // Initialize and run HPX
     HPX_TEST_EQ_MSG(hpx::init(argc, argv, cfg), 0,

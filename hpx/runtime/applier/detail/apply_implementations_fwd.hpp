@@ -11,6 +11,8 @@
 #include <hpx/runtime/naming/id_type.hpp>
 #include <hpx/traits/is_continuation.hpp>
 
+#include <type_traits>
+
 namespace hpx { namespace applier { namespace detail
 {
     // forward declaration only
@@ -47,14 +49,21 @@ namespace hpx { namespace applier { namespace detail
 namespace hpx { namespace detail
 {
     template <typename Action, typename Continuation, typename ...Ts>
-    typename boost::enable_if_c<
+    typename std::enable_if<
         traits::is_continuation<Continuation>::value, bool
     >::type
     apply_impl(Continuation && c,
         hpx::id_type const& id, threads::thread_priority priority, Ts&&... vs);
 
+    template <typename Action, typename Continuation, typename ...Ts>
+    typename std::enable_if<
+        traits::is_continuation<Continuation>::value, bool
+    >::type
+    apply_impl(Continuation && c, hpx::id_type const& id, naming::address&& addr,
+        threads::thread_priority priority, Ts&&... vs);
+
     template <typename Action, typename Continuation, typename Callback, typename ...Ts>
-    typename boost::enable_if_c<
+    typename std::enable_if<
         traits::is_continuation<Continuation>::value, bool
     >::type
     apply_cb_impl(Continuation && c,
@@ -64,6 +73,11 @@ namespace hpx { namespace detail
     template <typename Action, typename ...Ts>
     bool apply_impl(
         hpx::id_type const& id, threads::thread_priority priority, Ts&&... vs);
+
+    template <typename Action, typename ...Ts>
+    bool apply_impl(
+        hpx::id_type const& id, naming::address&&, threads::thread_priority priority,
+        Ts&&... vs);
 
     template <typename Action, typename Callback, typename ...Ts>
     bool apply_cb_impl(

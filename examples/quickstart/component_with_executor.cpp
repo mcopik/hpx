@@ -9,6 +9,8 @@
 #include <hpx/include/iostreams.hpp>
 #include <hpx/include/thread_executors.hpp>
 
+#include <utility>
+
 ///////////////////////////////////////////////////////////////////////////////
 // Define a base component which exposes the required interface
 struct hello_world_server
@@ -38,7 +40,7 @@ struct hello_world_server
         hpx::threads::thread_init_data& data,
         hpx::threads::thread_state_enum initial_state)
     {
-        char const* desc = 0;
+        hpx::util::thread_description desc(&hello_world_server::func);
 #ifdef HPX_HAVE_THREAD_DESCRIPTION
         desc = data.description;
 #endif

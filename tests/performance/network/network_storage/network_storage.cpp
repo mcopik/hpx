@@ -6,18 +6,20 @@
 #include <hpx/hpx_init.hpp>
 #include <hpx/hpx.hpp>
 
-#include <boost/assert.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/atomic.hpp>
 #include <boost/array.hpp>
+#include <boost/assert.hpp>
+#include <boost/atomic.hpp>
 #include <boost/random.hpp>
-#include <boost/thread/locks.hpp>
 
 #include <algorithm>
-#include <iostream>
-#include <vector>
-#include <memory>
+#include <chrono>
 #include <cstdio>
+#include <iostream>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <hpx/runtime/serialization/serialize.hpp>
 
@@ -89,7 +91,7 @@ hpx::lcos::barrier unique_barrier;
 //
 // Each locality allocates a buffer of memory which is used to host transfers
 //
-char                      *local_storage = NULL;
+char                      *local_storage = nullptr;
 hpx::lcos::local::spinlock storage_mutex;
 
 //
@@ -179,7 +181,7 @@ public:
   typedef std::ptrdiff_t difference_type;
 
   pointer_allocator() HPX_NOEXCEPT
-    : pointer_(0), size_(0)
+    : pointer_(nullptr), size_(0)
   {
   }
 
@@ -191,7 +193,7 @@ public:
   pointer address(reference value) const { return &value; }
   const_pointer address(const_reference value) const { return &value; }
 
-  pointer allocate(size_type n, void const* hint = 0)
+  pointer allocate(size_type n, void const* hint = nullptr)
   {
     HPX_ASSERT(n == size_);
     return static_cast<T*>(pointer_);
@@ -276,7 +278,7 @@ namespace Storage {
         // we must allocate a temporary buffer to copy from storage into
         // we can't use the remote buffer supplied because it is a handle to memory on
         // the (possibly) remote node. We allocate here using
-        // a NULL deleter so the array will
+        // a nullptr deleter so the array will
         // not be released by the shared_pointer
         std::allocator<char> local_allocator;
         boost::shared_array<char> local_buffer(local_allocator.allocate(length),
@@ -334,7 +336,7 @@ int RemoveCompletions()
     while(FuturesActive)
     {
         {
-            boost::lock_guard<hpx::lcos::local::spinlock> lk(FuturesMutex);
+            std::lock_guard<hpx::lcos::local::spinlock> lk(FuturesMutex);
             for(std::vector<hpx::future<int> > &futvec : ActiveFutures) {
                 for(std::vector<hpx::future<int> >::iterator fut = futvec.begin();
                     fut != futvec.end(); /**/)
@@ -352,7 +354,7 @@ int RemoveCompletions()
                 }
             }
         }
-        hpx::this_thread::suspend(boost::chrono::microseconds(10));
+        hpx::this_thread::suspend(std::chrono::microseconds(10));
     }
     return num_removed;
 }
@@ -380,7 +382,7 @@ hpx::lcos::barrier create_barrier(std::size_t num_localities, char const* symnam
     );
 
     hpx::lcos::barrier b = hpx::lcos::barrier::create(hpx::find_here(), num_localities);
-    hpx::agas::register_name_sync(symname, b.get_id());
+    hpx::agas::register_name(hpx::launch::sync, symname, b.get_id());
     return b;
 }
 
@@ -462,7 +464,7 @@ void test_write(
                 );
 #ifdef USE_CLEANING_THREAD
                 ++FuturesWaiting[send_rank];
-                boost::lock_guard<hpx::lcos::local::spinlock> lk(FuturesMutex);
+                std::lock_guard<hpx::lcos::local::spinlock> lk(FuturesMutex);
 #endif
                 ActiveFutures[send_rank].push_back(
                     hpx::async(actWrite, locality,
@@ -634,7 +636,7 @@ void test_read(
             {
 #ifdef USE_CLEANING_THREAD
                 ++FuturesWaiting[send_rank];
-                boost::lock_guard<hpx::lcos::local::spinlock> lk(FuturesMutex);
+                std::lock_guard<hpx::lcos::local::spinlock> lk(FuturesMutex);
 #endif
                 using hpx::util::placeholders::_1;
                 std::size_t buffer_address =
@@ -740,7 +742,8 @@ void find_barrier_startup()
     uint64_t rank = hpx::naming::get_locality_id_from_id(here);
 
     if (rank != 0) {
-        hpx::id_type id = hpx::agas::resolve_name_sync("/0/DSM_barrier");
+        hpx::id_type id =
+            hpx::agas::resolve_name(hpx::launch::sync, "/0/DSM_barrier");
         unique_barrier = hpx::lcos::barrier(id);
     }
 }
@@ -817,7 +820,7 @@ int hpx_main(boost::program_options::variables_map& vm)
         std::cout << "Unregistering Barrier " << rank << std::endl;
     );
     if (0 == rank)
-        hpx::agas::unregister_name_sync("/0/DSM_barrier");
+        hpx::agas::unregister_name(hpx::launch::sync, "/0/DSM_barrier");
 
     DEBUG_OUTPUT(2,
         std::cout << "Calling finalize" << rank << std::endl;
@@ -904,8 +907,9 @@ int main(int argc, char* argv[])
     hpx::register_startup_function(&find_barrier_startup);
 
     // Initialize and run HPX, this test requires to run hpx_main on all localities
-    std::vector<std::string> cfg;
-    cfg.push_back("hpx.run_hpx_main!=1");
+    std::vector<std::string> const cfg = {
+        "hpx.run_hpx_main!=1"
+    };
 
     return hpx::init(desc_commandline, argc, argv, cfg);
 }

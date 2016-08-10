@@ -10,6 +10,10 @@
 
 #include <boost/range/functions.hpp>
 
+#include <numeric>
+#include <string>
+#include <vector>
+
 #include "test_utils.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -21,8 +25,10 @@ void test_transform_binary(ExPolicy policy, IteratorTag)
     typedef std::vector<std::size_t>::iterator base_iterator;
     typedef test::test_iterator<base_iterator, IteratorTag> iterator;
 
-    std::vector<std::size_t> c1(10007);
-    std::vector<std::size_t> c2(c1.size());
+    typedef test::test_container<std::vector<int>, IteratorTag> test_vector;
+
+    test_vector c1(10007);
+    test_vector c2(10007);
     std::vector<std::size_t> d1(c1.size()); //-V656
     std::iota(boost::begin(c1), boost::end(c1), std::rand());
     std::iota(boost::begin(c2), boost::end(c2), std::rand());
@@ -34,15 +40,9 @@ void test_transform_binary(ExPolicy policy, IteratorTag)
 
     auto result =
         hpx::parallel::transform(policy,
-            boost::make_iterator_range(
-                iterator(boost::begin(c1)), iterator(boost::end(c1))
-            ),
-            boost::make_iterator_range(
-                boost::begin(c2), boost::end(c2)
-            ),
-            boost::begin(d1), add);
+            c1, c2, boost::begin(d1), add);
 
-    HPX_TEST(hpx::util::get<0>(result) == iterator(boost::end(c1)));
+    HPX_TEST(hpx::util::get<0>(result) == boost::end(c1));
     HPX_TEST(hpx::util::get<1>(result) == boost::end(c2));
     HPX_TEST(hpx::util::get<2>(result) == boost::end(d1));
 
@@ -67,8 +67,10 @@ void test_transform_binary_async(ExPolicy p, IteratorTag)
     typedef std::vector<std::size_t>::iterator base_iterator;
     typedef test::test_iterator<base_iterator, IteratorTag> iterator;
 
-    std::vector<std::size_t> c1(10007);
-    std::vector<std::size_t> c2(c1.size());
+    typedef test::test_container<std::vector<int>, IteratorTag> test_vector;
+
+    test_vector c1(10007);
+    test_vector c2(10007);
     std::vector<std::size_t> d1(c1.size()); //-V656
     std::iota(boost::begin(c1), boost::end(c1), std::rand());
     std::iota(boost::begin(c2), boost::end(c2), std::rand());
@@ -80,17 +82,11 @@ void test_transform_binary_async(ExPolicy p, IteratorTag)
 
     auto f =
         hpx::parallel::transform(p,
-            boost::make_iterator_range(
-                iterator(boost::begin(c1)), iterator(boost::end(c1))
-            ),
-            boost::make_iterator_range(
-                boost::begin(c2), boost::end(c2)
-            ),
-            boost::begin(d1), add);
+            c1, c2, boost::begin(d1), add);
     f.wait();
 
-    hpx::util::tuple<iterator, base_iterator, base_iterator> result = f.get();
-    HPX_TEST(hpx::util::get<0>(result) == iterator(boost::end(c1)));
+    auto result = f.get();
+    HPX_TEST(hpx::util::get<0>(result) == boost::end(c1));
     HPX_TEST(hpx::util::get<1>(result) == boost::end(c2));
     HPX_TEST(hpx::util::get<2>(result) == boost::end(d1));
 
@@ -121,12 +117,14 @@ void test_transform_binary()
     test_transform_binary_async(seq(task), IteratorTag());
     test_transform_binary_async(par(task), IteratorTag());
 
+#if defined(HPX_HAVE_GENERIC_EXECUTION_POLICY)
     test_transform_binary(execution_policy(seq), IteratorTag());
     test_transform_binary(execution_policy(par), IteratorTag());
     test_transform_binary(execution_policy(par_vec), IteratorTag());
 
     test_transform_binary(execution_policy(seq(task)), IteratorTag());
     test_transform_binary(execution_policy(par(task)), IteratorTag());
+#endif
 }
 
 void transform_binary_test()
@@ -236,11 +234,13 @@ void test_transform_binary_exception()
     test_transform_binary_exception_async(seq(task), IteratorTag());
     test_transform_binary_exception_async(par(task), IteratorTag());
 
+#if defined(HPX_HAVE_GENERIC_EXECUTION_POLICY)
     test_transform_binary_exception(execution_policy(seq), IteratorTag());
     test_transform_binary_exception(execution_policy(par), IteratorTag());
 
     test_transform_binary_exception(execution_policy(seq(task)), IteratorTag());
     test_transform_binary_exception(execution_policy(par(task)), IteratorTag());
+#endif
 }
 
 void transform_binary_exception_test()
@@ -348,11 +348,13 @@ void test_transform_binary_bad_alloc()
     test_transform_binary_bad_alloc_async(seq(task), IteratorTag());
     test_transform_binary_bad_alloc_async(par(task), IteratorTag());
 
+#if defined(HPX_HAVE_GENERIC_EXECUTION_POLICY)
     test_transform_binary_bad_alloc(execution_policy(seq), IteratorTag());
     test_transform_binary_bad_alloc(execution_policy(par), IteratorTag());
 
     test_transform_binary_bad_alloc(execution_policy(seq(task)), IteratorTag());
     test_transform_binary_bad_alloc(execution_policy(par(task)), IteratorTag());
+#endif
 }
 
 void transform_binary_bad_alloc_test()
@@ -365,7 +367,7 @@ void transform_binary_bad_alloc_test()
 ///////////////////////////////////////////////////////////////////////////////
 int hpx_main(boost::program_options::variables_map& vm)
 {
-    unsigned int seed = (unsigned int)std::time(0);
+    unsigned int seed = (unsigned int)std::time(nullptr);
     if (vm.count("seed"))
         seed = vm["seed"].as<unsigned int>();
 
@@ -390,9 +392,9 @@ int main(int argc, char* argv[])
         "the random number generator seed to use for this run")
         ;
     // By default this test should run on all available cores
-    std::vector<std::string> cfg;
-    cfg.push_back("hpx.os_threads=" +
-        boost::lexical_cast<std::string>(hpx::threads::hardware_concurrency()));
+    std::vector<std::string> const cfg = {
+        "hpx.os_threads=all"
+    };
 
     // Initialize and run HPX
     HPX_TEST_EQ_MSG(hpx::init(desc_commandline, argc, argv, cfg), 0,

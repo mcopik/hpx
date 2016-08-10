@@ -37,6 +37,9 @@ add_hpx_library_sources(hpx
 add_hpx_library_sources(hpx
   GLOB_RECURSE GLOBS "${PROJECT_SOURCE_DIR}/src/lcos/*.cpp"
   APPEND)
+add_hpx_library_sources(hpx
+  GLOB_RECURSE GLOBS "${PROJECT_SOURCE_DIR}/src/compute/*.cpp"
+  APPEND)
 
 
 # libhpx_init sources
@@ -53,7 +56,8 @@ set(hpx_external_SOURCES "" CACHE INTERNAL "Sources for libhpx_external." FORCE)
 
 if(MSVC)
   if(HPX_WITH_SWAP_CONTEXT_EMULATION)
-    set(switch_to_fiber_source "${PROJECT_SOURCE_DIR}/src/util/coroutine/switch_to_fiber.asm")
+    set(switch_to_fiber_source
+      "${PROJECT_SOURCE_DIR}/src/runtime/threads/coroutines/switch_to_fiber.asm")
     add_hpx_library_sources(hpx_external_objects
       GLOB GLOBS "${switch_to_fiber_source}")
     add_custom_command(
@@ -64,6 +68,15 @@ if(MSVC)
     set(hpx_external_OBJECTS "${CMAKE_CURRENT_BINARY_DIR}/switch_to_fiber.obj"
       CACHE INTERNAL "External object files for HPX." FORCE)
   endif()
+
+  # add natvis files to solution (supported starting VS2015)
+  if(MSVC14)
+    add_hpx_library_sources(hpx_natvis_files
+      GLOB GLOBS "${PROJECT_SOURCE_DIR}/tools/VS/*.natvis")
+    set(hpx_external_OBJECTS ${hpx_external_OBJECTS} ${hpx_natvis_files_SOURCES})
+    source_group("Natvis Files" FILES ${hpx_natvis_files_SOURCES})
+  endif()
+
 endif()
 
 if("${HPX_PLATFORM_UC}" STREQUAL "ANDROID")
@@ -77,9 +90,6 @@ endif()
 add_hpx_library_headers(hpx
   GLOB GLOBS "${PROJECT_SOURCE_DIR}/hpx/*.hpp"
   EXCLUDE ".*hpx_main.*[.]hpp")
-add_hpx_library_headers(hpx
-  GLOB GLOBS "${PROJECT_SOURCE_DIR}/hpx/preprocessed/*.hpp"
-  APPEND)
 add_hpx_library_headers(hpx
   GLOB_RECURSE GLOBS "${PROJECT_SOURCE_DIR}/hpx/runtime/*.hpp"
   APPEND)
@@ -107,6 +117,9 @@ add_hpx_library_headers(hpx
   APPEND)
 add_hpx_library_headers(hpx
   GLOB_RECURSE GLOBS "${PROJECT_SOURCE_DIR}/hpx/parallel/*.hpp"
+  APPEND)
+add_hpx_library_headers(hpx
+  GLOB_RECURSE GLOBS "${PROJECT_SOURCE_DIR}/hpx/compute/*.hpp"
   APPEND)
 
 if(HPX_WITH_STATIC_LINKING)
@@ -170,11 +183,21 @@ if(HPX_WITH_STATIC_LINKING)
   set(hpx_SOURCES ${hpx_SOURCES} ${hpx_init_SOURCES})
 endif()
 if(HPX_WITH_DEFAULT_TARGETS)
-  add_library(hpx ${hpx_library_link_mode_core}
-    ${hpx_SOURCES} ${hpx_external_SOURCES} ${hpx_external_OBJECTS} ${hpx_HEADERS})
+  if(HPX_WITH_CUDA)
+    cuda_add_library(hpx ${hpx_library_link_mode_core}
+      ${hpx_SOURCES} ${hpx_external_SOURCES} ${hpx_external_OBJECTS} ${hpx_HEADERS})
+  else()
+    add_library(hpx ${hpx_library_link_mode_core}
+      ${hpx_SOURCES} ${hpx_external_SOURCES} ${hpx_external_OBJECTS} ${hpx_HEADERS})
+  endif()
 else()
-  add_library(hpx ${hpx_library_link_mode_core} EXCLUDE_FROM_ALL
-    ${hpx_SOURCES} ${hpx_external_SOURCES} ${hpx_external_OBJECTS} ${hpx_HEADERS})
+  if(HPX_WITH_CUDA)
+    cuda_add_library(hpx ${hpx_library_link_mode_core} EXCLUDE_FROM_ALL
+      ${hpx_SOURCES} ${hpx_external_SOURCES} ${hpx_external_OBJECTS} ${hpx_HEADERS})
+  else()
+    add_library(hpx ${hpx_library_link_mode_core} EXCLUDE_FROM_ALL
+      ${hpx_SOURCES} ${hpx_external_SOURCES} ${hpx_external_OBJECTS} ${hpx_HEADERS})
+  endif()
 endif()
 
 #if(HPX_WITH_STATIC_LINKING)
@@ -196,10 +219,12 @@ else()
 endif()
 
 target_link_libraries(hpx
-  PUBLIC ${HPX_LIBRARIES})
+  #PUBLIC ${HPX_LIBRARIES})
+  ${HPX_LIBRARIES})
 if(HPX_ADDITIONAL_RUNTIME_DEPENDENCIES)
   target_link_libraries(hpx
-    PRIVATE ${HPX_ADDITIONAL_RUNTIME_DEPENDENCIES})
+    #PRIVATE ${HPX_ADDITIONAL_RUNTIME_DEPENDENCIES})
+    ${HPX_ADDITIONAL_RUNTIME_DEPENDENCIES})
 endif()
 
 set_property(TARGET hpx APPEND
@@ -227,12 +252,23 @@ set(hpx_targets ${hpx_targets} hpx)
 # libhpx_init
 
 if(NOT HPX_WITH_STATIC_LINKING)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
   if(HPX_WITH_DEFAULT_TARGETS)
-    add_library(hpx_init STATIC
-      ${hpx_init_SOURCES} ${hpx_init_HEADERS})
+    if(HPX_WITH_CUDA)
+      cuda_add_library(hpx_init STATIC
+        ${hpx_init_SOURCES} ${hpx_init_HEADERS})
+    else()
+      add_library(hpx_init STATIC
+        ${hpx_init_SOURCES} ${hpx_init_HEADERS})
+    endif()
   else()
-    add_library(hpx_init STATIC EXCLUDE_FROM_ALL
-      ${hpx_init_SOURCES} ${hpx_init_HEADERS})
+    if(HPX_WITH_CUDA)
+      cuda_add_library(hpx_init STATIC EXCLUDE_FROM_ALL
+        ${hpx_init_SOURCES} ${hpx_init_HEADERS})
+    else()
+      add_library(hpx_init STATIC EXCLUDE_FROM_ALL
+        ${hpx_init_SOURCES} ${hpx_init_HEADERS})
+    endif()
   endif()
 
   set_property(TARGET hpx_init APPEND
@@ -243,6 +279,26 @@ if(NOT HPX_WITH_STATIC_LINKING)
   set_property(TARGET hpx_init PROPERTY FOLDER "Core")
   set(hpx_targets ${hpx_targets} hpx_init)
 endif()
+
+get_property(HPX_TARGET_COMPILE_DEFININTIONS_VAR
+  GLOBAL PROPERTY HPX_TARGET_COMPILE_DEFINITIONS)
+foreach(_flag ${HPX_TARGET_COMPILE_DEFINITIONS_VAR})
+  target_compile_definitions(hpx INTERFACE ${_flag})
+  target_compile_definitions(hpx PUBLIC ${_flag})
+  if(NOT HPX_WITH_STATIC_LINKING)
+    target_compile_definitions(hpx_init PUBLIC ${_flag})
+  endif()
+endforeach()
+
+get_property(HPX_TARGET_COMPILE_OPTIONS_VAR
+  GLOBAL PROPERTY HPX_TARGET_COMPILE_OPTIONS)
+foreach(_flag ${HPX_TARGET_COMPILE_OPTIONS_VAR})
+  target_compile_options(hpx INTERFACE ${_flag})
+  target_compile_options(hpx PUBLIC ${_flag})
+  if(NOT HPX_WITH_STATIC_LINKING)
+    target_compile_options(hpx_init PUBLIC ${_flag})
+  endif()
+endforeach()
 
 set(_optional)
 if(HPX_WITH_DEFAULT_TARGETS)

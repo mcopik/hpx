@@ -9,15 +9,13 @@
 #define HPX_UTIL_DETAIL_FUNCTION_REGISTRATION_HPP
 
 #include <hpx/config.hpp>
-#include <hpx/util/detail/get_table.hpp>
 #include <hpx/runtime/serialization/detail/polymorphic_intrusive_factory.hpp>
 #include <hpx/traits/needs_automatic_registration.hpp>
 #include <hpx/util/demangle_helper.hpp>
+#include <hpx/util/detail/get_table.hpp>
 
-#include <boost/mpl/bool.hpp>
-#include <boost/smart_ptr/shared_ptr.hpp>
-
-#include <utility>
+#include <string>
+#include <type_traits>
 
 namespace hpx { namespace util { namespace detail
 {
@@ -121,7 +119,7 @@ namespace hpx { namespace util { namespace detail
     };
 
     template <typename VTablePair>
-    struct automatic_function_registration<VTablePair, boost::mpl::false_>
+    struct automatic_function_registration<VTablePair, std::false_type>
     {
         automatic_function_registration()
         {}

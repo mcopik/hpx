@@ -6,22 +6,21 @@
 #if !defined(HPX_APPLY_APR_16_20012_0943AM)
 #define HPX_APPLY_APR_16_20012_0943AM
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
 #include <hpx/async.hpp>
-#include <hpx/runtime/threads/thread_helpers.hpp>
-#include <hpx/runtime/threads/thread_executor.hpp>
 #include <hpx/runtime/applier/apply.hpp>
 #include <hpx/runtime/applier/apply_continue.hpp>
+#include <hpx/runtime/threads/thread_executor.hpp>
+#include <hpx/runtime/threads/thread_helpers.hpp>
+#include <hpx/traits/is_executor.hpp>
+#include <hpx/traits/is_launch_policy.hpp>
 #include <hpx/util/bind_action.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/deferred_call.hpp>
-#include <hpx/traits/is_callable.hpp>
-#include <hpx/traits/is_executor.hpp>
-#include <hpx/traits/is_launch_policy.hpp>
-
-#include <boost/utility/enable_if.hpp>
+#include <hpx/util/thread_description.hpp>
 
 #include <type_traits>
+#include <utility>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace detail
@@ -36,15 +35,16 @@ namespace hpx { namespace detail
     {
         template <typename F, typename ...Ts>
         HPX_FORCEINLINE static
-        typename boost::enable_if_c<
+        typename std::enable_if<
             traits::detail::is_deferred_callable<F(Ts&&...)>::value,
             bool
         >::type
         call(F&& f, Ts&&... ts)
         {
+            util::thread_description desc(f, "apply_dispatch::call");
             threads::register_thread_nullary(
                 util::deferred_call(std::forward<F>(f), std::forward<Ts>(ts)...),
-                "hpx::apply");
+                desc);
             return false;
         }
     };
@@ -52,13 +52,13 @@ namespace hpx { namespace detail
     // threads::executor
     template <typename Executor>
     struct apply_dispatch<Executor,
-        typename boost::enable_if_c<
+        typename std::enable_if<
             traits::is_threads_executor<Executor>::value
         >::type>
     {
         template <typename F, typename ...Ts>
         HPX_FORCEINLINE static
-        typename boost::enable_if_c<
+        typename std::enable_if<
             traits::detail::is_deferred_callable<F(Ts&&...)>::value,
             bool
         >::type
@@ -74,20 +74,20 @@ namespace hpx { namespace detail
     // parallel::executor
     template <typename Executor>
     struct apply_dispatch<Executor,
-        typename boost::enable_if_c<
+        typename std::enable_if<
             traits::is_executor<Executor>::value
         >::type>
     {
         template <typename F, typename ...Ts>
         HPX_FORCEINLINE static
-        typename boost::enable_if_c<
+        typename std::enable_if<
             traits::detail::is_deferred_callable<F(Ts&&...)>::value,
             bool
         >::type
         call(Executor& exec, F&& f, Ts&&... ts)
         {
             parallel::executor_traits<Executor>::apply_execute(exec,
-                util::deferred_call(std::forward<F>(f), std::forward<Ts>(ts)...));
+                std::forward<F>(f), std::forward<Ts>(ts)...);
             return false;
         }
     };
@@ -95,7 +95,7 @@ namespace hpx { namespace detail
     // bound action
     template <typename Bound>
     struct apply_dispatch<Bound,
-        typename boost::enable_if_c<
+        typename std::enable_if<
             traits::is_bound_action<Bound>::value
         >::type>
     {

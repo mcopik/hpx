@@ -9,6 +9,11 @@
 #include <hpx/include/lcos.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
+#include <boost/atomic.hpp>
+
+#include <chrono>
+#include <vector>
+
 ///////////////////////////////////////////////////////////////////////////////
 boost::atomic<int> count_call_void(0);
 boost::atomic<int> count_call_future_void(0);
@@ -26,7 +31,7 @@ struct test_server
         // make sure this function is not concurrently invoked
         HPX_TEST_EQ(count_active_call_void.fetch_add(1) + 1, 1);
 
-        hpx::this_thread::suspend(boost::chrono::microseconds(100));
+        hpx::this_thread::suspend(std::chrono::microseconds(100));
 
         --count_active_call_void;
         HPX_TEST_EQ(count_active_call_void.load(), 0);
@@ -39,7 +44,7 @@ struct test_server
         // make sure this function is not concurrently invoked
         HPX_TEST_EQ(count_active_call_future_void.fetch_add(1) + 1, 1);
 
-        hpx::this_thread::suspend(boost::chrono::microseconds(100));
+        hpx::this_thread::suspend(std::chrono::microseconds(100));
 
         --count_active_call_future_void;
         HPX_TEST_EQ(count_active_call_future_void.load(), 0);
@@ -117,7 +122,7 @@ void plain_void()
     // make sure this function is not concurrently invoked
     HPX_TEST_EQ(count_active_plain_void.fetch_add(1) + 1, 1);
 
-    hpx::this_thread::suspend(boost::chrono::microseconds(100));
+    hpx::this_thread::suspend(std::chrono::microseconds(100));
 
     --count_active_plain_void;
     HPX_TEST_EQ(count_active_plain_void.load(), 0);
@@ -135,7 +140,7 @@ hpx::future<void> plain_future_void()
     // make sure this function is not concurrently invoked
     HPX_TEST_EQ(count_active_plain_future_void.fetch_add(1) + 1, 1);
 
-    hpx::this_thread::suspend(boost::chrono::microseconds(100));
+    hpx::this_thread::suspend(std::chrono::microseconds(100));
 
     --count_active_plain_future_void;
     HPX_TEST_EQ(count_active_plain_future_void.load(), 0);

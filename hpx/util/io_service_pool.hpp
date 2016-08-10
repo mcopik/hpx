@@ -12,22 +12,24 @@
 #include <hpx/config.hpp>
 #include <hpx/config/asio.hpp>
 #include <hpx/util/function.hpp>
-#include <hpx/config/warnings_prefix.hpp>
 
-#include <vector>
 #include <memory>
+#include <vector>
 
 #include <boost/asio/io_service.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
-#include <boost/noncopyable.hpp>
+
+#include <hpx/config/warnings_prefix.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace util
 {
     /// A pool of io_service objects.
-    class HPX_EXPORT io_service_pool : private boost::noncopyable
+    class HPX_EXPORT io_service_pool
     {
+        HPX_NON_COPYABLE(io_service_pool);
+
     public:
         /// \brief Construct the io_service pool.
         /// \param pool_size
@@ -95,7 +97,7 @@ namespace hpx { namespace util
     private:
         typedef std::unique_ptr<boost::asio::io_service> io_service_ptr;
 // FIXME: Intel compilers don't like this
-#if (defined(HPX_GCC_VERSION) && HPX_GCC_VERSION < 40700) || defined(HPX_NATIVE_MIC)
+#if defined(HPX_NATIVE_MIC)
         typedef std::unique_ptr<boost::asio::io_service::work> work_type;
 #else
         typedef boost::asio::io_service::work work_type;
@@ -105,7 +107,7 @@ namespace hpx { namespace util
         {
             return work_type(
 // FIXME: Intel compilers don't like this
-#if (defined(HPX_GCC_VERSION) && HPX_GCC_VERSION < 40700) || defined(HPX_NATIVE_MIC)
+#if defined(HPX_NATIVE_MIC)
                     new boost::asio::io_service::work(io_service)
 #else
                     io_service

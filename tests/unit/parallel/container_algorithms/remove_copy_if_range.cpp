@@ -10,6 +10,10 @@
 
 #include <boost/range/functions.hpp>
 
+#include <numeric>
+#include <string>
+#include <vector>
+
 #include "test_utils.hpp"
 
 ////////////////////////////////////////////////////////////////////////////
@@ -166,12 +170,14 @@ void test_remove_copy_if()
     test_remove_copy_if_async(seq(task), IteratorTag());
     test_remove_copy_if_async(par(task), IteratorTag());
 
+#if defined(HPX_HAVE_GENERIC_EXECUTION_POLICY)
     test_remove_copy_if(execution_policy(seq), IteratorTag());
     test_remove_copy_if(execution_policy(par), IteratorTag());
     test_remove_copy_if(execution_policy(par_vec), IteratorTag());
 
     test_remove_copy_if(execution_policy(seq(task)), IteratorTag());
     test_remove_copy_if(execution_policy(par(task)), IteratorTag());
+#endif
 
     test_remove_copy_if_outiter(seq, IteratorTag());
     test_remove_copy_if_outiter(par, IteratorTag());
@@ -180,12 +186,14 @@ void test_remove_copy_if()
     test_remove_copy_if_outiter_async(seq(task), IteratorTag());
     test_remove_copy_if_outiter_async(par(task), IteratorTag());
 
+#if defined(HPX_HAVE_GENERIC_EXECUTION_POLICY)
     test_remove_copy_if_outiter(execution_policy(seq), IteratorTag());
     test_remove_copy_if_outiter(execution_policy(par), IteratorTag());
     test_remove_copy_if_outiter(execution_policy(par_vec), IteratorTag());
 
     test_remove_copy_if_outiter(execution_policy(seq(task)), IteratorTag());
     test_remove_copy_if_outiter(execution_policy(par(task)), IteratorTag());
+#endif
 }
 
 void remove_copy_if_test()
@@ -206,7 +214,9 @@ void test_remove_copy_if_exception(ExPolicy policy, IteratorTag)
     typedef std::vector<std::size_t>::iterator base_iterator;
     typedef test::test_iterator<base_iterator, IteratorTag> iterator;
 
-    std::vector<std::size_t> c(10007);
+    typedef test::test_container<std::vector<int>, IteratorTag> test_vector;
+
+    test_vector c(10007);
     std::vector<std::size_t> d(c.size());
     std::iota(boost::begin(c), boost::end(c), std::rand());
 
@@ -236,7 +246,9 @@ void test_remove_copy_if_exception_async(ExPolicy p, IteratorTag)
     typedef std::vector<std::size_t>::iterator base_iterator;
     typedef test::test_iterator<base_iterator, IteratorTag> iterator;
 
-    std::vector<std::size_t> c(10007);
+    typedef test::test_container<std::vector<int>, IteratorTag> test_vector;
+
+    test_vector c(10007);
     std::vector<std::size_t> d(c.size());
     std::iota(boost::begin(c), boost::end(c), std::rand());
 
@@ -281,11 +293,13 @@ void test_remove_copy_if_exception()
     test_remove_copy_if_exception_async(seq(task), IteratorTag());
     test_remove_copy_if_exception_async(par(task), IteratorTag());
 
+#if defined(HPX_HAVE_GENERIC_EXECUTION_POLICY)
     test_remove_copy_if_exception(execution_policy(seq), IteratorTag());
     test_remove_copy_if_exception(execution_policy(par), IteratorTag());
 
     test_remove_copy_if_exception(execution_policy(seq(task)), IteratorTag());
     test_remove_copy_if_exception(execution_policy(par(task)), IteratorTag());
+#endif
 }
 
 void remove_copy_if_exception_test()
@@ -306,7 +320,9 @@ void test_remove_copy_if_bad_alloc(ExPolicy policy, IteratorTag)
     typedef std::vector<std::size_t>::iterator base_iterator;
     typedef test::test_iterator<base_iterator, IteratorTag> iterator;
 
-    std::vector<std::size_t> c(10007);
+    typedef test::test_container<std::vector<int>, IteratorTag> test_vector;
+
+    test_vector c(10007);
     std::vector<std::size_t> d(c.size());
     std::iota(boost::begin(c), boost::end(c), std::rand());
 
@@ -336,7 +352,9 @@ void test_remove_copy_if_bad_alloc_async(ExPolicy p, IteratorTag)
     typedef std::vector<std::size_t>::iterator base_iterator;
     typedef test::test_iterator<base_iterator, IteratorTag> iterator;
 
-    std::vector<std::size_t> c(10007);
+    typedef test::test_container<std::vector<int>, IteratorTag> test_vector;
+
+    test_vector c(10007);
     std::vector<std::size_t> d(c.size());
     std::iota(boost::begin(c), boost::end(c), std::rand());
 
@@ -380,11 +398,13 @@ void test_remove_copy_if_bad_alloc()
     test_remove_copy_if_bad_alloc_async(seq(task), IteratorTag());
     test_remove_copy_if_bad_alloc_async(par(task), IteratorTag());
 
+#if defined(HPX_HAVE_GENERIC_EXECUTION_POLICY)
     test_remove_copy_if_bad_alloc(execution_policy(seq), IteratorTag());
     test_remove_copy_if_bad_alloc(execution_policy(par), IteratorTag());
 
     test_remove_copy_if_bad_alloc(execution_policy(seq(task)), IteratorTag());
     test_remove_copy_if_bad_alloc(execution_policy(par(task)), IteratorTag());
+#endif
 }
 
 void remove_copy_if_bad_alloc_test()
@@ -396,7 +416,7 @@ void remove_copy_if_bad_alloc_test()
 
 int hpx_main(boost::program_options::variables_map& vm)
 {
-    unsigned int seed = (unsigned int)std::time(0);
+    unsigned int seed = (unsigned int)std::time(nullptr);
     if (vm.count("seed"))
         seed = vm["seed"].as<unsigned int>();
 
@@ -422,9 +442,9 @@ int main(int argc, char* argv[])
         ;
 
     // By default this test should run on all available cores
-    std::vector<std::string> cfg;
-    cfg.push_back("hpx.os_threads=" +
-        boost::lexical_cast<std::string>(hpx::threads::hardware_concurrency()));
+    std::vector<std::string> const cfg = {
+        "hpx.os_threads=all"
+    };
 
     // Initialize and run HPX
     HPX_TEST_EQ_MSG(hpx::init(desc_commandline, argc, argv, cfg), 0,

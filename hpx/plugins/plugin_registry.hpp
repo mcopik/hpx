@@ -3,26 +3,26 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
+// make inspect happy: hpxinspect:nodeprecatedname:boost::is_any_of
+
 #if !defined(HPX_PLUGIN_REGISTRY_MAR_24_2013_0235PM)
 #define HPX_PLUGIN_REGISTRY_MAR_24_2013_0235PM
 
 #include <hpx/config.hpp>
-#include <hpx/hpx_fwd.hpp>
-
-#include <hpx/plugins/unique_plugin_name.hpp>
 #include <hpx/plugins/plugin_registry_base.hpp>
+#include <hpx/plugins/unique_plugin_name.hpp>
 
-#include <hpx/util/ini.hpp>
-#include <hpx/util/find_prefix.hpp>
 #include <hpx/util/detail/count_num_args.hpp>
+#include <hpx/util/find_prefix.hpp>
+#include <hpx/util/ini.hpp>
 
 #include <hpx/traits/plugin_config_data.hpp>
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/assign/std/vector.hpp>
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/classification.hpp>
 
 #include <string>
 #include <vector>
@@ -60,7 +60,7 @@ namespace hpx { namespace plugins
                 unique_plugin_name<plugin_registry>::call() + "]";
             fillini += "name = " HPX_PLUGIN_STRING;
             fillini += std::string("path = ") +
-                util::find_prefixes("/lib/hpx", HPX_PLUGIN_STRING);
+                util::find_prefixes("/hpx", HPX_PLUGIN_STRING);
             fillini += "enabled = 1";
 
             char const* more = traits::plugin_config_data<Plugin>::call();

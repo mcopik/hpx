@@ -4,6 +4,7 @@
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include <hpx/hpx.hpp>
+#include <hpx/runtime/shutdown_function.hpp>
 #include <hpx/runtime/agas/interface.hpp>
 #include <hpx/runtime/components/component_factory_base.hpp>
 #include <hpx/runtime/components/component_startup_shutdown.hpp>
@@ -13,8 +14,12 @@
 #include <hpx/lcos/local/packaged_task.hpp>
 #include <hpx/util/assert.hpp>
 
-#include <boost/make_shared.hpp>
-#include <boost/move/move.hpp>
+#include <cstring>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "read_values.hpp"
 #include "partition3d.hpp"
@@ -48,7 +53,7 @@ namespace sheneos
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    bool get_shutdown(hpx::util::function_nonser<void()>& shutdown_func,
+    bool get_shutdown(hpx::shutdown_function_type& shutdown_func,
         bool& pre_shutdown)
     {
         shutdown_func = shutdown;
@@ -77,13 +82,13 @@ namespace sheneos
         if (was_created_) {
             // Unregister the config data.
             config_data data = cfg_.get();
-            hpx::agas::unregister_name(data.symbolic_name_);
+            hpx::agas::unregister_name(hpx::launch::sync, data.symbolic_name_);
 
             // Unregister all symbolic names.
             for (std::size_t i = 0; i < partitions_.size(); ++i)
             {
-                hpx::agas::unregister_name(data.symbolic_name_ +
-                    boost::lexical_cast<std::string>(i++));
+                hpx::agas::unregister_name(hpx::launch::sync,
+                    data.symbolic_name_ + std::to_string(i++));
             }
         }
     }
@@ -92,7 +97,7 @@ namespace sheneos
     void interpolator::create(std::string const& datafilename,
         std::string const& symbolic_name_base, std::size_t num_instances)
     {
-        // Get the component type of the partition backend.
+        // Get the component type of the partition back-end.
         hpx::components::component_type type =
             hpx::components::get_component_type<server::partition3d>();
 
@@ -119,7 +124,8 @@ namespace sheneos
     void interpolator::connect(std::string symbolic_name_base)
     {
         // Connect to the config object.
-        hpx::naming::id_type cfg_gid = hpx::agas::resolve_name(symbolic_name_base).get();
+        hpx::naming::id_type cfg_gid = hpx::agas::resolve_name(
+            hpx::launch::sync, symbolic_name_base);
         cfg_ = configuration(cfg_gid);
         config_data data = cfg_.get();
 
@@ -130,10 +136,9 @@ namespace sheneos
         partitions_.reserve(data.num_instances_);
         for (std::size_t i = 0; i < data.num_instances_; ++i)
         {
-            using boost::lexical_cast;
             partitions_.push_back(hpx::naming::id_type());
             hpx::naming::id_type id = hpx::agas::resolve_name(
-                    data.symbolic_name_ + lexical_cast<std::string>(i)).get();
+                hpx::launch::sync, data.symbolic_name_ + std::to_string(i));
         }
 
         // Read required data from given file.
@@ -243,7 +248,8 @@ namespace sheneos
             hpx::find_locality(configuration::get_component_type());
         cfg_ = configuration(config_id, datafilename, symbolic_name_base,
             num_localities);
-        hpx::agas::register_name(symbolic_name_base, cfg_.get_id());
+        hpx::agas::register_name(hpx::launch::sync, symbolic_name_base,
+            cfg_.get_id());
 
         if (symbolic_name_base[symbolic_name_base.size() - 1] != '/')
             symbolic_name_base += "/";
@@ -253,9 +259,9 @@ namespace sheneos
         // Register symbolic names of all involved components.
         for (hpx::naming::id_type const& id : partitions_)
         {
-            using boost::lexical_cast;
             hpx::agas::register_name(
-                symbolic_name_base + lexical_cast<std::string>(i++),
+                hpx::launch::sync,
+                symbolic_name_base + std::to_string(i++),
                 id);
         }
 
@@ -326,11 +332,9 @@ namespace sheneos
     // bulk operation has been completed
     struct on_completed_bulk_one
     {
-        typedef void result_type;
-
         typedef std::map<hpx::naming::id_type, context_data> partitions_type;
 
-        on_completed_bulk_one(boost::shared_ptr<partitions_type> parts,
+        on_completed_bulk_one(std::shared_ptr<partitions_type> parts,
                 context_data const& data,
                 std::vector<double>& overall_result)
           : data_(data), overall_result_(overall_result), partitions_(parts)
@@ -354,15 +358,14 @@ namespace sheneos
 
         boost::reference_wrapper<context_data const> data_;
         boost::reference_wrapper<std::vector<double> > overall_result_;
-        boost::shared_ptr<partitions_type> partitions_;
+        std::shared_ptr<partitions_type> partitions_;
     };
 
     struct bulk_one_context
     {
-        typedef std::vector<double> result_type;
         typedef std::map<hpx::naming::id_type, context_data> partitions_type;
 
-        bulk_one_context(boost::shared_ptr<partitions_type> parts, std::size_t s,
+        bulk_one_context(std::shared_ptr<partitions_type> parts, std::size_t s,
                 boost::uint32_t eos)
           : partitions(parts), size(s), eosvalue(eos)
         {}
@@ -402,7 +405,7 @@ namespace sheneos
             return overall_result;
         }
 
-        boost::shared_ptr<partitions_type> partitions;
+        std::shared_ptr<partitions_type> partitions;
         std::size_t size;
         boost::uint32_t eosvalue;
     };
@@ -416,8 +419,8 @@ namespace sheneos
         namespace lcos = hpx::lcos;
 
         typedef std::map<naming::id_type, context_data> partitions_type;
-        boost::shared_ptr<partitions_type> partitions(
-            boost::make_shared<partitions_type>());
+        std::shared_ptr<partitions_type> partitions(
+            std::make_shared<partitions_type>());
 
         partitions_type& parts = *partitions;
 
@@ -442,11 +445,9 @@ namespace sheneos
     // bulk operation has been completed
     struct on_completed_bulk
     {
-        typedef void result_type;
-
         typedef std::map<hpx::naming::id_type, context_data> partitions_type;
 
-        on_completed_bulk(boost::shared_ptr<partitions_type> parts,
+        on_completed_bulk(std::shared_ptr<partitions_type> parts,
                 context_data const& data,
                 std::vector<std::vector<double> >& overall_results)
           : data_(data), overall_results_(overall_results), partitions_(parts)
@@ -471,16 +472,15 @@ namespace sheneos
 
         boost::reference_wrapper<context_data const> data_;
         boost::reference_wrapper<std::vector<std::vector<double> > > overall_results_;
-        boost::shared_ptr<partitions_type> partitions_;
+        std::shared_ptr<partitions_type> partitions_;
     };
 
     ///////////////////////////////////////////////////////////////////////////
     struct bulk_context
     {
-        typedef std::vector<std::vector<double> > result_type;
         typedef std::map<hpx::naming::id_type, context_data> partitions_type;
 
-        bulk_context(boost::shared_ptr<partitions_type> parts, std::size_t s,
+        bulk_context(std::shared_ptr<partitions_type> parts, std::size_t s,
                 boost::uint32_t eos)
           : partitions(parts), size(s), eosvalues(eos)
         {}
@@ -520,7 +520,7 @@ namespace sheneos
             return overall_results;
         }
 
-        boost::shared_ptr<partitions_type> partitions;
+        std::shared_ptr<partitions_type> partitions;
         std::size_t size;
         boost::uint32_t eosvalues;
     };
@@ -533,8 +533,8 @@ namespace sheneos
         namespace lcos = hpx::lcos;
 
         typedef std::map<naming::id_type, context_data> partitions_type;
-        boost::shared_ptr<partitions_type> partitions(
-            boost::make_shared<partitions_type>());
+        std::shared_ptr<partitions_type> partitions(
+            std::make_shared<partitions_type>());
 
         partitions_type& parts = *partitions;
 

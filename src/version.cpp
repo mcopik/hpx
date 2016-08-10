@@ -6,7 +6,7 @@
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <hpx/config/defines.hpp>
+#include <hpx/config.hpp>
 
 #if defined(HPX_HAVE_PARCELPORT_MPI)
 // Intel MPI does not like to be included after stdio.h. As such, we include mpi.h
@@ -14,12 +14,10 @@
 #include <mpi.h>
 #endif
 
-#include <hpx/version.hpp>
-
-#include <hpx/hpx_fwd.hpp>
 #include <hpx/exception.hpp>
 #include <hpx/util/command_line_handling.hpp>
 #include <hpx/util/find_prefix.hpp>
+#include <hpx/version.hpp>
 
 #include <boost/config.hpp>
 #include <boost/version.hpp>
@@ -27,6 +25,7 @@
 #include <boost/preprocessor/stringize.hpp>
 
 #include <sstream>
+#include <string>
 
 #if defined(HPX_HAVE_HWLOC)
 #include <hwloc.h>
@@ -103,13 +102,13 @@ namespace hpx
     {
         char const* const copyright =
             "HPX - High Performance ParalleX\n"
-            "A general purpose parallel C++ runtime system for\
-             distributed applications\n"
+            "A general purpose parallel C++ runtime system for "
+            "distributed applications\n"
             "of any scale.\n\n"
             "Copyright (c) 2007-2016, The STE||AR Group,\n"
             "http://stellar-group.org, email:hpx-users@stellar.cct.lsu.edu\n\n"
-            "Distributed under the Boost Software License, \
-             Version 1.0. (See accompanying\n"
+            "Distributed under the Boost Software License, "
+            "Version 1.0. (See accompanying\n"
             "file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)\n";
         return copyright;
     }
@@ -235,13 +234,9 @@ namespace hpx
         strm << "  HPX_PARCEL_MAX_CONNECTIONS_PER_LOCALITY="
              << HPX_PARCEL_MAX_CONNECTIONS_PER_LOCALITY << "\n";
 #endif
-#if defined(HPX_INITIAL_AGAS_LOCAL_CACHE_SIZE)
-        strm << "  HPX_INITIAL_AGAS_LOCAL_CACHE_SIZE="
-             << HPX_INITIAL_AGAS_LOCAL_CACHE_SIZE << "\n";
-#endif
-#if defined(HPX_AGAS_LOCAL_CACHE_SIZE_PER_THREAD)
-        strm << "  HPX_AGAS_LOCAL_CACHE_SIZE_PER_THREAD="
-             << HPX_AGAS_LOCAL_CACHE_SIZE_PER_THREAD << "\n";
+#if defined(HPX_AGAS_LOCAL_CACHE_SIZE)
+        strm << "  HPX_AGAS_LOCAL_CACHE_SIZE="
+             << HPX_AGAS_LOCAL_CACHE_SIZE << "\n";
 #endif
 #if defined(HPX_HAVE_PARCELPORT_IPC) && defined(HPX_PARCEL_IPC_DATA_BUFFER_CACHE_SIZE)
         strm << "  HPX_PARCEL_IPC_DATA_BUFFER_CACHE_SIZE="

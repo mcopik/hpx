@@ -1,4 +1,4 @@
-//  Copyright (c) 2007-2013 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //  Copyright (c) 2011      Bryce Lelbach
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -9,22 +9,26 @@
 #if !defined(HPX_RUNTIME_ACTIONS_PLAIN_ACTION_NOV_14_2008_0706PM)
 #define HPX_RUNTIME_ACTIONS_PLAIN_ACTION_NOV_14_2008_0706PM
 
-#include <hpx/hpx_fwd.hpp>
 #include <hpx/config.hpp>
-#include <hpx/exception.hpp>
-#include <hpx/runtime/naming/address.hpp>
-#include <hpx/runtime/actions/continuation.hpp>
 #include <hpx/runtime/actions/basic_action.hpp>
+#include <hpx/runtime/actions/continuation.hpp>
 #include <hpx/runtime/components/console_error_sink.hpp>
-#include <hpx/util/unused.hpp>
+#include <hpx/runtime/naming/address.hpp>
+#include <hpx/traits/component_type_database.hpp>
 #include <hpx/util/detail/count_num_args.hpp>
-#include <hpx/util/detail/pp_strip_parens.hpp>
 #include <hpx/util/detail/pack.hpp>
+#include <hpx/util/detail/pp_strip_parens.hpp>
+#include <hpx/util/unused.hpp>
 
 #include <boost/preprocessor/cat.hpp>
 
 #include <cstdlib>
 #include <stdexcept>
+#include <string>
+#if defined(__NVCC__)
+#include <type_traits>
+#endif
+#include <utility>
 
 #include <hpx/config/warnings_prefix.hpp>
 
@@ -37,18 +41,10 @@ namespace hpx { namespace actions
     {
         struct plain_function
         {
-            template <typename F>
-            static threads::thread_function_type
-            decorate_action(naming::address_type, F && f)
+            // Only localities are valid targets for a plain action
+            static bool is_target_valid(naming::id_type const& id)
             {
-                return std::forward<F>(f);
-            }
-
-            static void schedule_thread(naming::address_type,
-                threads::thread_init_data& data,
-                threads::thread_state_enum initial_state)
-            {
-                hpx::threads::register_work_plain(data, initial_state); //-V106
+                return naming::is_locality(id);
             }
         };
     }
@@ -74,12 +70,6 @@ namespace hpx { namespace actions
             return name.str();
         }
 
-        // Only localities are valid targets for a plain action
-        static bool is_target_valid(naming::id_type const& id)
-        {
-            return naming::is_locality(id);
-        }
-
         template <typename ...Ts>
         static R invoke(naming::address::address_type /*lva*/, Ts&&... vs)
         {
@@ -94,6 +84,7 @@ namespace hpx { namespace actions
 
 namespace hpx { namespace traits
 {
+    /// \cond NOINTERNAL
     template <> HPX_ALWAYS_EXPORT
     inline components::component_type
     component_type_database<hpx::actions::detail::plain_function>::get()
@@ -101,7 +92,6 @@ namespace hpx { namespace traits
         return hpx::components::component_plain_function;
     }
 
-    /// \cond NOINTERNAL
     template <> HPX_ALWAYS_EXPORT
     inline void
     component_type_database<hpx::actions::detail::plain_function>::set(
@@ -168,10 +158,19 @@ namespace hpx { namespace traits
     HPX_DEFINE_PLAIN_ACTION_2(func, BOOST_PP_CAT(func, _action))              \
     /**/
 
+#if defined(__NVCC__)
+#define HPX_DEFINE_PLAIN_ACTION_2(func, name)                                 \
+    struct name : hpx::actions::make_action<                                  \
+        typename std::add_pointer<                                            \
+            typename std::remove_pointer<decltype(&func)>::type               \
+        >::type, &func, name>::type {}                                        \
+    /**/
+#else
 #define HPX_DEFINE_PLAIN_ACTION_2(func, name)                                 \
     struct name : hpx::actions::make_action<                                  \
         decltype(&func), &func, name>::type {}                                \
     /**/
+#endif
 
 #define HPX_DEFINE_PLAIN_DIRECT_ACTION_1(func)                                \
     HPX_DEFINE_PLAIN_DIRECT_ACTION_2(func, BOOST_PP_CAT(func, _action))       \
@@ -183,6 +182,14 @@ namespace hpx { namespace traits
     /**/
 
 /// \endcond
+
+///////////////////////////////////////////////////////////////////////////////
+/// \def HPX_DECLARE_PLAIN_ACTION(func, name)
+/// \brief Declares a plain action type
+///
+#define HPX_DECLARE_PLAIN_ACTION(...)                                         \
+    HPX_DECLARE_ACTION(__VA_ARGS__)                                           \
+    /**/
 
 /// \def HPX_PLAIN_ACTION(func, name)
 ///

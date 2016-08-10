@@ -9,22 +9,9 @@
 
 #include "htts2.hpp"
 
-#if defined(HPX_HAVE_CXX11_DELETED_FUNCTIONS)
-#define HPX_MOVABLE_BUT_NOT_COPYABLE(TYPE)                                    \
-    public:                                                                   \
-        TYPE(TYPE const &) = delete;                                          \
-        TYPE& operator=(TYPE const &) = delete;                               \
-    private:                                                                  \
-/**/
-#else
-#define HPX_MOVABLE_BUT_NOT_COPYABLE(TYPE)                                    \
-    private:                                                                  \
-        TYPE(TYPE const &);                                                   \
-        TYPE& operator=(TYPE const &);                                        \
-/**/
-#endif
+#include <chrono>
 
-template <typename BaseClock = boost::chrono::steady_clock>
+template <typename BaseClock = std::chrono::steady_clock>
 struct payload_precision_tracker : htts2::clocksource<BaseClock>
 {
     typedef typename htts2::clocksource<BaseClock>::rep rep;
@@ -95,7 +82,7 @@ struct payload_precision_tracker : htts2::clocksource<BaseClock>
     rep samples_;
 };
 
-template <typename BaseClock = boost::chrono::steady_clock>
+template <typename BaseClock = std::chrono::steady_clock>
 struct payload_precision_driver : htts2::driver
 {
     payload_precision_driver(int argc, char** argv)

@@ -1,4 +1,4 @@
-//  Copyright (c) 2007-2012 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //  Copyright (c)      2011 Thomas Heller
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -7,18 +7,15 @@
 #if !defined(HPX_COMPONENTS_MEMORY_BLOCK_OCT_22_2008_0416PM)
 #define HPX_COMPONENTS_MEMORY_BLOCK_OCT_22_2008_0416PM
 
-#include <hpx/hpx_fwd.hpp>
-#include <hpx/exception.hpp>
+#include <hpx/config.hpp>
+#include <hpx/runtime/components/client_base.hpp>
 #include <hpx/runtime/components/stubs/memory_block.hpp>
-#include <hpx/include/client.hpp>
-#include <hpx/util/unwrapped.hpp>
 #include <hpx/util/detail/pack.hpp>
+#include <hpx/util/unwrapped.hpp>
 
-#include <boost/type_traits/is_const.hpp>
-#include <boost/type_traits/is_convertible.hpp>
-#include <boost/type_traits/remove_const.hpp>
-#include <boost/utility/enable_if.hpp>
-#include <boost/type_traits/conditional.hpp>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace components
@@ -101,35 +98,35 @@ namespace hpx { namespace components
         // exposed functionality of this component
 
         /// Get the \a memory_block_data maintained by this memory_block
-        memory_block_data get()
+        memory_block_data get_data()
         {
-            return this->base_type::get(get_id());
+            return this->base_type::get_data(get_id());
         }
 
         /// Asynchronously get the \a memory_block_data maintained by this
         /// memory_block
-        lcos::future<memory_block_data> get_async()
+        lcos::future<memory_block_data> get_data_async()
         {
-            return this->base_type::get_async(get_id());
+            return this->base_type::get_data_async(get_id());
         }
 
         /// Get the \a memory_block_data maintained by this memory_block, use
         /// given data for serialization configuration (will be passed to the
         /// save() function exposed by the datatype instance wrapped in the
         /// return value of this get())
-        memory_block_data get(memory_block_data const& config)
+        memory_block_data get_data(memory_block_data const& config)
         {
-            return this->base_type::get(get_id(), config);
+            return this->base_type::get_data(get_id(), config);
         }
 
         /// Asynchronously get the \a memory_block_data maintained by this
         /// memory_block. Use given data for serialization configuration (will
         /// be passed to the save() function exposed by the datatype instance
         /// wrapped in the return value of this get())
-        lcos::future<memory_block_data> get_async(
+        lcos::future<memory_block_data> get_data_async(
             memory_block_data const& config)
         {
-            return this->base_type::get_async(get_id(), config);
+            return this->base_type::get_data_async(get_id(), config);
         }
 
         ///////////////////////////////////////////////////////////////////////
@@ -169,10 +166,10 @@ namespace hpx { namespace components
     class access_memory_block_proxy
     {
     private:
-        typedef typename boost::remove_const<T>::type target_type;
+        typedef typename std::remove_const<T>::type target_type;
         typedef typename
-            boost::mpl::if_<
-                boost::is_const<T>, memory_block_data const&, memory_block_data&
+            std::conditional<
+                std::is_const<T>::value, memory_block_data const&, memory_block_data&
             >::type
         wrapped_type;
 
@@ -201,7 +198,7 @@ namespace hpx { namespace components
     class access_memory_block
     {
     private:
-        typedef typename boost::remove_const<T>::type target_type;
+        typedef typename std::remove_const<T>::type target_type;
 
     public:
         access_memory_block()
@@ -291,7 +288,7 @@ namespace hpx { namespace components
 
         const_iterator_type end = gids.end();
         for (const_iterator_type it = gids.begin(); it != end; ++it)
-            lazy_results.push_back(stubs::memory_block::get_async(*it));
+            lazy_results.push_back(stubs::memory_block::get_data_async(*it));
 
         // then wait for all results to get back to us
         typedef typename lazy_results_type::iterator iterator_type;
@@ -319,11 +316,11 @@ namespace hpx { namespace components
 
         const_iterator_type end = gids.end();
         for (const_iterator_type it = gids.begin(); it != end; ++it)
-            lazy_results.push_back(stubs::memory_block::get_async(*it));
+            lazy_results.push_back(stubs::memory_block::get_data_async(*it));
 
         //  invoke the remote operation for the result gid as well
         lcos::future<memory_block_data> lazy_result =
-            stubs::memory_block::get_async(result);
+            stubs::memory_block::get_data_async(result);
 
         // then wait for all results to get back to us
         typedef typename lazy_results_type::iterator iterator_type;
@@ -336,14 +333,14 @@ namespace hpx { namespace components
     }
 
     template <typename T, typename ...Us>
-    inline typename boost::enable_if<
+    inline typename std::enable_if<
         util::detail::all_of<
-            boost::is_convertible<Us const&, naming::id_type>...>,
-        util::tuple<typename boost::conditional<
+            std::is_convertible<Us const&, naming::id_type>...>::value,
+        util::tuple<typename std::conditional<
             false, Us, access_memory_block<T> >::type...>
     >::type get_memory_block_async(Us const&... vs)
     {
-        return util::unwrapped(stubs::memory_block::get_async(vs)...);
+        return util::unwrapped(stubs::memory_block::get_data_async(vs)...);
     }
 }}
 

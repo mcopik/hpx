@@ -9,19 +9,16 @@
 
 #include <hpx/config.hpp>
 #include <hpx/runtime/serialization/basic_archive.hpp>
-#include <hpx/runtime/serialization/input_container.hpp>
-#include <hpx/runtime/serialization/detail/raw_ptr.hpp>
 #include <hpx/runtime/serialization/detail/polymorphic_nonintrusive_factory.hpp>
+#include <hpx/runtime/serialization/detail/raw_ptr.hpp>
+#include <hpx/runtime/serialization/input_container.hpp>
+#include <hpx/traits/is_bitwise_serializable.hpp>
 
-#include <boost/config.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_unsigned.hpp>
-#include <boost/type_traits/is_enum.hpp>
-#include <boost/utility/enable_if.hpp>
-#include <boost/mpl/or.hpp>
-
+#include <map>
 #include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include <hpx/config/warnings_prefix.hpp>
 
@@ -39,7 +36,7 @@ namespace hpx { namespace serialization
         template <typename Container>
         input_archive(Container & buffer,
             std::size_t inbound_data_size = 0,
-            const std::vector<serialization_chunk>* chunks = 0)
+            const std::vector<serialization_chunk>* chunks = nullptr)
           : base_type(0U)
           , buffer_(new input_container<Container>(buffer, chunks, inbound_data_size))
         {
@@ -61,7 +58,7 @@ namespace hpx { namespace serialization
             bool has_filter = false;
             load(has_filter);
 
-            serialization::binary_filter* filter = 0;
+            serialization::binary_filter* filter = nullptr;
             if (has_filter && enable_compression())
             {
                 *this >> detail::raw_ptr(filter);
@@ -76,29 +73,23 @@ namespace hpx { namespace serialization
         }
 
         template <typename T>
-        typename boost::disable_if<
-            boost::mpl::or_<
-                boost::is_integral<T>
-              , boost::is_enum<T>
-            >
+        typename std::enable_if<
+            !std::is_integral<T>::value && !std::is_enum<T>::value
         >::type
         load(T & t)
         {
-            load_bitwise(t,
-                typename hpx::traits::is_bitwise_serializable<T>::type());
+            typedef hpx::traits::is_bitwise_serializable<T> use_optimized;
+
+            load_bitwise(t, use_optimized());
         }
 
         template <typename T>
-        typename boost::enable_if<
-            boost::mpl::or_<
-                boost::is_integral<T>
-              , boost::is_enum<T>
-            >
+        typename std::enable_if<
+            std::is_integral<T>::value || std::is_enum<T>::value
         >::type
-        load(T & t)
+        load(T & t) //-V659
         {
-            load_integral(t,
-                typename boost::is_unsigned<T>::type());
+            load_integral(t, std::is_unsigned<T>());
         }
 
         void load(float & f)
@@ -139,16 +130,16 @@ namespace hpx { namespace serialization
         friend class array;
 
         template <typename T>
-        void load_bitwise(T & t, boost::mpl::false_)
+        void load_bitwise(T & t, std::false_type)
         {
             load_nonintrusively_polymorphic(t,
                 hpx::traits::is_nonintrusive_polymorphic<T>());
         }
 
         template <typename T>
-        void load_bitwise(T & t, boost::mpl::true_)
+        void load_bitwise(T & t, std::true_type)
         {
-            static_assert(!boost::is_abstract<T>::value,
+            static_assert(!std::is_abstract<T>::value,
                 "Can not bitwise serialize a class that is abstract");
             if(disable_array_optimization())
             {
@@ -161,19 +152,19 @@ namespace hpx { namespace serialization
         }
 
         template <class T>
-        void load_nonintrusively_polymorphic(T& t, boost::mpl::false_)
+        void load_nonintrusively_polymorphic(T& t, std::false_type)
         {
             access::serialize(*this, t, 0);
         }
 
         template <class T>
-        void load_nonintrusively_polymorphic(T& t, boost::mpl::true_)
+        void load_nonintrusively_polymorphic(T& t, std::true_type)
         {
             detail::polymorphic_nonintrusive_factory::instance().load(*this, t);
         }
 
         template <typename T>
-        void load_integral(T & val, boost::mpl::false_)
+        void load_integral(T & val, std::false_type)
         {
             boost::int64_t l;
             load_integral_impl(l);
@@ -181,20 +172,43 @@ namespace hpx { namespace serialization
         }
 
         template <typename T>
-        void load_integral(T & val, boost::mpl::true_)
+        void load_integral(T & val, std::true_type)
         {
             boost::uint64_t ul;
             load_integral_impl(ul);
             val = static_cast<T>(ul);
         }
 
-#if defined(BOOST_HAS_INT128)
-        void load_integral(boost::int128_type& t, boost::mpl::false_)
+#if defined(BOOST_HAS_INT128) && !defined(__CUDACC__)
+        void load_integral(boost::int128_type& t, std::false_type)
         {
             load_integral_impl(t);
         }
 
-        void load_integral(boost::uint128_type& t, boost::mpl::true_)
+        void load_integral(boost::uint128_type& t, std::true_type)
+        {
+            load_integral_impl(t);
+        }
+
+        // On some platforms (gcc) std::is_integral<int128>::value
+        // evaluates to false. Thus, these functions re-route the
+        // serialization for those types to the proper implementation
+        void load_bitwise(boost::int128_type& t, std::false_type)
+        {
+            load_integral_impl(t);
+        }
+
+        void load_bitwise(boost::int128_type& t, std::true_type)
+        {
+            load_integral_impl(t);
+        }
+
+        void load_bitwise(boost::uint128_type& t, std::false_type)
+        {
+            load_integral_impl(t);
+        }
+
+        void load_bitwise(boost::uint128_type& t, std::true_type)
         {
             load_integral_impl(t);
         }

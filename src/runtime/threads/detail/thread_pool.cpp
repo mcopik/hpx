@@ -3,30 +3,42 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
-#include <hpx/exception.hpp>
 #include <hpx/runtime/threads/detail/thread_pool.hpp>
+
+#include <hpx/error_code.hpp>
+#include <hpx/exception.hpp>
+#include <hpx/state.hpp>
+#include <hpx/throw_exception.hpp>
+#include <hpx/lcos/local/no_mutex.hpp>
+#include <hpx/runtime/get_worker_thread_num.hpp>
 #include <hpx/runtime/threads/detail/create_thread.hpp>
 #include <hpx/runtime/threads/detail/create_work.hpp>
 #include <hpx/runtime/threads/detail/scheduling_loop.hpp>
 #include <hpx/runtime/threads/detail/set_thread_state.hpp>
+#include <hpx/runtime/threads/detail/thread_num_tss.hpp>
 #include <hpx/runtime/threads/policies/callback_notifier.hpp>
 #include <hpx/runtime/threads/topology.hpp>
-#include <hpx/util/logging.hpp>
+#include <hpx/util/assert.hpp>
 #include <hpx/util/bind.hpp>
-#include <hpx/lcos/local/no_mutex.hpp>
-#include <hpx/util/unlock_guard.hpp>
-
-#if defined(HPX_HAVE_THREAD_CUMULATIVE_COUNTS) && \
-    defined(HPX_HAVE_THREAD_IDLE_RATES)
+#include <hpx/util/logging.hpp>
 #include <hpx/util/hardware/timestamp.hpp>
 #include <hpx/util/high_resolution_clock.hpp>
-#endif
+#include <hpx/util/unlock_guard.hpp>
 
-#include <boost/ref.hpp>
+#include <boost/atomic.hpp>
 #include <boost/exception_ptr.hpp>
+#include <boost/ref.hpp>
+#include <boost/system/system_error.hpp>
+#include <boost/thread/barrier.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp>
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <exception>
+#include <iomanip>
+#include <mutex>
 #include <numeric>
 
 namespace hpx { namespace threads { namespace detail
@@ -56,10 +68,7 @@ namespace hpx { namespace threads { namespace detail
         used_processing_units_(),
         mode_(m)
     {
-#if defined(HPX_HAVE_THREAD_CUMULATIVE_COUNTS) && \
-    defined(HPX_HAVE_THREAD_IDLE_RATES)
         timestamp_scale_ = 1.0;
-#endif
     }
 
     template <typename Scheduler>
@@ -70,7 +79,7 @@ namespace hpx { namespace threads { namespace detail
             {
                 // still running
                 lcos::local::no_mutex mtx;
-                boost::unique_lock<lcos::local::no_mutex> l(mtx);
+                std::unique_lock<lcos::local::no_mutex> l(mtx);
                 stop_locked(l);
             }
             threads_.clear();
@@ -238,7 +247,7 @@ namespace hpx { namespace threads { namespace detail
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::get_thread_count(
+    std::int64_t thread_pool<Scheduler>::get_thread_count(
         thread_state_enum state, thread_priority priority,
         std::size_t num, bool reset) const
     {
@@ -260,7 +269,7 @@ namespace hpx { namespace threads { namespace detail
 
     ///////////////////////////////////////////////////////////////////////////
     template <typename Scheduler>
-    bool thread_pool<Scheduler>::run(boost::unique_lock<boost::mutex>& l,
+    bool thread_pool<Scheduler>::run(std::unique_lock<boost::mutex>& l,
         std::size_t num_threads)
     {
         HPX_ASSERT(l.owns_lock());
@@ -287,18 +296,13 @@ namespace hpx { namespace threads { namespace detail
         tfunc_times_.resize(num_threads);
         exec_times_.resize(num_threads);
 
-#if defined(HPX_HAVE_THREAD_CUMULATIVE_COUNTS)
-        // timestamps/values of last reset operation for various performance
-        // counters
-        reset_executed_threads_.resize(num_threads);
-        reset_executed_thread_phases_.resize(num_threads);
+        reset_tfunc_times_.resize(num_threads);
 
-#if defined(HPX_HAVE_THREAD_IDLE_RATES)
         // scale timestamps to nanoseconds
-        boost::uint64_t base_timestamp = util::hardware::timestamp();
-        boost::uint64_t base_time = util::high_resolution_clock::now();
-        boost::uint64_t curr_timestamp = util::hardware::timestamp();
-        boost::uint64_t curr_time = util::high_resolution_clock::now();
+        std::uint64_t base_timestamp = util::hardware::timestamp();
+        std::uint64_t base_time = util::high_resolution_clock::now();
+        std::uint64_t curr_timestamp = util::hardware::timestamp();
+        std::uint64_t curr_time = util::high_resolution_clock::now();
 
         while ((curr_time - base_time) <= 100000)
         {
@@ -312,10 +316,13 @@ namespace hpx { namespace threads { namespace detail
                 double(curr_timestamp - base_timestamp);
         }
 
-        LTM_(info)
-            << "thread_pool::run: " << pool_name_
-            << " timestamp_scale: " << timestamp_scale_; //-V128
+#if defined(HPX_HAVE_THREAD_CUMULATIVE_COUNTS)
+        // timestamps/values of last reset operation for various performance
+        // counters
+        reset_executed_threads_.resize(num_threads);
+        reset_executed_thread_phases_.resize(num_threads);
 
+#if defined(HPX_HAVE_THREAD_IDLE_RATES)
         // timestamps/values of last reset operation for various performance
         // counters
         reset_thread_duration_.resize(num_threads);
@@ -352,8 +359,12 @@ namespace hpx { namespace threads { namespace detail
 #endif
 #endif
 
+        LTM_(info)
+            << "thread_pool::run: " << pool_name_
+            << " timestamp_scale: " << timestamp_scale_; //-V128
+
         try {
-            HPX_ASSERT(startup_.get() == 0);
+            HPX_ASSERT(startup_.get() == nullptr);
             startup_.reset(
                 new boost::barrier(static_cast<unsigned>(num_threads+1))
             );
@@ -380,9 +391,9 @@ namespace hpx { namespace threads { namespace detail
 #endif
 
                 // create a new thread
-                threads_.push_back(new boost::thread(
-                        util::bind(&thread_pool::thread_func, this, thread_num,
-                            boost::ref(topology_), boost::ref(*startup_))
+                threads_.push_back(boost::thread(
+                        &thread_pool::thread_func, this, thread_num,
+                        boost::ref(topology_), boost::ref(*startup_)
                     ));
 
                 // set the new threads affinity (on Windows systems)
@@ -418,7 +429,7 @@ namespace hpx { namespace threads { namespace detail
                 << " failed with: " << e.what();
 
             // trigger the barrier
-            if (startup_.get() != 0)
+            if (startup_.get() != nullptr)
             {
                 while (num_threads-- != 0 && !startup_->wait())
                     ;
@@ -437,7 +448,7 @@ namespace hpx { namespace threads { namespace detail
     ///////////////////////////////////////////////////////////////////////////
     template <typename Scheduler>
     void thread_pool<Scheduler>::stop (
-        boost::unique_lock<boost::mutex>& l, bool blocking)
+        std::unique_lock<boost::mutex>& l, bool blocking)
     {
         HPX_ASSERT(l.owns_lock());
 
@@ -583,7 +594,7 @@ namespace hpx { namespace threads { namespace detail
                     manage_active_thread_count count(thread_count_);
 
                     // run the work queue
-                    hpx::util::coroutines::prepare_main_thread main_thread;
+                    hpx::threads::coroutines::prepare_main_thread main_thread;
 
                     // run main Scheduler loop until terminated
                     detail::scheduling_counters counters(
@@ -592,7 +603,7 @@ namespace hpx { namespace threads { namespace detail
                         tfunc_times_[num_thread], exec_times_[num_thread]);
 
                     detail::scheduling_callbacks callbacks(
-                        util::bind(
+                        util::bind( //-V107
                             &policies::scheduler_base::idle_callback,
                             &sched_, num_thread
                         ),
@@ -600,7 +611,7 @@ namespace hpx { namespace threads { namespace detail
 
                     if (mode_ & policies::do_background_work)
                     {
-                        callbacks.background_ = util::bind(
+                        callbacks.background_ = util::bind( //-V107
                             &policies::scheduler_base::background_callback,
                             &sched_, num_thread);
                     }
@@ -665,11 +676,11 @@ namespace hpx { namespace threads { namespace detail
     // performance counters
 #if defined(HPX_HAVE_THREAD_CUMULATIVE_COUNTS)
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_executed_threads(std::size_t num, bool reset)
     {
-        boost::int64_t executed_threads = 0;
-        boost::int64_t reset_executed_threads = 0;
+        std::int64_t executed_threads = 0;
+        std::int64_t reset_executed_threads = 0;
 
         if (num != std::size_t(-1))
         {
@@ -682,10 +693,10 @@ namespace hpx { namespace threads { namespace detail
         else
         {
             executed_threads = std::accumulate(executed_threads_.begin(),
-                executed_threads_.end(), boost::int64_t(0));
+                executed_threads_.end(), std::int64_t(0));
             reset_executed_threads = std::accumulate(
                 reset_executed_threads_.begin(),
-                reset_executed_threads_.end(), boost::int64_t(0));
+                reset_executed_threads_.end(), std::int64_t(0));
 
             if (reset)
             {
@@ -700,11 +711,11 @@ namespace hpx { namespace threads { namespace detail
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_executed_thread_phases(std::size_t num, bool reset)
     {
-        boost::int64_t executed_phases = 0;
-        boost::int64_t reset_executed_phases = 0;
+        std::int64_t executed_phases = 0;
+        std::int64_t reset_executed_phases = 0;
 
         if (num != std::size_t(-1))
         {
@@ -717,10 +728,10 @@ namespace hpx { namespace threads { namespace detail
         else
         {
             executed_phases = std::accumulate(executed_thread_phases_.begin(),
-                executed_thread_phases_.end(), boost::int64_t(0));
+                executed_thread_phases_.end(), std::int64_t(0));
             reset_executed_phases = std::accumulate(
                 reset_executed_thread_phases_.begin(),
-                reset_executed_thread_phases_.end(), boost::int64_t(0));
+                reset_executed_thread_phases_.end(), std::int64_t(0));
 
             if (reset)
             {
@@ -737,13 +748,13 @@ namespace hpx { namespace threads { namespace detail
 
 #if defined(HPX_HAVE_THREAD_IDLE_RATES)
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_thread_phase_duration(std::size_t num, bool reset)
     {
-        boost::uint64_t exec_total = 0ul;
-        boost::int64_t num_phases = 0l;
-        boost::uint64_t reset_exec_total = 0ul;
-        boost::int64_t reset_num_phases = 0l;
+        std::uint64_t exec_total = 0ul;
+        std::int64_t num_phases = 0l;
+        std::uint64_t reset_exec_total = 0ul;
+        std::int64_t reset_num_phases = 0l;
 
         if (num != std::size_t(-1))
         {
@@ -762,16 +773,16 @@ namespace hpx { namespace threads { namespace detail
         else
         {
             exec_total = std::accumulate(exec_times_.begin(),
-                exec_times_.end(), boost::uint64_t(0));
+                exec_times_.end(), std::uint64_t(0));
             num_phases = std::accumulate(executed_thread_phases_.begin(),
-                executed_thread_phases_.end(), boost::int64_t(0));
+                executed_thread_phases_.end(), std::int64_t(0));
 
             reset_exec_total = std::accumulate(
                 reset_thread_phase_duration_times_.begin(),
-                reset_thread_phase_duration_times_.end(), boost::uint64_t(0));
+                reset_thread_phase_duration_times_.end(), std::uint64_t(0));
             reset_num_phases = std::accumulate(
                 reset_thread_phase_duration_.begin(),
-                reset_thread_phase_duration_.end(), boost::int64_t(0));
+                reset_thread_phase_duration_.end(), std::int64_t(0));
 
             if (reset)
             {
@@ -789,19 +800,19 @@ namespace hpx { namespace threads { namespace detail
         exec_total -= reset_exec_total;
         num_phases -= reset_num_phases;
 
-        return boost::uint64_t(
+        return std::uint64_t(
                 (double(exec_total) * timestamp_scale_) / double(num_phases)
             );
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_thread_duration(std::size_t num, bool reset)
     {
-        boost::uint64_t exec_total = 0ul;
-        boost::int64_t num_threads = 0l;
-        boost::uint64_t reset_exec_total = 0ul;
-        boost::int64_t reset_num_threads = 0l;
+        std::uint64_t exec_total = 0ul;
+        std::int64_t num_threads = 0l;
+        std::uint64_t reset_exec_total = 0ul;
+        std::int64_t reset_num_threads = 0l;
 
         if (num != std::size_t(-1))
         {
@@ -820,18 +831,18 @@ namespace hpx { namespace threads { namespace detail
         else
         {
             exec_total = std::accumulate(exec_times_.begin(),
-                exec_times_.end(), boost::uint64_t(0));
+                exec_times_.end(), std::uint64_t(0));
             num_threads = std::accumulate(executed_threads_.begin(),
-                executed_threads_.end(), boost::int64_t(0));
+                executed_threads_.end(), std::int64_t(0));
 
             reset_exec_total = std::accumulate(
                 reset_thread_duration_times_.begin(),
                 reset_thread_duration_times_.end(),
-                boost::uint64_t(0));
+                std::uint64_t(0));
             reset_num_threads = std::accumulate(
                 reset_thread_duration_.begin(),
                 reset_thread_duration_.end(),
-                boost::int64_t(0));
+                std::int64_t(0));
 
             if (reset)
             {
@@ -849,22 +860,22 @@ namespace hpx { namespace threads { namespace detail
         exec_total -= reset_exec_total;
         num_threads -= reset_num_threads;
 
-        return boost::uint64_t(
+        return std::uint64_t(
                 (double(exec_total) * timestamp_scale_) / double(num_threads)
             );
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_thread_phase_overhead(std::size_t num, bool reset)
     {
-        boost::uint64_t exec_total = 0;
-        boost::uint64_t tfunc_total = 0;
-        boost::int64_t num_phases = 0;
+        std::uint64_t exec_total = 0;
+        std::uint64_t tfunc_total = 0;
+        std::int64_t num_phases = 0;
 
-        boost::uint64_t reset_exec_total = 0;
-        boost::uint64_t reset_tfunc_total = 0;
-        boost::int64_t reset_num_phases = 0;
+        std::uint64_t reset_exec_total = 0;
+        std::uint64_t reset_tfunc_total = 0;
+        std::int64_t reset_num_phases = 0;
 
         if (num != std::size_t(-1))
         {
@@ -886,23 +897,23 @@ namespace hpx { namespace threads { namespace detail
         else
         {
             exec_total = std::accumulate(exec_times_.begin(),
-                exec_times_.end(), boost::uint64_t(0));
+                exec_times_.end(), std::uint64_t(0));
             tfunc_total = std::accumulate(tfunc_times_.begin(),
-                tfunc_times_.end(), boost::uint64_t(0));
+                tfunc_times_.end(), std::uint64_t(0));
             num_phases = std::accumulate(
                 executed_thread_phases_.begin(),
-                executed_thread_phases_.end(), boost::int64_t(0));
+                executed_thread_phases_.end(), std::int64_t(0));
 
             reset_exec_total = std::accumulate(
                 reset_thread_phase_overhead_times_.begin(),
-                reset_thread_phase_overhead_times_.end(), boost::uint64_t(0));
+                reset_thread_phase_overhead_times_.end(), std::uint64_t(0));
             reset_tfunc_total = std::accumulate(
                 reset_thread_phase_overhead_times_total_.begin(),
                 reset_thread_phase_overhead_times_total_.end(),
-                boost::uint64_t(0));
+                std::uint64_t(0));
             reset_num_phases = std::accumulate(
                 reset_thread_phase_overhead_.begin(),
-                reset_thread_phase_overhead_.end(), boost::int64_t(0));
+                reset_thread_phase_overhead_.end(), std::int64_t(0));
 
             if (reset)
             {
@@ -929,23 +940,23 @@ namespace hpx { namespace threads { namespace detail
 
         HPX_ASSERT(tfunc_total >= exec_total);
 
-        return boost::uint64_t(
+        return std::uint64_t(
                 double((tfunc_total - exec_total) * timestamp_scale_) /
                 double(num_phases)
             );
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_thread_overhead(std::size_t num, bool reset)
     {
-        boost::uint64_t exec_total = 0;
-        boost::uint64_t tfunc_total = 0;
-        boost::int64_t num_threads = 0;
+        std::uint64_t exec_total = 0;
+        std::uint64_t tfunc_total = 0;
+        std::int64_t num_threads = 0;
 
-        boost::uint64_t reset_exec_total = 0;
-        boost::uint64_t reset_tfunc_total = 0;
-        boost::int64_t reset_num_threads = 0;
+        std::uint64_t reset_exec_total = 0;
+        std::uint64_t reset_tfunc_total = 0;
+        std::int64_t reset_num_threads = 0;
 
         if (num != std::size_t(-1))
         {
@@ -967,22 +978,22 @@ namespace hpx { namespace threads { namespace detail
         else
         {
             exec_total = std::accumulate(exec_times_.begin(),
-                exec_times_.end(), boost::uint64_t(0));
+                exec_times_.end(), std::uint64_t(0));
             tfunc_total = std::accumulate(tfunc_times_.begin(),
-                tfunc_times_.end(), boost::uint64_t(0));
+                tfunc_times_.end(), std::uint64_t(0));
             num_threads = std::accumulate(executed_threads_.begin(),
-                executed_threads_.end(), boost::int64_t(0));
+                executed_threads_.end(), std::int64_t(0));
 
             reset_exec_total = std::accumulate(
                 reset_thread_overhead_times_.begin(),
-                reset_thread_overhead_times_.end(), boost::uint64_t(0));
+                reset_thread_overhead_times_.end(), std::uint64_t(0));
             reset_tfunc_total = std::accumulate(
                 reset_thread_overhead_times_total_.begin(),
                 reset_thread_overhead_times_total_.end(),
-                boost::uint64_t(0));
+                std::uint64_t(0));
             reset_num_threads = std::accumulate(
                 reset_thread_overhead_.begin(),
-                reset_thread_overhead_.end(), boost::int64_t(0));
+                reset_thread_overhead_.end(), std::int64_t(0));
 
             if (reset)
             {
@@ -1009,18 +1020,18 @@ namespace hpx { namespace threads { namespace detail
 
         HPX_ASSERT(tfunc_total >= exec_total);
 
-        return boost::uint64_t(
+        return std::uint64_t(
                 double((tfunc_total - exec_total) * timestamp_scale_) /
                 double(num_threads)
             );
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_cumulative_thread_duration(std::size_t num, bool reset)
     {
-        boost::uint64_t exec_total = 0ul;
-        boost::uint64_t reset_exec_total = 0ul;
+        std::uint64_t exec_total = 0ul;
+        std::uint64_t reset_exec_total = 0ul;
 
         if (num != std::size_t(-1))
         {
@@ -1033,11 +1044,11 @@ namespace hpx { namespace threads { namespace detail
         else
         {
             exec_total = std::accumulate(exec_times_.begin(),
-                exec_times_.end(), boost::uint64_t(0));
+                exec_times_.end(), std::uint64_t(0));
             reset_exec_total = std::accumulate(
                 reset_cumulative_thread_duration_.begin(),
                 reset_cumulative_thread_duration_.end(),
-                boost::uint64_t(0));
+                std::uint64_t(0));
 
             if (reset)
             {
@@ -1050,17 +1061,17 @@ namespace hpx { namespace threads { namespace detail
 
         exec_total -= reset_exec_total;
 
-        return boost::uint64_t(double(exec_total) * timestamp_scale_);
+        return std::uint64_t(double(exec_total) * timestamp_scale_);
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_cumulative_thread_overhead(std::size_t num, bool reset)
     {
-        boost::uint64_t exec_total = 0ul;
-        boost::uint64_t reset_exec_total = 0ul;
-        boost::uint64_t tfunc_total = 0ul;
-        boost::uint64_t reset_tfunc_total = 0ul;
+        std::uint64_t exec_total = 0ul;
+        std::uint64_t reset_exec_total = 0ul;
+        std::uint64_t tfunc_total = 0ul;
+        std::uint64_t reset_tfunc_total = 0ul;
 
         if (num != std::size_t(-1))
         {
@@ -1079,18 +1090,18 @@ namespace hpx { namespace threads { namespace detail
         else
         {
             exec_total = std::accumulate(exec_times_.begin(),
-                exec_times_.end(), boost::uint64_t(0));
+                exec_times_.end(), std::uint64_t(0));
             reset_exec_total = std::accumulate(
                 reset_cumulative_thread_overhead_.begin(),
                 reset_cumulative_thread_overhead_.end(),
-                boost::uint64_t(0));
+                std::uint64_t(0));
 
             tfunc_total = std::accumulate(tfunc_times_.begin(),
-                tfunc_times_.end(), boost::uint64_t(0));
+                tfunc_times_.end(), std::uint64_t(0));
             reset_tfunc_total = std::accumulate(
                 reset_cumulative_thread_overhead_total_.begin(),
                 reset_cumulative_thread_overhead_total_.end(),
-                boost::uint64_t(0));
+                std::uint64_t(0));
 
             if (reset)
             {
@@ -1107,28 +1118,65 @@ namespace hpx { namespace threads { namespace detail
         exec_total -= reset_exec_total;
         tfunc_total -= reset_tfunc_total;
 
-        return boost::uint64_t(
+        return std::uint64_t(
                 (double(tfunc_total) - double(exec_total)) * timestamp_scale_
             );
     }
 #endif
 #endif
 
+    template <typename Scheduler>
+    std::int64_t thread_pool<Scheduler>::
+        get_cumulative_duration(std::size_t num, bool reset)
+    {
+        std::uint64_t tfunc_total = 0ul;
+        std::uint64_t reset_tfunc_total = 0ul;
+
+        if (num != std::size_t(-1))
+        {
+            tfunc_total = tfunc_times_[num];
+            reset_tfunc_total = reset_tfunc_times_[num];
+
+            if (reset)
+                reset_tfunc_times_[num] = tfunc_total;
+        }
+        else
+        {
+            tfunc_total = std::accumulate(tfunc_times_.begin(),
+                tfunc_times_.end(), std::uint64_t(0));
+            reset_tfunc_total = std::accumulate(
+                reset_tfunc_times_.begin(), reset_tfunc_times_.end(),
+                std::uint64_t(0));
+
+            if (reset)
+            {
+                std::copy(tfunc_times_.begin(), tfunc_times_.end(),
+                    reset_tfunc_times_.begin());
+            }
+        }
+
+        HPX_ASSERT(tfunc_total >= reset_tfunc_total);
+
+        tfunc_total -= reset_tfunc_total;
+
+        return std::uint64_t(double(tfunc_total) * timestamp_scale_);
+    }
+
 #if defined(HPX_HAVE_THREAD_IDLE_RATES)
     ///////////////////////////////////////////////////////////////////////////
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::avg_idle_rate(bool reset)
+    std::int64_t thread_pool<Scheduler>::avg_idle_rate(bool reset)
     {
-        boost::uint64_t exec_total = std::accumulate(exec_times_.begin(),
-            exec_times_.end(), boost::uint64_t(0));
-        boost::uint64_t tfunc_total = std::accumulate(tfunc_times_.begin(),
-            tfunc_times_.end(), boost::uint64_t(0));
-        boost::uint64_t reset_exec_total = std::accumulate(
+        std::uint64_t exec_total = std::accumulate(exec_times_.begin(),
+            exec_times_.end(), std::uint64_t(0));
+        std::uint64_t tfunc_total = std::accumulate(tfunc_times_.begin(),
+            tfunc_times_.end(), std::uint64_t(0));
+        std::uint64_t reset_exec_total = std::accumulate(
             reset_idle_rate_time_.begin(),
-            reset_idle_rate_time_.end(), boost::uint64_t(0));
-        boost::uint64_t reset_tfunc_total = std::accumulate(
+            reset_idle_rate_time_.end(), std::uint64_t(0));
+        std::uint64_t reset_tfunc_total = std::accumulate(
             reset_idle_rate_time_total_.begin(),
-            reset_idle_rate_time_total_.end(), boost::uint64_t(0));
+            reset_idle_rate_time_total_.end(), std::uint64_t(0));
 
         if (reset)
         {
@@ -1150,17 +1198,17 @@ namespace hpx { namespace threads { namespace detail
         HPX_ASSERT(tfunc_total >= exec_total);
 
         double const percent = 1. - (double(exec_total) / double(tfunc_total));
-        return boost::int64_t(10000. * percent);   // 0.01 percent
+        return std::int64_t(10000. * percent);   // 0.01 percent
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::avg_idle_rate(
+    std::int64_t thread_pool<Scheduler>::avg_idle_rate(
         std::size_t num_thread, bool reset)
     {
-        boost::uint64_t exec_time = exec_times_[num_thread];
-        boost::uint64_t tfunc_time = tfunc_times_[num_thread];
-        boost::uint64_t reset_exec_time = reset_idle_rate_time_[num_thread];
-        boost::uint64_t reset_tfunc_time = reset_idle_rate_time_total_[num_thread];
+        std::uint64_t exec_time = exec_times_[num_thread];
+        std::uint64_t tfunc_time = tfunc_times_[num_thread];
+        std::uint64_t reset_exec_time = reset_idle_rate_time_[num_thread];
+        std::uint64_t reset_tfunc_time = reset_idle_rate_time_total_[num_thread];
 
         if (reset)
         {
@@ -1180,26 +1228,26 @@ namespace hpx { namespace threads { namespace detail
         HPX_ASSERT(tfunc_time > exec_time);
 
         double const percent = 1. - (double(exec_time) / double(tfunc_time));
-        return boost::int64_t(10000. * percent);   // 0.01 percent
+        return std::int64_t(10000. * percent);   // 0.01 percent
     }
 
 #if defined(HPX_HAVE_THREAD_CREATION_AND_CLEANUP_RATES)
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::avg_creation_idle_rate(bool reset)
+    std::int64_t thread_pool<Scheduler>::avg_creation_idle_rate(bool reset)
     {
         double const creation_total =
             static_cast<double>(sched_.get_creation_time(reset));
 
-        boost::uint64_t exec_total = std::accumulate(exec_times_.begin(),
-            exec_times_.end(), boost::uint64_t(0));
-        boost::uint64_t tfunc_total = std::accumulate(tfunc_times_.begin(),
-            tfunc_times_.end(), boost::uint64_t(0));
-        boost::uint64_t reset_exec_total = std::accumulate(
+        std::uint64_t exec_total = std::accumulate(exec_times_.begin(),
+            exec_times_.end(), std::uint64_t(0));
+        std::uint64_t tfunc_total = std::accumulate(tfunc_times_.begin(),
+            tfunc_times_.end(), std::uint64_t(0));
+        std::uint64_t reset_exec_total = std::accumulate(
             reset_creation_idle_rate_time_.begin(),
-            reset_creation_idle_rate_time_.end(), boost::uint64_t(0));
-        boost::uint64_t reset_tfunc_total = std::accumulate(
+            reset_creation_idle_rate_time_.end(), std::uint64_t(0));
+        std::uint64_t reset_tfunc_total = std::accumulate(
             reset_creation_idle_rate_time_total_.begin(),
-            reset_creation_idle_rate_time_total_.end(), boost::uint64_t(0));
+            reset_creation_idle_rate_time_total_.end(), std::uint64_t(0));
 
         if (reset)
         {
@@ -1221,25 +1269,25 @@ namespace hpx { namespace threads { namespace detail
         HPX_ASSERT(tfunc_total > exec_total);
 
         double const percent = (creation_total / double(tfunc_total - exec_total));
-        return boost::int64_t(10000. * percent);    // 0.01 percent
+        return std::int64_t(10000. * percent);    // 0.01 percent
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::avg_cleanup_idle_rate(bool reset)
+    std::int64_t thread_pool<Scheduler>::avg_cleanup_idle_rate(bool reset)
     {
         double const cleanup_total =
             static_cast<double>(sched_.get_cleanup_time(reset));
 
-        boost::uint64_t exec_total = std::accumulate(exec_times_.begin(),
-            exec_times_.end(), boost::uint64_t(0));
-        boost::uint64_t tfunc_total = std::accumulate(tfunc_times_.begin(),
-            tfunc_times_.end(), boost::uint64_t(0));
-        boost::uint64_t reset_exec_total = std::accumulate(
+        std::uint64_t exec_total = std::accumulate(exec_times_.begin(),
+            exec_times_.end(), std::uint64_t(0));
+        std::uint64_t tfunc_total = std::accumulate(tfunc_times_.begin(),
+            tfunc_times_.end(), std::uint64_t(0));
+        std::uint64_t reset_exec_total = std::accumulate(
             reset_cleanup_idle_rate_time_.begin(),
-            reset_cleanup_idle_rate_time_.end(), boost::uint64_t(0));
-        boost::uint64_t reset_tfunc_total = std::accumulate(
+            reset_cleanup_idle_rate_time_.end(), std::uint64_t(0));
+        std::uint64_t reset_tfunc_total = std::accumulate(
             reset_cleanup_idle_rate_time_total_.begin(),
-            reset_cleanup_idle_rate_time_total_.end(), boost::uint64_t(0));
+            reset_cleanup_idle_rate_time_total_.end(), std::uint64_t(0));
 
         if (reset)
         {
@@ -1261,13 +1309,13 @@ namespace hpx { namespace threads { namespace detail
         HPX_ASSERT(tfunc_total > exec_total);
 
         double const percent = (cleanup_total / double(tfunc_total - exec_total));
-        return boost::int64_t(10000. * percent);    // 0.01 percent
+        return std::int64_t(10000. * percent);    // 0.01 percent
     }
 #endif
 #endif
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_queue_length(std::size_t num_thread) const
     {
         return sched_.Scheduler::get_queue_length(num_thread);
@@ -1275,14 +1323,14 @@ namespace hpx { namespace threads { namespace detail
 
 #ifdef HPX_HAVE_THREAD_QUEUE_WAITTIME
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_average_thread_wait_time(std::size_t num_thread) const
     {
         return sched_.Scheduler::get_average_thread_wait_time(num_thread);
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_average_task_wait_time(std::size_t num_thread) const
     {
         return sched_.Scheduler::get_average_task_wait_time(num_thread);
@@ -1291,42 +1339,42 @@ namespace hpx { namespace threads { namespace detail
 
 #ifdef HPX_HAVE_THREAD_STEALING_COUNTS
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_num_pending_misses(std::size_t num, bool reset)
     {
         return sched_.Scheduler::get_num_pending_misses(num, reset);
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_num_pending_accesses(std::size_t num, bool reset)
     {
         return sched_.Scheduler::get_num_pending_accesses(num, reset);
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_num_stolen_from_pending(std::size_t num, bool reset)
     {
         return sched_.Scheduler::get_num_stolen_from_pending(num, reset);
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_num_stolen_to_pending(std::size_t num, bool reset)
     {
         return sched_.Scheduler::get_num_stolen_to_pending(num, reset);
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_num_stolen_from_staged(std::size_t num, bool reset)
     {
         return sched_.Scheduler::get_num_stolen_from_staged(num, reset);
     }
 
     template <typename Scheduler>
-    boost::int64_t thread_pool<Scheduler>::
+    std::int64_t thread_pool<Scheduler>::
         get_num_stolen_to_staged(std::size_t num, bool reset)
     {
         return sched_.Scheduler::get_num_stolen_to_staged(num, reset);

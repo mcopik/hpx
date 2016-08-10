@@ -9,7 +9,10 @@
 #include <hpx/include/components.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
-#include <boost/thread/locks.hpp>
+#include <boost/atomic.hpp>
+
+#include <mutex>
+#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 bool root_locality = false;
@@ -18,7 +21,7 @@ hpx::util::spinlock result_mutex;
 
 void receive_result(boost::int32_t i)
 {
-    boost::lock_guard<hpx::util::spinlock> l(result_mutex);
+    std::lock_guard<hpx::util::spinlock> l(result_mutex);
     if (i > final_result)
         final_result = i;
 }
@@ -68,7 +71,7 @@ int hpx_main()
     hpx::id_type here = hpx::find_here();
     hpx::id_type there = here;
     root_locality = true;
-    if (hpx::get_num_localities_sync() > 1)
+    if (hpx::get_num_localities(hpx::launch::sync) > 1)
     {
         std::vector<hpx::id_type> localities = hpx::find_remote_localities();
         there = localities[0];

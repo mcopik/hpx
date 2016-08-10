@@ -24,17 +24,17 @@ foreach(benchmark ${benchmarks})
                      COMPONENT_DEPENDENCIES iostreams
                      EXCLUDE_FROM_ALL
                      HPX_PREFIX ${HPX_BUILD_PREFIX}
-                     FOLDER "Benchmarks/Network/${benchmark}")
+                     FOLDER "Benchmarks/Network/OSU")
 
   # add a custom target for this example
-  add_hpx_pseudo_target(tests.performance.network.osu.${benchmark})
+  add_hpx_pseudo_target(tests.performance.network.osu_perf.${benchmark})
 
   # make pseudo-targets depend on master pseudo-target
-  add_hpx_pseudo_dependencies(tests.performance.network.osu
-                              tests.performance.network.osu.${benchmark})
+  add_hpx_pseudo_dependencies(tests.performance.network.osu_perf
+                              tests.performance.network.osu_perf.${benchmark})
 
   # add dependencies to pseudo-target
-  add_hpx_pseudo_dependencies(tests.performance.network.osu.${benchmark}
+  add_hpx_pseudo_dependencies(tests.performance.network.osu_perf.${benchmark}
                               ${benchmark}_exe)
 endforeach()
 
@@ -59,14 +59,14 @@ foreach(benchmark ${coll_benchmarks})
                      FOLDER "Benchmarks/Network/${benchmark}")
 
   # add a custom target for this example
-  add_hpx_pseudo_target(tests.performance.network.osu.${benchmark})
+  add_hpx_pseudo_target(tests.performance.network.osu_perf.${benchmark})
 
   # make pseudo-targets depend on master pseudo-target
-  add_hpx_pseudo_dependencies(tests.performance.network.osu
-                              tests.performance.network.osu.${benchmark})
+  add_hpx_pseudo_dependencies(tests.performance.network.osu_perf
+                              tests.performance.network.osu_perf.${benchmark})
 
   # add dependencies to pseudo-target
-  add_hpx_pseudo_dependencies(tests.performance.network.osu.${benchmark}
+  add_hpx_pseudo_dependencies(tests.performance.network.osu_perf.${benchmark}
                               ${benchmark}_exe)
 endforeach()
 

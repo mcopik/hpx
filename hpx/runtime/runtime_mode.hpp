@@ -9,11 +9,12 @@
 #ifndef HPX_RUNTIME_RUNTIME_MODE_HPP
 #define HPX_RUNTIME_RUNTIME_MODE_HPP
 
-#include <hpx/config/export_definitions.hpp>
+#include <hpx/config.hpp>
 
 #include <string>
 
-namespace hpx {
+namespace hpx
+{
     /// A HPX runtime can be executed in two different modes: console mode
     /// and worker mode.
     enum runtime_mode
@@ -31,7 +32,10 @@ namespace hpx {
     /// Get the readable string representing the name of the given runtime_mode
     /// constant.
     HPX_API_EXPORT char const* get_runtime_mode_name(runtime_mode state);
+
+    /// Get the internal representation (runtime_mode constant) from the
+    /// readable string representing the name.
     HPX_API_EXPORT runtime_mode get_runtime_mode_from_name(std::string const& mode);
 }
 
-#endif
+#endif /*HPX_RUNTIME_RUNTIME_MODE_HPP*/

@@ -1,4 +1,4 @@
-//  Copyright (c) 2007-2015 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -9,7 +9,7 @@
 #define HPX_THREAD_ENUMS_JUL_23_2015_0852PM
 
 #include <hpx/config.hpp>
-#include <hpx/runtime/threads/detail/tagged_thread_state.hpp>
+#include <hpx/runtime/threads/detail/combined_tagged_state.hpp>
 
 #include <cstddef>
 
@@ -42,16 +42,13 @@ namespace hpx { namespace threads
                                  thread objects */
     };
 
+    /// Get the readable string representing the name of the given
+    /// thread_state constant.
     HPX_API_EXPORT char const* get_thread_state_name(thread_state_enum state);
 
-    /// \ cond NODETAIL
-    ///   Please note that if you change the value of threads::terminated
-    ///   above, you will need to adjust do_call(dummy<1> = 1) in
-    ///   util/coroutine/detail/coroutine_impl.hpp as well.
-    /// \ endcond
-
-    ///////////////////////////////////////////////////////////////////////
-    /// \enum thread_priority
+    ///////////////////////////////////////////////////////////////////////////
+    /// This enumeration lists all possible thread-priorities for HPX threads.
+    ///
     enum thread_priority
     {
         thread_priority_unknown = -1,
@@ -63,8 +60,8 @@ namespace hpx { namespace threads
                                           ///< invocation, normal afterwards
     };
 
-    typedef threads::detail::tagged_thread_state<thread_state_enum> thread_state;
-
+    /// Get the readable string representing the name of the given thread_priority
+    /// constant.
     HPX_API_EXPORT char const* get_thread_priority_name(thread_priority priority);
 
     ///////////////////////////////////////////////////////////////////////////
@@ -74,18 +71,33 @@ namespace hpx { namespace threads
     /// thread is being restarted
     enum thread_state_ex_enum
     {
-        wait_unknown = -1,
-        wait_signaled = 0,  ///< The thread has been signaled
-        wait_timeout = 1,   ///< The thread has been reactivated after a timeout
-        wait_terminate = 2, ///< The thread needs to be terminated
-        wait_abort = 3      ///< The thread needs to be aborted
+        wait_unknown = 0,
+        wait_signaled = 1,  ///< The thread has been signaled
+        wait_timeout = 2,   ///< The thread has been reactivated after a timeout
+        wait_terminate = 3, ///< The thread needs to be terminated
+        wait_abort = 4      ///< The thread needs to be aborted
     };
 
-    typedef threads::detail::tagged_thread_state<thread_state_ex_enum>
-        thread_state_ex;
+    /// Get the readable string representing the name of the given
+    /// thread_state_ex_enum constant.
+    HPX_API_EXPORT char const* get_thread_state_ex_name(thread_state_ex_enum state);
 
-    ///////////////////////////////////////////////////////////////////////
+    /// \cond NOINTERNAL
+    // special type storing both state in one tagged structure
+    typedef threads::detail::combined_tagged_state<
+            thread_state_enum, thread_state_ex_enum
+        > thread_state;
+    /// \endcond
+
+    /// Get the readable string representing the name of the given
+    /// thread_state constant.
+    HPX_API_EXPORT char const* get_thread_state_name(thread_state state);
+
+    ///////////////////////////////////////////////////////////////////////////
     /// \enum thread_stacksize
+    ///
+    /// A \a thread_stacksize references any of the possible stack-sizes for
+    /// HPX threads.
     enum thread_stacksize
     {
         thread_stacksize_unknown = -1,
@@ -99,6 +111,7 @@ namespace hpx { namespace threads
         thread_stacksize_maximal = thread_stacksize_huge,   ///< use maximally stack size
     };
 
+    /// Get the readable string representing the the given stack size constant.
     HPX_API_EXPORT char const* get_stack_size_name(std::ptrdiff_t size);
 }}
 

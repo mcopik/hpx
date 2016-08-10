@@ -3,7 +3,7 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
 #include <hpx/runtime/components/derived_component_factory.hpp>
 #include <hpx/runtime/actions/continuation.hpp>
 #include <hpx/util/high_resolution_clock.hpp>
@@ -11,7 +11,7 @@
 #include <hpx/performance_counters/server/raw_counter.hpp>
 #include <hpx/util/function.hpp>
 
-#include <boost/version.hpp>
+#include <utility>
 
 ///////////////////////////////////////////////////////////////////////////////
 typedef hpx::components::component<
@@ -29,7 +29,7 @@ namespace hpx { namespace performance_counters { namespace server
 {
     raw_counter::raw_counter(counter_info const& info,
             hpx::util::function_nonser<boost::int64_t(bool)> f)
-      : base_type_holder(info), f_(std::move(f))
+      : base_type_holder(info), f_(std::move(f)), reset_(false)
     {
         if (info.type_ != counter_raw) {
             HPX_THROW_EXCEPTION(bad_parameter,

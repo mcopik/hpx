@@ -6,10 +6,14 @@
 #if !defined(HPX_PERFORMANCE_COUNTERS_REGISTRY_MAR_01_2009_0424PM)
 #define HPX_PERFORMANCE_COUNTERS_REGISTRY_MAR_01_2009_0424PM
 
-#include <hpx/hpx_fwd.hpp>
-#include <hpx/runtime/naming/name.hpp>
+#include <hpx/config.hpp>
 #include <hpx/performance_counters/counters.hpp>
+#include <hpx/runtime/naming/name.hpp>
 #include <hpx/util/function.hpp>
+
+#include <map>
+#include <string>
+#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx { namespace performance_counters
@@ -99,6 +103,20 @@ namespace hpx { namespace performance_counters
             hpx::util::function_nonser<boost::int64_t(bool)> const& f,
             naming::gid_type& id, error_code& ec = throws);
 
+        /// \brief Create a new performance counter instance of type
+        ///        raw_counter based on given function returning the counter
+        ///        value
+        counter_status create_raw_counter(counter_info const& info,
+            hpx::util::function_nonser<std::vector<boost::int64_t>()> const& f,
+            naming::gid_type& id, error_code& ec = throws);
+
+        /// \brief Create a new performance counter instance of type
+        ///        raw_counter based on given function returning the counter
+        ///        value
+        counter_status create_raw_counter(counter_info const& info,
+            hpx::util::function_nonser<std::vector<boost::int64_t>(bool)> const& f,
+            naming::gid_type& id, error_code& ec = throws);
+
         /// \brief Create a new performance counter instance based on given
         ///        counter info
         counter_status create_counter(counter_info const& info,
@@ -143,7 +161,7 @@ namespace hpx { namespace performance_counters
 
     namespace detail
     {
-        std::string regex_from_pattern(std::string const& pattern,
+        HPX_EXPORT std::string regex_from_pattern(std::string const& pattern,
             error_code& ec);
     }
 }}

@@ -1,5 +1,5 @@
 //  Copyright (c) 2011      Bryce Lelbach
-//  Copyright (c) 2007-2012 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,22 +8,22 @@
 #define HPX_F5D19D10_9D74_4DB9_9ABB_ECCF2FA54497
 
 #include <hpx/config.hpp>
-#include <hpx/exception.hpp>
-#include <hpx/traits/is_component.hpp>
-#include <hpx/runtime_fwd.hpp>
-#include <hpx/runtime/components_fwd.hpp>
-#include <hpx/runtime/components/component_type.hpp>
-#include <hpx/runtime/components/server/create_component_fwd.hpp>
-#include <hpx/runtime/naming/name.hpp>
-#include <hpx/runtime/naming/address.hpp>
 #include <hpx/runtime/applier/applier.hpp>
 #include <hpx/runtime/applier/bind_naming_wrappers.hpp>
+#include <hpx/runtime/components/component_type.hpp>
+#include <hpx/runtime/components/server/create_component_fwd.hpp>
+#include <hpx/runtime/components_fwd.hpp>
+#include <hpx/runtime/naming/address.hpp>
+#include <hpx/runtime/naming/name.hpp>
+#include <hpx/runtime_fwd.hpp>
+#include <hpx/throw_exception.hpp>
+#include <hpx/traits/is_component.hpp>
 #include <hpx/util/unique_function.hpp>
 
-#include <boost/mpl/bool.hpp>
-#include <boost/type_traits/is_base_and_derived.hpp>
+#include <boost/cstdint.hpp>
 
 #include <sstream>
+#include <type_traits>
 
 namespace hpx { namespace components
 {
@@ -36,10 +36,19 @@ template <typename Component>
 class fixed_component_base : public traits::detail::fixed_component_tag
 {
 private:
-    typedef typename boost::mpl::if_<
-            boost::is_same<Component, detail::this_type>,
+    typedef typename std::conditional<
+            std::is_same<Component, detail::this_type>::value,
             fixed_component_base, Component
         >::type this_component_type;
+
+    Component& derived()
+    {
+        return static_cast<Component&>(*this);
+    }
+    Component const& derived() const
+    {
+        return static_cast<Component const&>(*this);
+    }
 
 public:
     typedef this_component_type wrapped_type;
@@ -130,7 +139,7 @@ public:
     naming::id_type get_id() const
     {
         // fixed_address components are created without any credits
-        naming::gid_type gid = get_base_gid();
+        naming::gid_type gid = derived().get_base_gid();
         HPX_ASSERT(!naming::detail::has_credits(gid));
 
         naming::detail::replenish_credits(gid);
@@ -139,7 +148,8 @@ public:
 
     naming::id_type get_unmanaged_id() const
     {
-        return naming::id_type(get_base_gid(), naming::id_type::unmanaged);
+        return naming::id_type(derived().get_base_gid(),
+            naming::id_type::unmanaged);
     }
 
 #if defined(HPX_HAVE_COMPONENT_GET_GID_COMPATIBILITY)
@@ -170,15 +180,6 @@ public:
     }
 #endif
 
-    // This component type requires valid id for its actions to be invoked
-    static bool is_target_valid(naming::id_type const& id)
-    {
-        return !naming::is_locality(id);
-    }
-
-    // This component type does not support migration.
-    static HPX_CONSTEXPR bool supports_migration() { return false; }
-
     // Pinning functionality
     void pin() {}
     void unpin() {}
@@ -190,24 +191,6 @@ public:
         // migrated even if the component type has not been enabled to support
         // migration.
         HPX_ASSERT(false);
-    }
-
-    /// This is the default hook implementation for decorate_action which
-    /// does no hooking at all.
-    template <typename F>
-    static threads::thread_function_type
-    decorate_action(naming::address::address_type, F && f)
-    {
-        return std::forward<F>(f);
-    }
-
-    /// This is the default hook implementation for schedule_thread which
-    /// forwards to the default scheduler.
-    static void schedule_thread(naming::address::address_type,
-        threads::thread_init_data& data,
-        threads::thread_state_enum initial_state)
-    {
-        hpx::threads::register_work_plain(data, initial_state); //-V106
     }
 
 private:
@@ -225,7 +208,7 @@ namespace detail
         static Component* alloc(std::size_t count)
         {
             HPX_ASSERT(false);        // this shouldn't ever be called
-            return 0;
+            return nullptr;
         }
         static void free(void* p, std::size_t count)
         {
@@ -249,7 +232,7 @@ class fixed_component : public Component
     static Component* create(std::size_t count)
     {
         HPX_ASSERT(false);        // this shouldn't ever be called
-        return 0;
+        return nullptr;
     }
 
     /// \brief  The function \a destroy is used for destruction and

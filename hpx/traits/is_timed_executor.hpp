@@ -6,15 +6,13 @@
 #if !defined(HPX_TRAITS_IS_TIMED_EXECUTOR_AUG_05_2015_0840AM)
 #define HPX_TRAITS_IS_TIMED_EXECUTOR_AUG_05_2015_0840AM
 
-#include <hpx/traits.hpp>
+#include <hpx/config.hpp>
 #include <hpx/config/inline_namespace.hpp>
 #include <hpx/parallel/config/inline_namespace.hpp>
 #include <hpx/traits/is_executor.hpp>
 #include <hpx/util/decay.hpp>
 
 #include <type_traits>
-
-#include <boost/type_traits/is_base_of.hpp>
 
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 {
@@ -26,7 +24,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         /// \cond NOINTERNAL
         template <typename T>
         struct is_timed_executor
-          : boost::is_base_of<timed_executor_tag, T>
+          : std::is_base_of<timed_executor_tag, T>
         {};
 
         template <>
@@ -48,7 +46,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 namespace hpx { namespace traits
 {
     // new executor framework
-    template <typename Executor, typename Enable>
+    template <typename Executor, typename Enable = void>
     struct is_timed_executor
       : parallel::v3::is_timed_executor<Executor>
     {};

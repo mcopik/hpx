@@ -10,13 +10,12 @@
 
 #if defined(HPX_HAVE_SECURITY)
 
-#include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime/serialization/array.hpp>
+#include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/traits/is_bitwise_serializable.hpp>
 
 #include <boost/array.hpp>
 #include <boost/io/ios_state.hpp>
-#include <boost/mpl/bool.hpp>
 
 #include <sodium.h>
 
@@ -72,14 +71,7 @@ namespace hpx { namespace components { namespace security
 #endif
 }}}
 
-namespace hpx { namespace traits
-{
-    template <>
-    struct is_bitwise_serializable<
-            hpx::components::security::signature>
-       : boost::mpl::true_
-    {};
-}}
+HPX_IS_BITWISE_SERIALIZABLE(hpx::components::security::signature)
 
 #endif
 

@@ -1,33 +1,42 @@
-//  Copyright (c) 2005-2013 Hartmut Kaiser
+//  Copyright (c) 2005-2016 Hartmut Kaiser
 //  Copyright (c)      2011 Bryce Adelstein-Lelbach
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#include <hpx/config.hpp>
-#include <hpx/version.hpp>
-#include <hpx/config/defaults.hpp>
 #include <hpx/util/runtime_configuration.hpp>
+
+#include <hpx/config/defaults.hpp>
+// TODO: move parcel ports into plugins
+#include <hpx/runtime/parcelset/parcelhandler.hpp>
+#include <hpx/util/filesystem_compatibility.hpp>
+#include <hpx/util/find_prefix.hpp>
 #include <hpx/util/init_ini_data.hpp>
 #include <hpx/util/itt_notify.hpp>
-#include <hpx/util/find_prefix.hpp>
 #include <hpx/util/register_locks.hpp>
 #include <hpx/util/register_locks_globally.hpp>
 #include <hpx/util/safe_lexical_cast.hpp>
-
-// TODO: move parcel ports into plugins
-#include <hpx/runtime/parcelset/parcelhandler.hpp>
-
-#include <boost/assign/std/vector.hpp>
-#include <boost/preprocessor/stringize.hpp>
-#include <boost/tokenizer.hpp>
+#include <hpx/version.hpp>
 
 #include <boost/detail/endian.hpp>
+#include <boost/preprocessor/stringize.hpp>
 #include <boost/spirit/include/qi_parse.hpp>
 #include <boost/spirit/include/qi_string.hpp>
 #include <boost/spirit/include/qi_numeric.hpp>
 #include <boost/spirit/include/qi_alternative.hpp>
 #include <boost/spirit/include/qi_sequence.hpp>
+#include <boost/tokenizer.hpp>
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #if defined(HPX_WINDOWS)
 #  include <process.h>
@@ -59,24 +68,39 @@
 ///////////////////////////////////////////////////////////////////////////////
 #if defined(__linux) || defined(linux) || defined(__linux__)\
          || defined(__FreeBSD__) || defined(__APPLE__)
-namespace hpx { namespace util { namespace coroutines
-{ namespace detail { namespace posix
+namespace hpx { namespace threads { namespace coroutines { namespace detail
 {
-    ///////////////////////////////////////////////////////////////////////////
-    // this global (urghhh) variable is used to control whether guard pages
-    // will be used or not
-    HPX_EXPORT bool use_guard_pages = true;
-}}}}}
+    namespace posix
+    {
+        ///////////////////////////////////////////////////////////////////////
+        // this global (urghhh) variable is used to control whether guard pages
+        // will be used or not
+        HPX_EXPORT bool use_guard_pages = true;
+    }
+}}}}
 #endif
 
 namespace hpx { namespace threads { namespace policies
 {
-#ifdef HPX_THREAD_MINIMAL_DEADLOCK_DETECTION
+#ifdef HPX_HAVE_THREAD_MINIMAL_DEADLOCK_DETECTION
     ///////////////////////////////////////////////////////////////////////////
     // We globally control whether to do minimal deadlock detection using this
     // global bool variable. It will be set once by the runtime configuration
     // startup code
     bool minimal_deadlock_detection = true;
+#endif
+}}}
+
+namespace hpx { namespace lcos { namespace local
+{
+#ifdef HPX_HAVE_SPINLOCK_DEADLOCK_DETECTION
+    ///////////////////////////////////////////////////////////////////////////
+    // We globally control whether to do minimal deadlock detection in
+    // spin-locks using this global bool variable. It will be set once by the
+    // runtime configuration startup code
+    bool spinlock_break_on_deadlock = false;
+    std::size_t spinlock_deadlock_detection_limit =
+        HPX_SPINLOCK_DEADLOCK_DETECTION_LIMIT;
 #endif
 }}}
 
@@ -89,15 +113,13 @@ namespace hpx { namespace util
         if (!need_to_call_pre_initialize)
             return;
 
-        using namespace boost::assign;
-        std::vector<std::string> lines; //-V808
-        lines +=
+        std::vector<std::string> lines = {
             // create an empty application section
             "[application]",
 
             // create system and application instance specific entries
             "[system]",
-            "pid = " + boost::lexical_cast<std::string>(getpid()),
+            "pid = " + std::to_string(getpid()),
             "prefix = " + find_prefix(),
 #if defined(__linux) || defined(linux) || defined(__linux__)
             "executable_prefix = " + get_executable_prefix(argv0),
@@ -135,12 +157,21 @@ namespace hpx { namespace util
             "global_lock_detection = ${HPX_GLOBAL_LOCK_DETECTION:0}",
 #endif
 #endif
-#ifdef HPX_THREAD_MINIMAL_DEADLOCK_DETECTION
+#ifdef HPX_HAVE_THREAD_MINIMAL_DEADLOCK_DETECTION
 #ifdef HPX_DEBUG
             "minimal_deadlock_detection = ${HPX_MINIMAL_DEADLOCK_DETECTION:1}",
 #else
             "minimal_deadlock_detection = ${HPX_MINIMAL_DEADLOCK_DETECTION:0}",
 #endif
+#endif
+#ifdef HPX_HAVE_SPINLOCK_DEADLOCK_DETECTION
+#ifdef HPX_DEBUG
+            "spinlick_deadlock_detection = ${HPX_SPINLOCK_DEADLOCK_DETECTION:1}",
+#else
+            "spinlick_deadlock_detection = ${HPX_SPINLOCK_DEADLOCK_DETECTION:0}",
+#endif
+            "spinlick_deadlock_detection_limit = "
+                "${HPX_SPINLOCK_DEADLOCK_DETECTION_LIMIT:1000000}",
 #endif
             "expect_connecting_localities = ${HPX_EXPECT_CONNECTING_LOCALITIES:0}",
 
@@ -156,6 +187,10 @@ namespace hpx { namespace util
             "pu_offset = 0",
             "numa_sensitive = 0",
             "max_background_threads = ${MAX_BACKGROUND_THREADS:$[hpx.os_threads]}",
+
+            // connect back to the given latch if specified
+            "[hpx.on_startup]",
+            "wait_on_latch = ${HPX_ON_STARTUP_WAIT_ON_LATCH}",
 
             "[hpx.stacks]",
             "small_size = ${HPX_SMALL_STACK_SIZE:"
@@ -211,7 +246,9 @@ namespace hpx { namespace util
             "-9 = --hpx:node=9",
 
             "[hpx.agas]",
-            "address = ${HPX_AGAS_SERVER_ADDRESS:" HPX_INITIAL_IP_ADDRESS "}",
+            // 'address' has deliberately no default, see
+            // command_line_handling.cpp
+            "address = ${HPX_AGAS_SERVER_ADDRESS}",
             "port = ${HPX_AGAS_SERVER_PORT:"
                 BOOST_PP_STRINGIZE(HPX_INITIAL_IP_PORT) "}",
             "max_pending_refcnt_requests = "
@@ -221,9 +258,7 @@ namespace hpx { namespace util
             "service_mode = hosted",
             "dedicated_server = 0",
             "local_cache_size = ${HPX_AGAS_LOCAL_CACHE_SIZE:"
-                BOOST_PP_STRINGIZE(HPX_INITIAL_AGAS_LOCAL_CACHE_SIZE) "}",
-            "local_cache_size_per_thread = ${HPX_AGAS_LOCAL_CACHE_SIZE_PER_THREAD:"
-                BOOST_PP_STRINGIZE(HPX_AGAS_LOCAL_CACHE_SIZE_PER_THREAD) "}",
+                BOOST_PP_STRINGIZE(HPX_AGAS_LOCAL_CACHE_SIZE) "}",
             "use_range_caching = ${HPX_AGAS_USE_RANGE_CACHING:1}",
             "use_caching = ${HPX_AGAS_USE_CACHING:1}",
 
@@ -254,7 +289,7 @@ namespace hpx { namespace util
             "name = hpx",
             "path = $[hpx.location]/bin/" HPX_DLL_STRING,
             "enabled = 1"
-        ;
+        };
 
         std::vector<std::string> lines_pp =
             hpx::parcelset::parcelhandler::load_runtime_configuration();
@@ -314,10 +349,10 @@ namespace hpx { namespace util
     }
 
     // load information about dynamically discovered plugins
-    std::vector<boost::shared_ptr<plugins::plugin_registry_base> >
+    std::vector<std::shared_ptr<plugins::plugin_registry_base> >
     runtime_configuration::load_modules()
     {
-        typedef std::vector<boost::shared_ptr<plugins::plugin_registry_base> >
+        typedef std::vector<std::shared_ptr<plugins::plugin_registry_base> >
             plugin_list_type;
 
         namespace fs = boost::filesystem;
@@ -429,7 +464,8 @@ namespace hpx { namespace util
         huge_stacksize = init_huge_stack_size();
 
 #if defined(__linux) || defined(linux) || defined(__linux__) || defined(__FreeBSD__)
-        coroutines::detail::posix::use_guard_pages = init_use_stack_guard_pages();
+        threads::coroutines::detail::posix::use_guard_pages =
+            init_use_stack_guard_pages();
 #endif
 #ifdef HPX_HAVE_VERIFY_LOCKS
         if (enable_lock_detection())
@@ -439,9 +475,15 @@ namespace hpx { namespace util
         if (enable_global_lock_detection())
             util::enable_global_lock_detection();
 #endif
-#ifdef HPX_THREAD_MINIMAL_DEADLOCK_DETECTION
+#ifdef HPX_HAVE_THREAD_MINIMAL_DEADLOCK_DETECTION
         threads::policies::minimal_deadlock_detection =
             enable_minimal_deadlock_detection();
+#endif
+#ifdef HPX_HAVE_SPINLOCK_DEADLOCK_DETECTION
+        lcos::local::spinlock_break_on_deadlock =
+            enable_spinlock_deadlock_detection();
+        lcos::local::spinlock_deadlock_detection_limit =
+            get_spinlock_deadlock_detection_limit();
 #endif
     }
 
@@ -483,7 +525,8 @@ namespace hpx { namespace util
         huge_stacksize = init_huge_stack_size();
 
 #if defined(__linux) || defined(linux) || defined(__linux__) || defined(__FreeBSD__)
-        coroutines::detail::posix::use_guard_pages = init_use_stack_guard_pages();
+        threads::coroutines::detail::posix::use_guard_pages =
+            init_use_stack_guard_pages();
 #endif
 #ifdef HPX_HAVE_VERIFY_LOCKS
         if (enable_lock_detection())
@@ -493,9 +536,15 @@ namespace hpx { namespace util
         if (enable_global_lock_detection())
             util::enable_global_lock_detection();
 #endif
-#ifdef HPX_THREAD_MINIMAL_DEADLOCK_DETECTION
+#ifdef HPX_HAVE_THREAD_MINIMAL_DEADLOCK_DETECTION
         threads::policies::minimal_deadlock_detection =
             enable_minimal_deadlock_detection();
+#endif
+#ifdef HPX_HAVE_SPINLOCK_DEADLOCK_DETECTION
+        lcos::local::spinlock_break_on_deadlock =
+            enable_spinlock_deadlock_detection();
+        lcos::local::spinlock_deadlock_detection_limit =
+            get_spinlock_deadlock_detection_limit();
 #endif
     }
 
@@ -504,7 +553,7 @@ namespace hpx { namespace util
         if (has_section("hpx.parcel"))
         {
             util::section const * sec = get_section("hpx.parcel.ipc");
-            if(NULL != sec)
+            if(nullptr != sec)
             {
                 return hpx::util::get_entry_as<std::size_t>(
                     *sec, "data_buffer_cache_size",
@@ -520,7 +569,7 @@ namespace hpx { namespace util
         if (has_section("hpx.agas"))
         {
             util::section const* sec = get_section("hpx.agas");
-            if (NULL != sec)
+            if (nullptr != sec)
             {
                 std::string const m = sec->get_entry("service_mode", "hosted");
 
@@ -539,13 +588,13 @@ namespace hpx { namespace util
         return agas::service_mode_hosted;
     }
 
-    boost::uint32_t runtime_configuration::get_num_localities() const
+    std::uint32_t runtime_configuration::get_num_localities() const
     {
         if (num_localities == 0) {
             if (has_section("hpx")) {
                 util::section const* sec = get_section("hpx");
-                if (NULL != sec) {
-                    num_localities = hpx::util::get_entry_as<boost::uint32_t>(
+                if (nullptr != sec) {
+                    num_localities = hpx::util::get_entry_as<std::uint32_t>(
                         *sec, "localities", 1);
                 }
             }
@@ -555,7 +604,7 @@ namespace hpx { namespace util
         return num_localities;
     }
 
-    void runtime_configuration::set_num_localities(boost::uint32_t num_localities_)
+    void runtime_configuration::set_num_localities(std::uint32_t num_localities_)
     {
         // this function should not be called on the AGAS server
         HPX_ASSERT(agas::service_mode_bootstrap != get_agas_service_mode());
@@ -563,19 +612,19 @@ namespace hpx { namespace util
 
         if (has_section("hpx")) {
             util::section* sec = get_section("hpx");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 sec->add_entry("localities",
-                    boost::lexical_cast<std::string>(num_localities));
+                    std::to_string(num_localities));
             }
         }
     }
 
-    boost::uint32_t runtime_configuration::get_first_used_core() const
+    std::uint32_t runtime_configuration::get_first_used_core() const
     {
         if (has_section("hpx")) {
             util::section const* sec = get_section("hpx");
-            if (NULL != sec) {
-                return hpx::util::get_entry_as<boost::uint32_t>(
+            if (nullptr != sec) {
+                return hpx::util::get_entry_as<std::uint32_t>(
                     *sec, "first_used_core", 0);
             }
         }
@@ -583,13 +632,13 @@ namespace hpx { namespace util
     }
 
     void runtime_configuration::set_first_used_core(
-        boost::uint32_t first_used_core)
+        std::uint32_t first_used_core)
     {
         if (has_section("hpx")) {
             util::section* sec = get_section("hpx");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 sec->add_entry("first_used_core",
-                    boost::lexical_cast<std::string>(first_used_core));
+                    std::to_string(first_used_core));
             }
         }
     }
@@ -600,27 +649,9 @@ namespace hpx { namespace util
 
         if (has_section("hpx.agas")) {
             util::section const* sec = get_section("hpx.agas");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 cache_size = hpx::util::get_entry_as<std::size_t>(
                     *sec, "local_cache_size", cache_size);
-            }
-        }
-
-        if (cache_size != std::size_t(~0x0ul) && cache_size < 16ul)
-            cache_size = 16;      // limit lower bound
-        return cache_size;
-    }
-
-    std::size_t runtime_configuration
-        ::get_agas_local_cache_size_per_thread(std::size_t dflt) const
-    {
-        std::size_t cache_size = dflt;
-
-        if (has_section("hpx.agas")) {
-            util::section const* sec = get_section("hpx.agas");
-            if (NULL != sec) {
-                cache_size = hpx::util::get_entry_as<std::size_t>(
-                    *sec, "local_cache_size_per_thread", cache_size);
             }
         }
 
@@ -633,7 +664,7 @@ namespace hpx { namespace util
     {
         if (has_section("hpx.agas")) {
             util::section const* sec = get_section("hpx.agas");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 return hpx::util::get_entry_as<int>(
                     *sec, "use_caching", "1") != 0;
             }
@@ -645,7 +676,7 @@ namespace hpx { namespace util
     {
         if (has_section("hpx.agas")) {
             util::section const* sec = get_section("hpx.agas");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 return hpx::util::get_entry_as<int>(
                     *sec, "use_range_caching", "1") != 0;
             }
@@ -658,7 +689,7 @@ namespace hpx { namespace util
     {
         if (has_section("hpx.agas")) {
             util::section const* sec = get_section("hpx.agas");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 return hpx::util::get_entry_as<std::size_t>(
                     *sec, "max_pending_refcnt_requests",
                     HPX_INITIAL_AGAS_MAX_PENDING_REFCNT_REQUESTS);
@@ -674,7 +705,7 @@ namespace hpx { namespace util
     {
         if (has_section("hpx.agas")) {
             util::section const* sec = get_section("hpx.agas");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 return hpx::util::get_entry_as<int>(
                     *sec, "dedicated_server", 0) != 0;
             }
@@ -687,7 +718,7 @@ namespace hpx { namespace util
 #if HPX_HAVE_ITTNOTIFY != 0
         if (has_section("hpx")) {
             util::section const* sec = get_section("hpx");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 return hpx::util::get_entry_as<int>(
                     *sec, "use_itt_notify", "0") != 0;
             }
@@ -702,7 +733,7 @@ namespace hpx { namespace util
 #ifdef HPX_HAVE_VERIFY_LOCKS
         if (has_section("hpx")) {
             util::section const* sec = get_section("hpx");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 return hpx::util::get_entry_as<int>(
                     *sec, "lock_detection", "0") != 0;
             }
@@ -717,7 +748,7 @@ namespace hpx { namespace util
 #ifdef HPX_HAVE_VERIFY_LOCKS_GLOBALLY
         if (has_section("hpx")) {
             util::section const* sec = get_section("hpx");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 return hpx::util::get_entry_as<int>(
                     *sec, "global_lock_detection", "0") != 0;
             }
@@ -729,10 +760,10 @@ namespace hpx { namespace util
     // Enable minimal deadlock detection for HPX threads
     bool runtime_configuration::enable_minimal_deadlock_detection() const
     {
-#ifdef HPX_THREAD_MINIMAL_DEADLOCK_DETECTION
+#ifdef HPX_HAVE_THREAD_MINIMAL_DEADLOCK_DETECTION
         if (has_section("hpx")) {
             util::section const* sec = get_section("hpx");
-            if (NULL != sec) {
+            if (nullptr != sec) {
 #ifdef HPX_DEBUG
                 return hpx::util::get_entry_as<int>(
                     *sec, "minimal_deadlock_detection", "1") != 0;
@@ -754,11 +785,56 @@ namespace hpx { namespace util
 #endif
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    bool runtime_configuration::enable_spinlock_deadlock_detection() const
+    {
+#ifdef HPX_HAVE_SPINLOCK_DEADLOCK_DETECTION
+        if (has_section("hpx")) {
+            util::section const* sec = get_section("hpx");
+            if (nullptr != sec) {
+#ifdef HPX_DEBUG
+                return hpx::util::get_entry_as<int>(
+                    *sec, "spinlock_deadlock_detection", "1") != 0;
+#else
+                return hpx::util::get_entry_as<int>(
+                    *sec, "spinlock_deadlock_detection", "0") != 0;
+#endif
+            }
+        }
+
+#ifdef HPX_DEBUG
+        return true;
+#else
+        return false;
+#endif
+
+#else
+        return false;
+#endif
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    std::size_t runtime_configuration::get_spinlock_deadlock_detection_limit() const
+    {
+#ifdef HPX_HAVE_SPINLOCK_DEADLOCK_DETECTION
+        if (has_section("hpx")) {
+            util::section const* sec = get_section("hpx");
+            if (nullptr != sec) {
+                return hpx::util::get_entry_as<std::size_t>(
+                    *sec, "spinlick_deadlock_detection_limit", "1000000");
+            }
+        }
+        return HPX_SPINLOCK_DEADLOCK_DETECTION_LIMIT;
+#else
+        return std::size_t(-1);
+#endif
+    }
+
     std::size_t runtime_configuration::get_os_thread_count() const
     {
         if (has_section("hpx")) {
             util::section const* sec = get_section("hpx");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 return hpx::util::get_entry_as<std::size_t>(
                     *sec, "os_threads", 1);
             }
@@ -770,7 +846,7 @@ namespace hpx { namespace util
     {
         if (has_section("hpx")) {
             util::section const* sec = get_section("hpx");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 return sec->get_entry("cmd_line", "");
             }
         }
@@ -782,7 +858,7 @@ namespace hpx { namespace util
     {
         if (has_section("hpx.threadpools")) {
             util::section const* sec = get_section("hpx.threadpools");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 return hpx::util::get_entry_as<std::size_t>(
                     *sec, std::string(poolname) + "_size", "2");
             }
@@ -795,7 +871,7 @@ namespace hpx { namespace util
     {
         if (has_section("hpx.parcel")) {
             util::section const* sec = get_section("hpx.parcel");
-            if (NULL != sec) {
+            if (nullptr != sec) {
 #ifdef BOOST_BIG_ENDIAN
                 return sec->get_entry("endian_out", "big");
 #else
@@ -817,7 +893,7 @@ namespace hpx { namespace util
     {
         if (has_section("hpx")) {
             util::section const* sec = get_section("hpx.stacks");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 std::string entry = sec->get_entry(entryname, defaultvaluestr);
                 std::ptrdiff_t val = defaultvalue;
 
@@ -835,7 +911,7 @@ namespace hpx { namespace util
     {
         if (has_section("hpx")) {
             util::section const* sec = get_section("hpx.stacks");
-            if (NULL != sec) {
+            if (nullptr != sec) {
                 return hpx::util::get_entry_as<int>(
                     *sec, "use_guard_pages", "1") != 0;
             }
@@ -870,13 +946,13 @@ namespace hpx { namespace util
 
     ///////////////////////////////////////////////////////////////////////////
     // Return maximally allowed message size
-    boost::uint64_t runtime_configuration::get_max_inbound_message_size() const
+    std::uint64_t runtime_configuration::get_max_inbound_message_size() const
     {
         if (has_section("hpx")) {
             util::section const* sec = get_section("hpx.parcel");
-            if (NULL != sec) {
-                boost::uint64_t maxsize =
-                    hpx::util::get_entry_as<boost::uint64_t>(
+            if (nullptr != sec) {
+                std::uint64_t maxsize =
+                    hpx::util::get_entry_as<std::uint64_t>(
                         *sec, "max_message_size", HPX_PARCEL_MAX_MESSAGE_SIZE);
                 if (maxsize > 0)
                     return maxsize;
@@ -885,13 +961,13 @@ namespace hpx { namespace util
         return HPX_PARCEL_MAX_MESSAGE_SIZE;    // default is 1GByte
     }
 
-    boost::uint64_t runtime_configuration::get_max_outbound_message_size() const
+    std::uint64_t runtime_configuration::get_max_outbound_message_size() const
     {
         if (has_section("hpx")) {
             util::section const* sec = get_section("hpx.parcel");
-            if (NULL != sec) {
-                boost::uint64_t maxsize =
-                    hpx::util::get_entry_as<boost::uint64_t>(
+            if (nullptr != sec) {
+                std::uint64_t maxsize =
+                    hpx::util::get_entry_as<std::uint64_t>(
                         *sec, "max_outbound_message_size",
                         HPX_PARCEL_MAX_OUTBOUND_MESSAGE_SIZE);
                 if (maxsize > 0)

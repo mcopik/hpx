@@ -1,5 +1,5 @@
 //  Copyright (c) 2011 Thomas Heller
-//  Copyright (c) 2013 Hartmut Kaiser
+//  Copyright (c) 2013-2016 Hartmut Kaiser
 //  Copyright (c) 2014 Agustin Berge
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -9,12 +9,15 @@
 #define HPX_UTIL_DETAIL_FUNCTION_TEMPLATE_HPP
 
 #include <hpx/config.hpp>
+#include <hpx/traits/get_function_address.hpp>
 #include <hpx/traits/is_callable.hpp>
 #include <hpx/util/detail/basic_function.hpp>
 #include <hpx/util/detail/vtable/callable_vtable.hpp>
 #include <hpx/util/detail/vtable/copyable_vtable.hpp>
 #include <hpx/util/detail/vtable/vtable.hpp>
+#include <hpx/util_fwd.hpp>
 
+#include <cstddef>
 #include <type_traits>
 #include <utility>
 
@@ -25,6 +28,7 @@ namespace hpx { namespace util { namespace detail
     struct function_vtable_ptr
     {
         typename callable_vtable<Sig>::invoke_t invoke;
+        typename callable_vtable<Sig>::get_function_address_t get_function_address;
         copyable_vtable::copy_t copy;
         vtable::get_type_t get_type;
         vtable::destruct_t destruct;
@@ -34,6 +38,7 @@ namespace hpx { namespace util { namespace detail
         template <typename T>
         function_vtable_ptr(construct_vtable<T>) HPX_NOEXCEPT
           : invoke(&callable_vtable<Sig>::template invoke<T>)
+          , get_function_address(&callable_vtable<Sig>::template get_function_address<T>)
           , copy(&copyable_vtable::template copy<T>)
           , get_type(&vtable::template get_type<T>)
           , destruct(&vtable::template destruct<T>)
@@ -58,7 +63,7 @@ namespace hpx { namespace util { namespace detail
 namespace hpx { namespace util
 {
     ///////////////////////////////////////////////////////////////////////////
-    template <typename Sig, bool Serializable = true>
+    template <typename Sig, bool Serializable>
     class function;
 
     template <typename R, typename ...Ts, bool Serializable>
@@ -78,17 +83,21 @@ namespace hpx { namespace util
           : base_type()
         {}
 
+        function(std::nullptr_t) HPX_NOEXCEPT
+          : base_type()
+        {}
+
         function(function const& other)
           : base_type()
         {
             detail::vtable::delete_<
                 detail::empty_function<R(Ts...)>
-            >(&this->object);
+            >(this->object);
 
             this->vptr = other.vptr;
             if (!this->vptr->empty)
             {
-                this->vptr->copy(&this->object, &other.object);
+                this->vptr->copy(this->object, other.object);
             }
         }
 
@@ -117,12 +126,12 @@ namespace hpx { namespace util
                 reset();
                 detail::vtable::delete_<
                     detail::empty_function<R(Ts...)>
-                >(&this->object);
+                >(this->object);
 
                 this->vptr = other.vptr;
                 if (!this->vptr->empty)
                 {
-                    this->vptr->copy(&this->object, &other.object);
+                    this->vptr->copy(this->object, other.object);
                 }
             }
             return *this;
@@ -162,78 +171,20 @@ namespace hpx { namespace util
     {
         return f.empty();
     }
+}}
 
-    ///////////////////////////////////////////////////////////////////////////
-#   ifdef HPX_HAVE_CXX11_ALIAS_TEMPLATES
-
-    template <typename Sig>
-    using function_nonser = function<Sig, false>;
-
-#   else
-
-    template <typename T>
-    class function_nonser;
-
-    template <typename R, typename ...Ts>
-    class function_nonser<R(Ts...)>
-      : public function<R(Ts...), false>
+///////////////////////////////////////////////////////////////////////////////
+namespace hpx { namespace traits
+{
+    template <typename Sig, bool Serializable>
+    struct get_function_address<util::function<Sig, Serializable> >
     {
-        typedef function<R(Ts...), false> base_type;
-
-    public:
-        function_nonser() HPX_NOEXCEPT
-          : base_type()
-        {}
-
-        function_nonser(function_nonser const& other)
-          : base_type(static_cast<base_type const&>(other))
-        {}
-
-        function_nonser(function_nonser&& other) HPX_NOEXCEPT
-          : base_type(static_cast<base_type&&>(other))
-        {}
-
-        template <typename F, typename FD = typename std::decay<F>::type,
-            typename Enable = typename std::enable_if<
-                !std::is_same<FD, function_nonser>::value
-             && traits::is_callable<FD&(Ts...), R>::value
-            >::type>
-        function_nonser(F&& f)
-          : base_type(std::forward<F>(f))
-        {}
-
-        function_nonser& operator=(function_nonser const& other)
+        static std::size_t
+            call(util::function<Sig, Serializable> const& f) HPX_NOEXCEPT
         {
-            base_type::operator=(static_cast<base_type const&>(other));
-            return *this;
-        }
-
-        function_nonser& operator=(function_nonser&& other) HPX_NOEXCEPT
-        {
-            base_type::operator=(static_cast<base_type&&>(other));
-            return *this;
-        }
-
-        template <typename F, typename FD = typename std::decay<F>::type,
-            typename Enable = typename std::enable_if<
-                !std::is_same<FD, function_nonser>::value
-             && traits::is_callable<FD&(Ts...), R>::value
-            >::type>
-        function_nonser& operator=(F&& f)
-        {
-            base_type::operator=(std::forward<F>(f));
-            return *this;
+            return f.get_function_address();
         }
     };
-
-    template <typename Sig>
-    static bool is_empty_function(
-        function_nonser<Sig> const& f) HPX_NOEXCEPT
-    {
-        return f.empty();
-    }
-
-#   endif /*HPX_HAVE_CXX11_ALIAS_TEMPLATES*/
 }}
 
 #endif

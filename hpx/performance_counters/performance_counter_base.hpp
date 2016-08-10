@@ -6,7 +6,7 @@
 #if !defined(HPX_PERFORMANCE_COUNTERS_PERFORMANCE_COUNTER_BASE_SEP_18_2014_0732PM)
 #define HPX_PERFORMANCE_COUNTERS_PERFORMANCE_COUNTER_BASE_SEP_18_2014_0732PM
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
 #include <hpx/performance_counters/counters.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -26,6 +26,10 @@ namespace hpx { namespace performance_counters
 
         // Retrieve the current Performance Counter value.
         virtual counter_value get_counter_value(bool reset = false) = 0;
+
+        // Retrieve the current Performance Counter value.
+        virtual counter_values_array get_counter_values_array(
+            bool reset = false) = 0;
 
         // Reset the Performance Counter (value).
         virtual void reset_counter_value() = 0;

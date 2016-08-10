@@ -9,10 +9,7 @@
 
 #include <hpx/config.hpp>
 #include <hpx/util/always_void.hpp>
-#include <hpx/util/decay.hpp>
 #include <hpx/util/result_of.hpp>
-
-#include <boost/type_traits/integral_constant.hpp>
 
 #include <type_traits>
 
@@ -23,23 +20,21 @@ namespace hpx { namespace traits
     {
         template <typename T, typename R, typename Enable = void>
         struct is_callable_impl
-          : boost::false_type
+          : std::false_type
         {};
 
         template <typename T>
         struct is_callable_impl<T, void,
             typename util::always_void<typename util::result_of<T>::type>::type
-        > : boost::true_type
+        > : std::true_type
         {};
 
         template <typename T, typename R>
         struct is_callable_impl<T, R,
             typename util::always_void<typename util::result_of<T>::type>::type
-        > : boost::integral_constant<bool,
-                std::is_convertible<
-                    typename util::result_of<T>::type,
-                    R
-                >::value
+        > : std::is_convertible<
+                typename util::result_of<T>::type,
+                R
             >
         {};
     }
@@ -52,21 +47,6 @@ namespace hpx { namespace traits
     struct is_callable<F(Ts...), R>
       : detail::is_callable_impl<F(Ts...), R>
     {};
-
-    ///////////////////////////////////////////////////////////////////////////
-    namespace detail
-    {
-        template <typename T>
-        struct is_deferred_callable;
-
-        template <typename F, typename ...Ts>
-        struct is_deferred_callable<F(Ts...)>
-          : is_callable<
-                typename util::decay_unwrap<F>::type(
-                    typename util::decay_unwrap<Ts>::type...)
-            >
-        {};
-    }
 }}
 
 #endif

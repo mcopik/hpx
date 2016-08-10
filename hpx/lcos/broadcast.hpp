@@ -134,21 +134,26 @@ namespace hpx { namespace lcos
 #ifndef HPX_LCOS_BROADCAST_HPP
 #define HPX_LCOS_BROADCAST_HPP
 
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/config.hpp>
+#include <hpx/lcos/detail/async_colocated.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/lcos/when_all.hpp>
-#include <hpx/lcos/detail/async_colocated.hpp>
-#include <hpx/runtime/applier/detail/apply_colocated.hpp>
 #include <hpx/runtime/actions/plain_action.hpp>
+#include <hpx/runtime/applier/detail/apply_colocated.hpp>
 #include <hpx/runtime/naming/name.hpp>
 #include <hpx/runtime/serialization/vector.hpp>
+#include <hpx/throw_exception.hpp>
+#include <hpx/traits/extract_action.hpp>
+#include <hpx/traits/promise_local_result.hpp>
 #include <hpx/util/calculate_fanout.hpp>
-#include <hpx/util/tuple.hpp>
 #include <hpx/util/detail/count_num_args.hpp>
 #include <hpx/util/detail/pack.hpp>
+#include <hpx/util/tuple.hpp>
 
 #include <boost/preprocessor/cat.hpp>
 
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #if !defined(HPX_BROADCAST_FANOUT)
@@ -172,14 +177,14 @@ namespace hpx { namespace lcos
         {
             typedef
                 typename traits::promise_local_result<
-                    typename hpx::actions::extract_action<
+                    typename hpx::traits::extract_action<
                         Action
                     >::remote_result_type
                 >::type
                 action_result;
             typedef
-                typename boost::mpl::if_<
-                    boost::is_same<void, action_result>
+                typename std::conditional<
+                    std::is_same<void, action_result>::value
                   , void
                   , std::vector<action_result>
                 >::type
@@ -202,7 +207,7 @@ namespace hpx { namespace lcos
             Action const & act
           , std::vector<hpx::id_type> const & ids
           , std::size_t global_idx
-          , boost::mpl::false_
+          , std::false_type
           , Ts const&... vs
         );
 
@@ -216,7 +221,7 @@ namespace hpx { namespace lcos
             Action const & act
           , std::vector<hpx::id_type> const & ids
           , std::size_t global_idx
-          , boost::mpl::true_
+          , std::true_type
           , Ts const&... vs
         );
 
@@ -419,7 +424,7 @@ namespace hpx { namespace lcos
 
             typedef detail::broadcast_invoker<
                         Action
-                      , typename boost::is_same<void, action_result>::type
+                      , typename std::is_void<action_result>::type
                       , typename util::tuple_element<
                             Is, typename Action::arguments_type
                         >::type...
@@ -534,7 +539,7 @@ namespace hpx { namespace lcos
             Action const & act
           , std::vector<hpx::id_type> const & ids
           , std::size_t global_idx
-          , boost::mpl::true_
+          , std::true_type
           , Ts const&... vs
         )
         {
@@ -583,7 +588,7 @@ namespace hpx { namespace lcos
                           , act
                           , std::move(ids_next)
                           , global_idx + applied
-                          , boost::integral_constant<bool, true>::type()
+                          , std::true_type()
                           , vs...
                         )
                     );
@@ -607,7 +612,7 @@ namespace hpx { namespace lcos
             Action const & act
           , std::vector<hpx::id_type> const & ids
           , std::size_t global_idx
-          , boost::mpl::false_
+          , std::false_type
           , Ts const&... vs
         )
         {
@@ -665,7 +670,7 @@ namespace hpx { namespace lcos
                           , act
                           , std::move(ids_next)
                           , global_idx + applied
-                          , boost::integral_constant<bool, false>::type()
+                          , std::false_type()
                           , vs...
                         )
                     );
@@ -780,7 +785,7 @@ namespace hpx { namespace lcos
               , Action()
               , ids
               , std::size_t(0)
-              , typename boost::is_same<void, action_result>::type()
+              , std::is_void<action_result>()
               , vs...
             );
     }

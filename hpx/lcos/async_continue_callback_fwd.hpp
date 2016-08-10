@@ -1,4 +1,4 @@
-//  Copyright (c) 2007-2015 Hartmut Kaiser
+//  Copyright (c) 2007-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -7,8 +7,11 @@
 #define HPX_LCOS_ASYNC_CONTINUE_CALLBACK_FWD_MAR_30_2015_1130AM
 
 #include <hpx/lcos/async_continue_fwd.hpp>
+#include <hpx/traits/is_distribution_policy.hpp>
+#include <hpx/traits/promise_local_result.hpp>
+
 #ifndef HPX_MSVC
-#include <boost/utility/enable_if.hpp>
+#include <type_traits>
 #endif
 
 namespace hpx
@@ -55,7 +58,7 @@ namespace hpx
 #ifndef HPX_MSVC
     template <typename Action, typename Cont, typename DistPolicy,
         typename Callback, typename ...Ts>
-    typename boost::enable_if_c<
+    typename std::enable_if<
         traits::is_distribution_policy<DistPolicy>::value,
         lcos::future<
             typename traits::promise_local_result<
@@ -68,7 +71,7 @@ namespace hpx
     template <
         typename Component, typename Signature, typename Derived,
         typename Cont, typename DistPolicy, typename Callback, typename ...Ts>
-    typename boost::enable_if_c<
+    typename std::enable_if<
         traits::is_distribution_policy<DistPolicy>::value,
         lcos::future<
             typename traits::promise_local_result<

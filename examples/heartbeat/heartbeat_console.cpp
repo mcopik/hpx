@@ -6,6 +6,9 @@
 #include <hpx/hpx_init.hpp>
 #include <hpx/include/iostreams.hpp>
 
+#include <string>
+#include <vector>
+
 // This application will just sit and wait for being terminated from the
 // console window for the specified amount of time. This is useful for testing
 // the heartbeat tool which connects and disconnects to a running application.
@@ -43,8 +46,9 @@ int main(int argc, char* argv[])
         ;
 
     // we expect other localities to connect
-    std::vector<std::string> cfg;
-    cfg.push_back("hpx.expect_connecting_localities=1");
+    std::vector<std::string> const cfg = {
+        "hpx.expect_connecting_localities=1"
+    };
 
     return hpx::init(desc_commandline, argc, argv, cfg);
 }

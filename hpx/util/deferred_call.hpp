@@ -7,15 +7,30 @@
 #define HPX_UTIL_DEFERRED_CALL_HPP
 
 #include <hpx/config.hpp>
+#include <hpx/traits/get_function_address.hpp>
 #include <hpx/traits/is_callable.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/invoke_fused.hpp>
+#include <hpx/util/result_of.hpp>
 #include <hpx/util/tuple.hpp>
-
-#include <boost/static_assert.hpp>
 
 #include <type_traits>
 #include <utility>
+
+///////////////////////////////////////////////////////////////////////////////
+namespace hpx { namespace traits { namespace detail
+{
+    template <typename T>
+    struct is_deferred_callable;
+
+    template <typename F, typename ...Ts>
+    struct is_deferred_callable<F(Ts...)>
+      : is_callable<
+            typename util::decay_unwrap<F>::type(
+                typename util::decay_unwrap<Ts>::type...)
+        >
+    {};
+}}}
 
 namespace hpx { namespace util
 {
@@ -43,25 +58,25 @@ namespace hpx { namespace util
         public:
             deferred() {} // needed for serialization
 
-            explicit deferred(F&& f, Ts&&... vs)
+            explicit HPX_HOST_DEVICE deferred(F&& f, Ts&&... vs)
               : _f(std::forward<F>(f))
               , _args(std::forward<Ts>(vs)...)
             {}
 
-#if defined(HPX_HAVE_CXX11_DEFAULTED_FUNCTIONS)
+#if defined(HPX_HAVE_CXX11_DEFAULTED_FUNCTIONS) && !defined(__NVCC__)
             deferred(deferred&&) = default;
 #else
-            deferred(deferred&& other)
+            HPX_HOST_DEVICE deferred(deferred&& other)
               : _f(std::move(other._f))
               , _args(std::move(other._args))
             {}
 #endif
 
-#if defined(HPX_HAVE_CXX11_DELETED_FUNCTIONS)
-            deferred& operator=(deferred&&) = delete;
-#endif
+            HPX_DELETE_COPY_ASSIGN(deferred);
+            HPX_DELETE_MOVE_ASSIGN(deferred);
 
-            inline typename deferred_result_of<F(Ts...)>::type
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            typename deferred_result_of<F(Ts...)>::type
             operator()()
             {
                 return util::invoke_fused(std::move(_f), std::move(_args));
@@ -74,6 +89,13 @@ namespace hpx { namespace util
                 ar & _args;
             }
 
+            std::size_t get_function_address() const
+            {
+                return traits::get_function_address<
+                        typename util::decay_unwrap<F>::type
+                    >::call(_f);
+            }
+
         private:
             typename util::decay_unwrap<F>::type _f;
             util::tuple<typename util::decay_unwrap<Ts>::type...> _args;
@@ -84,8 +106,9 @@ namespace hpx { namespace util
     inline detail::deferred<F(Ts&&...)>
     deferred_call(F&& f, Ts&&... vs)
     {
-        BOOST_STATIC_ASSERT(
-            traits::detail::is_deferred_callable<F(Ts&&...)>::value);
+        static_assert(
+            traits::detail::is_deferred_callable<F(Ts&&...)>::value
+          , "F shall be Callable with decay_t<Ts> arguments");
 
         return detail::deferred<F(Ts&&...)>(
             std::forward<F>(f), std::forward<Ts>(vs)...);
@@ -96,11 +119,27 @@ namespace hpx { namespace util
     inline typename std::decay<F>::type
     deferred_call(F&& f)
     {
-        BOOST_STATIC_ASSERT(
-            traits::detail::is_deferred_callable<F()>::value);
+        static_assert(
+            traits::detail::is_deferred_callable<F()>::value
+          , "F shall be Callable with no arguments");
 
         return std::forward<F>(f);
     }
+}}
+
+///////////////////////////////////////////////////////////////////////////////
+namespace hpx { namespace traits
+{
+    ///////////////////////////////////////////////////////////////////////////
+    template <typename Sig>
+    struct get_function_address<util::detail::deferred<Sig> >
+    {
+        static std::size_t
+            call(util::detail::deferred<Sig> const& f) HPX_NOEXCEPT
+        {
+            return f.get_function_address();
+        }
+    };
 }}
 
 ///////////////////////////////////////////////////////////////////////////////

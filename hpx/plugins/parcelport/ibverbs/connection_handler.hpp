@@ -7,17 +7,30 @@
 #ifndef HPX_PARCELSET_POLICIES_IBVERBS_CONNECTION_HANDLER_HPP
 #define HPX_PARCELSET_POLICIES_IBVERBS_CONNECTION_HANDLER_HPP
 
-#include <hpx/config/defines.hpp>
+#include <hpx/config.hpp>
+
 #if defined(HPX_HAVE_PARCELPORT_IBVERBS)
 
-#include <hpx/config/warnings_prefix.hpp>
-
-#include <hpx/runtime/parcelset/locality.hpp>
-#include <hpx/runtime/parcelset/parcelport_impl.hpp>
 #include <hpx/plugins/parcelport/ibverbs/acceptor.hpp>
 #include <hpx/plugins/parcelport/ibverbs/locality.hpp>
+#include <hpx/runtime/parcelset/locality.hpp>
+#include <hpx/runtime/parcelset/parcelport_impl.hpp>
 
+#include <hpx/util/cache/entries/lru_entry.hpp>
+#include <hpx/util/cache/local_cache.hpp>
 #include <hpx/util/memory_chunk_pool.hpp>
+#include <hpx/util_fwd.hpp>
+
+#include <boost/atomic.hpp>
+
+#include <list>
+#include <map>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <hpx/config/warnings_prefix.hpp>
 
 namespace hpx { namespace parcelset {
     namespace policies { namespace ibverbs
@@ -31,9 +44,9 @@ namespace hpx { namespace parcelset {
     struct connection_handler_traits<policies::ibverbs::connection_handler>
     {
         typedef policies::ibverbs::sender connection_type;
-        typedef boost::mpl::false_  send_early_parcel;
-        typedef boost::mpl::true_ do_background_work;
-        typedef boost::mpl::false_ do_enable_parcel_handling;
+        typedef std::false_type  send_early_parcel;
+        typedef std::true_type do_background_work;
+        typedef std::false_type do_enable_parcel_handling;
 
         static const char * type()
         {
@@ -53,7 +66,7 @@ namespace hpx { namespace parcelset {
 
     namespace policies { namespace ibverbs
     {
-        parcelset::locality parcelport_address(util::runtime_configuration const & ini);
+        parcelset::locality parcelport_address(util::runtime_configuration const& ini);
 
         class HPX_EXPORT connection_handler
           : public parcelport_impl<connection_handler>
@@ -79,15 +92,15 @@ namespace hpx { namespace parcelset {
 
             void background_work();
 
-            boost::shared_ptr<sender> create_connection(
+            std::shared_ptr<sender> create_connection(
                 parcelset::locality const& l, error_code& ec);
 
-            parcelset::locality agas_locality(util::runtime_configuration const & ini)
+            parcelset::locality agas_locality(util::runtime_configuration const& ini)
                 const;
 
             parcelset::locality create_locality() const;
 
-            void add_sender(boost::shared_ptr<sender> const& sender_connection);
+            void add_sender(std::shared_ptr<sender> const& sender_connection);
 
             ibv_pd *get_pd(ibv_context *context, boost::system::error_code & ec);
 
@@ -110,8 +123,8 @@ namespace hpx { namespace parcelset {
             std::size_t mr_cache_size_;
 
             typedef std::pair<char *, util::memory_chunk_pool::size_type> chunk_pair;
-            typedef boost::cache::entries::lru_entry<ibverbs_mr> mr_cache_entry_type;
-            typedef boost::cache::local_cache<chunk_pair, mr_cache_entry_type>
+            typedef hpx::util::cache::entries::lru_entry<ibverbs_mr> mr_cache_entry_type;
+            typedef hpx::util::cache::local_cache<chunk_pair, mr_cache_entry_type>
                 mr_cache_type;
             /*
             typedef
@@ -132,11 +145,11 @@ namespace hpx { namespace parcelset {
             acceptor acceptor_;
 
             hpx::lcos::local::spinlock receivers_mtx_;
-            typedef std::list<boost::shared_ptr<receiver> > receivers_type;
+            typedef std::list<std::shared_ptr<receiver> > receivers_type;
             receivers_type receivers_;
 
             hpx::lcos::local::spinlock senders_mtx_;
-            typedef std::list<boost::shared_ptr<sender> > senders_type;
+            typedef std::list<std::shared_ptr<sender> > senders_type;
             senders_type senders_;
 
             boost::atomic<bool> stopped_;

@@ -4,18 +4,18 @@
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include <hpx/config.hpp>
-#include <hpx/hpx_fwd.hpp>
+#include <hpx/hpx.hpp>
 #include <hpx/hpx_init.hpp>
 #include <hpx/runtime/threads/thread_helpers.hpp>
 #include <hpx/util/high_resolution_timer.hpp>
 
-#include <boost/chrono.hpp>
+#include <chrono>
 
 using boost::program_options::variables_map;
 using boost::program_options::options_description;
 using boost::program_options::value;
 
-using boost::chrono::seconds;
+using std::chrono::seconds;
 
 using hpx::init;
 using hpx::finalize;

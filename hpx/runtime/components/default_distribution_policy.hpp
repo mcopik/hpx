@@ -1,4 +1,4 @@
-//  Copyright (c) 2014-2015 Hartmut Kaiser
+//  Copyright (c) 2014-2016 Hartmut Kaiser
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -9,20 +9,24 @@
 #define HPX_COMPONENTS_DISTRIBUTION_POLICY_APR_07_2015_1246PM
 
 #include <hpx/config.hpp>
-#include <hpx/traits/is_distribution_policy.hpp>
-#include <hpx/traits/component_type_is_compatible.hpp>
+#include <hpx/dataflow.hpp>
+#include <hpx/lcos/future.hpp>
+#include <hpx/lcos/packaged_action.hpp>
 #include <hpx/runtime/actions/action_support.hpp>
 #include <hpx/runtime/applier/apply.hpp>
 #include <hpx/runtime/components/stubs/stub_base.hpp>
-#include <hpx/runtime/naming/name.hpp>
-#include <hpx/runtime/naming/id_type.hpp>
 #include <hpx/runtime/launch_policy.hpp>
-#include <hpx/lcos/packaged_action.hpp>
-#include <hpx/lcos/future.hpp>
-#include <hpx/dataflow.hpp>
-#include <hpx/util/move.hpp>
+#include <hpx/runtime/naming/id_type.hpp>
+#include <hpx/runtime/naming/name.hpp>
+#include <hpx/runtime/serialization/serialization_fwd.hpp>
+#include <hpx/runtime/serialization/vector.hpp>
+#include <hpx/traits/extract_action.hpp>
+#include <hpx/traits/is_distribution_policy.hpp>
+#include <hpx/traits/promise_local_result.hpp>
 
 #include <algorithm>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace hpx { namespace components
@@ -59,6 +63,17 @@ namespace hpx { namespace components
             std::vector<id_type> const& locs) const
         {
             return default_distribution_policy(locs);
+        }
+
+        /// Create a new \a default_distribution policy representing the given
+        /// set of localities.
+        ///
+        /// \param locs     [in] The list of localities the new instance should
+        ///                 represent
+        default_distribution_policy operator()(
+            std::vector<id_type> && locs) const
+        {
+            return default_distribution_policy(std::move(locs));
         }
 
         /// Create a new \a default_distribution policy representing the given
@@ -150,15 +165,9 @@ namespace hpx { namespace components
 
                         for (std::size_t i = 0; i != v.size(); ++i)
                         {
-#if !defined(HPX_GCC_VERSION) || HPX_GCC_VERSION >= 408000
                             result.emplace_back(
                                     std::move(localities_[i]), v[i].get()
                                 );
-#else
-                            result.push_back(std::make_pair(
-                                    std::move(localities_[i]), v[i].get()
-                                ));
-#endif
                         }
                         return result;
                     },
@@ -166,8 +175,7 @@ namespace hpx { namespace components
             }
 
             // handle special cases
-            hpx::id_type id =
-                localities_.empty() ? hpx::find_here() : localities_.front();
+            hpx::id_type id = get_next_target();
 
             hpx::future<std::vector<hpx::id_type> > f =
                 stub_base<Component>::bulk_create_async(
@@ -178,11 +186,7 @@ namespace hpx { namespace components
                     -> std::vector<bulk_locality_result>
                 {
                     std::vector<bulk_locality_result> result;
-#if !defined(HPX_GCC_VERSION) || HPX_GCC_VERSION >= 408000
                     result.emplace_back(id, f.get());
-#else
-                    result.push_back(std::make_pair(id, f.get()));
-#endif
                     return result;
                 });
         }
@@ -193,13 +197,12 @@ namespace hpx { namespace components
         template <typename Action, typename ...Ts>
         hpx::future<
             typename traits::promise_local_result<
-                typename hpx::actions::extract_action<Action>::remote_result_type
+                typename hpx::traits::extract_action<Action>::remote_result_type
             >::type>
-        async(BOOST_SCOPED_ENUM(launch) policy, Ts&&... vs) const
+        async(launch policy, Ts&&... vs) const
         {
             return hpx::detail::async_impl<Action>(policy,
-                localities_.empty() ? hpx::find_here() : localities_.front(),
-                std::forward<Ts>(vs)...);
+                get_next_target(), std::forward<Ts>(vs)...);
         }
 
         /// \note This function is part of the invocation policy implemented by
@@ -208,13 +211,13 @@ namespace hpx { namespace components
         template <typename Action, typename Callback, typename ...Ts>
         hpx::future<
             typename traits::promise_local_result<
-                typename hpx::actions::extract_action<Action>::remote_result_type
+                typename hpx::traits::extract_action<Action>::remote_result_type
             >::type>
-        async_cb(BOOST_SCOPED_ENUM(launch) policy, Callback&& cb, Ts&&... vs) const
+        async_cb(launch policy, Callback&& cb, Ts&&... vs) const
         {
             return hpx::detail::async_cb_impl<Action>(policy,
-                localities_.empty() ? hpx::find_here() : localities_.front(),
-                std::forward<Callback>(cb), std::forward<Ts>(vs)...);
+                get_next_target(), std::forward<Callback>(cb),
+                std::forward<Ts>(vs)...);
         }
 
         /// \note This function is part of the invocation policy implemented by
@@ -225,8 +228,7 @@ namespace hpx { namespace components
             threads::thread_priority priority, Ts&&... vs) const
         {
             return hpx::detail::apply_impl<Action>(std::forward<Continuation>(c),
-                localities_.empty() ? hpx::find_here() : localities_.front(),
-                priority, std::forward<Ts>(vs)...);
+                get_next_target(), priority, std::forward<Ts>(vs)...);
         }
 
         template <typename Action, typename ...Ts>
@@ -234,8 +236,7 @@ namespace hpx { namespace components
             threads::thread_priority priority, Ts&&... vs) const
         {
             return hpx::detail::apply_impl<Action>(
-                localities_.empty() ? hpx::find_here() : localities_.front(),
-                priority, std::forward<Ts>(vs)...);
+                get_next_target(), priority, std::forward<Ts>(vs)...);
         }
 
         /// \note This function is part of the invocation policy implemented by
@@ -247,8 +248,8 @@ namespace hpx { namespace components
             threads::thread_priority priority, Callback&& cb, Ts&&... vs) const
         {
             return hpx::detail::apply_cb_impl<Action>(std::forward<Continuation>(c),
-                localities_.empty() ? hpx::find_here() : localities_.front(),
-                priority, std::forward<Callback>(cb), std::forward<Ts>(vs)...);
+                get_next_target(), priority, std::forward<Callback>(cb),
+                std::forward<Ts>(vs)...);
         }
 
         template <typename Action, typename Callback, typename ...Ts>
@@ -256,8 +257,8 @@ namespace hpx { namespace components
             threads::thread_priority priority, Callback&& cb, Ts&&... vs) const
         {
             return hpx::detail::apply_cb_impl<Action>(
-                localities_.empty() ? hpx::find_here() : localities_.front(),
-                priority, std::forward<Callback>(cb), std::forward<Ts>(vs)...);
+                get_next_target(), priority, std::forward<Callback>(cb),
+                std::forward<Ts>(vs)...);
         }
 
         /// Returns the number of associated localities for this distribution
@@ -269,6 +270,13 @@ namespace hpx { namespace components
         std::size_t get_num_localities() const
         {
             return (std::max)(std::size_t(1), localities_.size());
+        }
+
+        /// Returns the locality which is anticipated to be used for the next
+        /// async operation
+        hpx::id_type get_next_target() const
+        {
+            return localities_.empty() ? hpx::find_here() : localities_.front();
         }
 
     protected:
@@ -311,9 +319,21 @@ namespace hpx { namespace components
           : localities_(localities)
         {}
 
+        default_distribution_policy(std::vector<id_type> && localities)
+          : localities_(std::move(localities))
+        {}
+
         default_distribution_policy(id_type const& locality)
         {
             localities_.push_back(locality);
+        }
+
+        friend class hpx::serialization::access;
+
+        template <typename Archive>
+        void serialize(Archive& ar, unsigned int const)
+        {
+            ar & localities_;
         }
 
         std::vector<id_type> localities_;   // localities to create things on

@@ -10,15 +10,19 @@
 #include <hpx/include/async.hpp>
 #include <hpx/runtime/applier/applier.hpp>
 #include <hpx/runtime/threads/thread_helpers.hpp>
+#include <hpx/util/bind.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
 #include <boost/dynamic_bitset.hpp>
+
+#include <chrono>
+#include <vector>
 
 using boost::program_options::variables_map;
 using boost::program_options::options_description;
 using boost::program_options::value;
 
-using boost::chrono::milliseconds;
+using std::chrono::milliseconds;
 
 using hpx::naming::id_type;
 
@@ -159,7 +163,7 @@ int hpx_main(variables_map& vm)
 
     {
         thread_id_type thread_id = register_thread_nullary(
-            boost::bind(&test_dummy_thread, futures));
+            hpx::util::bind(&test_dummy_thread, futures));
         HPX_TEST(thread_id != hpx::threads::invalid_thread_id);
 
         // Flood the queues with suspension operations before the rescheduling

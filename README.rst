@@ -51,20 +51,20 @@ What's so special about HPX?
   active, and thriving developer community.
 
 
-The documentation for the latest release of HPX (currently V0.9.11) can be
-`found here <http://stellar.cct.lsu.edu/files/hpx-0.9.11/html/index.html>`_.
+The documentation for the latest release of HPX (currently V0.9.99) can be
+`found here <http://stellar.cct.lsu.edu/files/hpx-0.9.99/html/index.html>`_.
 In publications this release of HPX can be cited as: |zenodo_doi|.
 
-.. |zenodo_doi| image:: https://zenodo.org/badge/doi/10.5281/zenodo.33656.svg
-     :target: http://dx.doi.org/10.5281/zenodo.33656
+.. |zenodo_doi| image:: https://zenodo.org/badge/doi/10.5281/zenodo.58027.svg
+     :target: http://dx.doi.org/10.5281/zenodo.58027
 
-Additionally, we regularily upload the current status of the documentation
+Additionally, we regularly upload the current status of the documentation
 (which is being worked on as we speak)
 `here <http://stellar-group.github.io/hpx/docs/html/>`_. We also have a
 single-page version of the documentation `here <http://stellar-group.github.io/hpx/docs/html/hpx.html>`_.
 
 If you plan to use HPX we suggest to start with the latest released version
-(currently HPX V0.9.11) which can be `downloaded here <http://stellar.cct.lsu.edu/downloads/>`_.
+(currently HPX V0.9.99) which can be `downloaded here <http://stellar.cct.lsu.edu/downloads/>`_.
 
 If you would like to work with the cutting edge version from this repository
 we suggest following the current health status of the master branch by looking at
@@ -95,24 +95,24 @@ All of HPX is distributed under the Boost Software License,
 Version 1.0 (See accompanying file LICENSE_1_0.txt or an online copy available
 `here <http://www.boost.org/LICENSE_1_0.txt>`_).
 
-Before starting to build HPX, please read about the
-`prerequisites <http://stellar-group.github.io/hpx/docs/html/hpx/manual/build_system/prerequisites.html>`_.
-
 Linux
 -----
 
-1) Clone the master HPX git repository (or a stable tag)::
+1)  Before starting to build HPX, please read about the
+    `prerequisites <http://stellar-group.github.io/hpx/docs/html/hpx/manual/build_system/prerequisites.html>`_.
+
+2) Clone the master HPX git repository (or a stable tag)::
 
     git clone git://github.com/STEllAR-GROUP/hpx.git
 
-2) Create a build directory. HPX requires an out-of-tree build. This means you
+3) Create a build directory. HPX requires an out-of-tree build. This means you
    will be unable to run CMake in the HPX source directory::
 
       cd hpx
       mkdir my_hpx_build
       cd my_hpx_build
 
-3) Invoke CMake from your build directory, pointing the CMake driver to the root
+4) Invoke CMake from your build directory, pointing the CMake driver to the root
    of your HPX source tree::
 
       cmake -DBOOST_ROOT=/your_boost_directory \
@@ -125,15 +125,15 @@ Linux
       cmake -DBOOST_ROOT=~/packages/boost \
             -DHWLOC_ROOT=/packages/hwloc \
             -DCMAKE_INSTALL_PREFIX=~/packages/hpx \
-            ~/downloads/hpx_0.9.11
+            ~/downloads/hpx_0.9.99
 
-4) Invoke GNU make. If you are on a machine with multiple cores (very likely),
+5) Invoke GNU make. If you are on a machine with multiple cores (very likely),
    add the -jN flag to your make invocation, where N is the number of cores
    on your machine plus one::
 
       gmake -j5
 
-5) To complete the build and install HPX::
+6) To complete the build and install HPX::
 
       gmake install
 
@@ -154,18 +154,21 @@ for more information about building HPX on a Linux system.
 OS X (Mac)
 ----------
 
-1) Clone the master HPX git repository (or a stable tag)::
+1)  Before starting to build HPX, please read about the
+    `prerequisites <http://stellar-group.github.io/hpx/docs/html/hpx/manual/build_system/prerequisites.html>`_.
+
+2) Clone the master HPX git repository (or a stable tag)::
 
     git clone git://github.com/STEllAR-GROUP/hpx.git
 
-2) Create a build directory. HPX requires an out-of-tree build. This means you
+3) Create a build directory. HPX requires an out-of-tree build. This means you
    will be unable to run CMake in the HPX source directory::
 
       cd hpx
       mkdir my_hpx_build
       cd my_hpx_build
 
-3) Invoke CMake from your build directory, pointing the CMake driver to the root
+4) Invoke CMake from your build directory, pointing the CMake driver to the root
    of your HPX source tree::
 
       cmake -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
@@ -178,15 +181,15 @@ OS X (Mac)
       cmake -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
             -DBOOST_ROOT=~/packages/boost \
             -DCMAKE_INSTALL_PREFIX=~/packages/hpx \
-            ~/downloads/hpx_0.9.11
+            ~/downloads/hpx_0.9.99
 
-4) Invoke GNU make. If you are on a machine with multiple cores (very likely),
+5) Invoke GNU make. If you are on a machine with multiple cores (very likely),
    add the -jN flag to your make invocation, where N is the number of cores
    on your machine plus one::
 
       make -j5
 
-5) To complete the build and install HPX::
+6) To complete the build and install HPX::
 
       make install
 
@@ -207,38 +210,41 @@ For more information and additional options, please see the corresponding
 Windows
 -------
 
-1) Clone the master HPX git repository (or a stable tag). You can use
+1)  Before starting to build HPX, please read about the
+    `prerequisites <http://stellar-group.github.io/hpx/docs/html/hpx/manual/build_system/prerequisites.html>`_.
+
+2) Clone the master HPX git repository (or a stable tag). You can use
    TortoiseGIT, or the git client that Cygwin provides. The git repository can
    be found at::
 
     git://github.com/STEllAR-GROUP/hpx.git
 
-2) Create a build folder. HPX requires an out-of-tree-build. This means that you
+3) Create a build folder. HPX requires an out-of-tree-build. This means that you
    will be unable to run CMake in the HPX source folder.
 
-3) Open up the CMake GUI. In the input box labelled "Where is the source code:",
+4) Open up the CMake GUI. In the input box labelled "Where is the source code:",
    enter the full path to the source folder. In the input box labelled
    "Where to build the binaries:", enter the full path to the build folder you
    created in step 2.
 
-4) Add CMake variable definitions (if any) by clicking the "Add Entry" button and selecting type
+5) Add CMake variable definitions (if any) by clicking the "Add Entry" button and selecting type
    "String". Most probably you will need to at least add the directories where `Boost <http://www.boost.org>`_
    is located as BOOST_ROOT and where `Hwloc <http://www.open-mpi.org/projects/hwloc/>`_ is
    located as HWLOC_ROOT.
 
-5) Press the "Configure" button. A window will pop up asking you which compiler
+6) Press the "Configure" button. A window will pop up asking you which compiler
    to use. Select the x64 Visual Studio 2012 compiler. Note that while it is possible to build HPX for x86
    we don't recommend doing so as 32 bit runs are severely restricted by a 32 bit
    Windows system limitation affecting the number of HPX threads you can create.
 
-6) If the "Generate" button is not clickable, press "Configure" again. Repeat
+7) If the "Generate" button is not clickable, press "Configure" again. Repeat
    this step until the "Generate" button becomes clickable.
 
-7) Press "Generate".
+8) Press "Generate".
 
-8) Open up the build folder, and double-click hpx.sln.
+9) Open up the build folder, and double-click hpx.sln.
 
-9) Build the INSTALL target.
+10) Build the INSTALL target.
 
 For more information, please see the corresponding
 `section in the documentation <http://stellar-group.github.io/hpx/docs/html/hpx/manual/build_system/building_hpx/build_recipes.html#hpx.manual.build_system.building_hpx.build_recipes.windows_installation>`_
@@ -248,10 +254,13 @@ BlueGene/Q
 
 So far we only support BGClang for compiling HPX on the BlueGene/Q.
 
-1) Check if BGClang is available on your installation. If not obtain and install a copy
+1)  Before starting to build HPX, please read about the
+    `prerequisites <http://stellar-group.github.io/hpx/docs/html/hpx/manual/build_system/prerequisites.html>`_.
+
+2) Check if BGClang is available on your installation. If not obtain and install a copy
    from the `BGClang trac page <https://trac.alcf.anl.gov/projects/llvm-bgq>`_
 
-2) Build (and install) a recent version of `Hwloc <http://www.open-mpi.org/projects/hwloc/>`_
+3) Build (and install) a recent version of `Hwloc <http://www.open-mpi.org/projects/hwloc/>`_
    With the following commands::
 
     ./configure \
@@ -264,7 +273,7 @@ So far we only support BGClang for compiling HPX on the BlueGene/Q.
     make
     make install
 
-3) Build (and install) a recent version of Boost, using BGClang::
+4) Build (and install) a recent version of Boost, using BGClang::
    To build Boost with BGClang, you'll need to set up the following in your Boost
    ``~/user-config.jam`` file::
 
@@ -280,11 +289,11 @@ So far we only support BGClang for compiling HPX on the BlueGene/Q.
         ./bootstrap.sh
         ./b2 --build-dir=/tmp/build-boost --layout=versioned toolset=clang -j12
 
-4) Clone the master HPX git repository (or a stable tag)::
+5) Clone the master HPX git repository (or a stable tag)::
 
     git clone git://github.com/STEllAR-GROUP/hpx.git
 
-5) Generate the HPX buildfiles using cmake::
+6) Generate the HPX buildfiles using cmake::
 
     cmake -DHPX_PLATFORM=BlueGeneQ \
           -DCMAKE_TOOLCHAIN_FILE=/path/to/hpx/cmake/toolchains/BGQ.cmake \
@@ -295,7 +304,7 @@ So far we only support BGClang for compiling HPX on the BlueGene/Q.
           -DHPX_MALLOC=system \
           /path/to/hpx
 
-6) To complete the build and install HPX::
+7) To complete the build and install HPX::
 
     make -j24
     make install
@@ -326,55 +335,6 @@ CMake in the following way::
 
 For more detailed information about building HPX for the Xeon/Phi please refer to
 the `documentation <http://stellar-group.github.io/hpx/docs/html/hpx/manual/build_system/building_hpx/build_recipes.html#hpx.manual.build_system.building_hpx.build_recipes.intel_mic_installation>`_.
-
-
-
-******************
- Docker
-******************
-
-We also provide several HPX docker images.
-Those can be used for rapid prototyping, demonstrations or writing minimal
-examples for issue reports. This also provides an HPX build environment for
-continuous integration of external projects.
-
-The following images are currently available:
-
-* ``stellargroup/hpx:dev``		(HEAD, updated on every commit to master which
-  builds successfully, see
-  `here <https://circleci.com/gh/STEllAR-GROUP/hpx/tree/master>`_ for the
-  build status)
-* ``stellargroup/hpx:latest``	(latest release)
-* ``stellargroup/hpx:0.9.11``	(release v0.9.11)
-* ``stellargroup/hpx:0.9.10``	(release v0.9.10)
-
-While a more detailed introduction to docker can be found at the official
-`docker homepage <https://docs.docker.com/userguide/>`_, here are some easy
-steps that explain how to use a docker image::
-
-    # Download/Update the image
-    docker pull stellargroup/hpx:dev
-
-    # Run a command.
-    # NOTICE: Docker images are read-only and will be reset after execution.
-    docker run stellargroup/hpx:dev hello_world
-
-    # Mount a host directory to make changes persistant.
-    # In this case, mount the current host directory $PWD to /hpx in the
-    # dockerfile via '-v'.
-    # Also, make /hpx the current working directory with '-w'.
-    docker run -v $PWD:/hpx -w /hpx stellargroup/hpx:dev <command> <arguments>
-
-    # For example, build the binary "example" from "example.cpp" using
-    # the built-in hpx compilation script "hpxcxx". Note that hpx libraries
-    # other than the core library have to be linked explicitly (like hpx_iostreams).
-    docker run -v $PWD:/hpx -w /hpx stellargroup/hpx:dev \
-        hpxcxx example.cpp --exe=example -lhpx_iostreams
-
-    # Now run the resulting program:
-    docker run -v $PWD:/hpx -w /hpx stellargroup/hpx:dev ./example
-
-
 
 
 ******************
@@ -415,3 +375,7 @@ HPX is currently funded by
 
 * The Bavarian Research Foundation (Bayerische Forschungsstfitung) through
   the grant AZ-987-11.
+
+* The European Commission's Horizon 2020 programme through the grant
+  H2020-EU.1.2.2. 671603 (AllScale).
+

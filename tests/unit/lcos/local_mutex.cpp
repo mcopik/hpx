@@ -11,38 +11,40 @@
 #include <hpx/lcos/local/mutex.hpp>
 #include <hpx/runtime/threads/thread.hpp>
 #include <hpx/runtime/threads/threadmanager.hpp>
+#include <hpx/util/bind.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
-#include <boost/assign/std/vector.hpp>
-#include <boost/chrono.hpp>
-#include <boost/thread/locks.hpp>
 
-boost::chrono::milliseconds const delay(1000);
-boost::chrono::milliseconds const timeout_resolution(100);
+#include <chrono>
+#include <mutex>
+#include <string>
+#include <vector>
+
+std::chrono::milliseconds const timeout_resolution(100);
 
 template <typename M>
 struct test_lock
 {
     typedef M mutex_type;
-    typedef typename M::scoped_lock lock_type;
+    typedef std::unique_lock<M> lock_type;
 
     void operator()()
     {
         mutex_type mutex;
-        hpx::lcos::local::condition_variable condition;
+        hpx::lcos::local::condition_variable_any condition;
 
         // Test the lock's constructors.
         {
-            lock_type lock(mutex, boost::defer_lock);
+            lock_type lock(mutex, std::defer_lock);
             HPX_TEST(!lock);
         }
         lock_type lock(mutex);
         HPX_TEST(lock ? true : false);
 
         // Construct and initialize an xtime for a fast time out.
-        boost::chrono::system_clock::time_point xt =
-            boost::chrono::system_clock::now()
-          + boost::chrono::milliseconds(10);
+        std::chrono::system_clock::time_point xt =
+            std::chrono::system_clock::now()
+          + std::chrono::milliseconds(10);
 
         // Test the lock and the mutex with condition variables.
         // No one is going to notify this condition variable.  We expect to
@@ -62,12 +64,12 @@ template <typename M>
 struct test_trylock
 {
     typedef M mutex_type;
-    typedef typename M::scoped_try_lock try_lock_type;
+    typedef std::unique_lock<M> try_lock_type;
 
     void operator()()
     {
         mutex_type mutex;
-        hpx::lcos::local::condition_variable condition;
+        hpx::lcos::local::condition_variable_any condition;
 
         // Test the lock's constructors.
         {
@@ -75,16 +77,16 @@ struct test_trylock
             HPX_TEST(lock ? true : false);
         }
         {
-            try_lock_type lock(mutex, boost::defer_lock);
+            try_lock_type lock(mutex, std::defer_lock);
             HPX_TEST(!lock);
         }
         try_lock_type lock(mutex);
         HPX_TEST(lock ? true : false);
 
         // Construct and initialize an xtime for a fast time out.
-        boost::chrono::system_clock::time_point xt =
-            boost::chrono::system_clock::now()
-          + boost::chrono::milliseconds(10);
+        std::chrono::system_clock::time_point xt =
+            std::chrono::system_clock::now()
+          + std::chrono::milliseconds(10);
 
         // Test the lock and the mutex with condition variables.
         // No one is going to notify this condition variable.  We expect to
@@ -107,13 +109,13 @@ struct test_trylock
 template<typename Mutex>
 struct test_lock_times_out_if_other_thread_has_lock
 {
-    typedef boost::unique_lock<Mutex> Lock;
+    typedef std::unique_lock<Mutex> Lock;
 
     Mutex m;
     hpx::lcos::local::mutex done_mutex;
     bool done;
     bool locked;
-    hpx::lcos::local::condition_variable done_cond;
+    hpx::lcos::local::condition_variable_any done_cond;
 
     test_lock_times_out_if_other_thread_has_lock():
         done(false),locked(false)
@@ -121,10 +123,10 @@ struct test_lock_times_out_if_other_thread_has_lock
 
     void locking_thread()
     {
-        Lock lock(m,boost::defer_lock);
-        lock.try_lock_for(boost::chrono::milliseconds(50));
+        Lock lock(m,std::defer_lock);
+        lock.try_lock_for(std::chrono::milliseconds(50));
 
-        boost::lock_guard<hpx::lcos::local::mutex> lk(done_mutex);
+        std::lock_guard<hpx::lcos::local::mutex> lk(done_mutex);
         locked=lock.owns_lock();
         done=true;
         done_cond.notify_one();
@@ -132,9 +134,9 @@ struct test_lock_times_out_if_other_thread_has_lock
 
     void locking_thread_through_constructor()
     {
-        Lock lock(m,boost::chrono::milliseconds(50));
+        Lock lock(m,std::chrono::milliseconds(50));
 
-        boost::lock_guard<hpx::lcos::local::mutex> lk(done_mutex);
+        std::lock_guard<hpx::lcos::local::mutex> lk(done_mutex);
         locked=lock.owns_lock();
         done=true;
         done_cond.notify_one();
@@ -159,9 +161,9 @@ struct test_lock_times_out_if_other_thread_has_lock
         try
         {
             {
-                boost::unique_lock<hpx::lcos::local::mutex> lk(done_mutex);
-                HPX_TEST(done_cond.wait_for(lk,boost::chrono::seconds(2),
-                                                 boost::bind(&this_type::is_done,this)));
+                std::unique_lock<hpx::lcos::local::mutex> lk(done_mutex);
+                HPX_TEST(done_cond.wait_for(lk,std::chrono::seconds(2),
+                    hpx::util::bind(&this_type::is_done,this)));
                 HPX_TEST(!locked);
             }
 
@@ -184,12 +186,11 @@ struct test_lock_times_out_if_other_thread_has_lock
     }
 };
 
-#if BOOST_VERSION >= 105000 // 1.49 has old timed lock interface
 template <typename M>
 struct test_timedlock
 {
     typedef M mutex_type;
-    typedef typename M::scoped_lock try_lock_for_type;
+    typedef std::unique_lock<M> try_lock_for_type;
 
     static bool fake_predicate()
     {
@@ -201,29 +202,29 @@ struct test_timedlock
         test_lock_times_out_if_other_thread_has_lock<mutex_type>()();
 
         mutex_type mutex;
-        hpx::lcos::local::condition_variable condition;
+        hpx::lcos::local::condition_variable_any condition;
 
         // Test the lock's constructors.
         {
             // Construct and initialize an xtime for a fast time out.
-            boost::chrono::system_clock::time_point xt =
-                boost::chrono::system_clock::now()
-              + boost::chrono::milliseconds(10);
+            std::chrono::system_clock::time_point xt =
+                std::chrono::system_clock::now()
+              + std::chrono::milliseconds(10);
 
             try_lock_for_type lock(mutex, xt);
             HPX_TEST(lock ? true : false);
         }
         {
-            try_lock_for_type lock(mutex, boost::defer_lock);
+            try_lock_for_type lock(mutex, std::defer_lock);
             HPX_TEST(!lock);
         }
         try_lock_for_type lock(mutex);
         HPX_TEST(lock ? true : false);
 
         // Construct and initialize an xtime for a fast time out.
-        boost::chrono::system_clock::time_point timeout =
-            boost::chrono::system_clock::now()
-          + boost::chrono::milliseconds(100);
+        std::chrono::system_clock::time_point timeout =
+            std::chrono::system_clock::now()
+          + std::chrono::milliseconds(100);
 
         // Test the lock and the mutex with condition variables.
         // No one is going to notify this condition variable.  We expect to
@@ -231,9 +232,9 @@ struct test_timedlock
         HPX_TEST(!condition.wait_until(lock, timeout, fake_predicate));
         HPX_TEST(lock ? true : false);
 
-        boost::chrono::system_clock::time_point const now =
-            boost::chrono::system_clock::now();
-        HPX_TEST_LTE(timeout - timeout_resolution, now);
+        std::chrono::system_clock::time_point const now =
+            std::chrono::system_clock::now();
+        HPX_TEST(timeout - timeout_resolution < now);
 
         // Test the lock, unlock and timedlock methods.
         lock.unlock();
@@ -243,30 +244,29 @@ struct test_timedlock
         lock.unlock();
         HPX_TEST(!lock);
 
-        boost::chrono::system_clock::time_point target =
-            boost::chrono::system_clock::now()
-          + boost::chrono::milliseconds(100);
+        std::chrono::system_clock::time_point target =
+            std::chrono::system_clock::now()
+          + std::chrono::milliseconds(100);
         HPX_TEST(lock.try_lock_until(target));
         HPX_TEST(lock ? true : false);
         lock.unlock();
         HPX_TEST(!lock);
 
-        HPX_TEST(mutex.try_lock_for(boost::chrono::milliseconds(100)));
+        HPX_TEST(mutex.try_lock_for(std::chrono::milliseconds(100)));
         mutex.unlock();
 
-        HPX_TEST(lock.try_lock_for(boost::chrono::milliseconds(100)));
+        HPX_TEST(lock.try_lock_for(std::chrono::milliseconds(100)));
         HPX_TEST(lock ? true : false);
         lock.unlock();
         HPX_TEST(!lock);
     }
 };
-#endif
 
 template <typename M>
 struct test_recursive_lock
 {
     typedef M mutex_type;
-    typedef typename M::scoped_lock lock_type;
+    typedef std::unique_lock<M> lock_type;
 
     void operator()()
     {
@@ -284,11 +284,9 @@ void test_mutex()
 
 void test_timed_mutex()
 {
-#if BOOST_VERSION >= 105000 // 1.49 has old timed lock interface
     test_lock<hpx::lcos::local::timed_mutex>()();
     test_trylock<hpx::lcos::local::timed_mutex>()();
     test_timedlock<hpx::lcos::local::timed_mutex>()();
-#endif
 }
 
 //void test_recursive_mutex()
@@ -300,12 +298,10 @@ void test_timed_mutex()
 //
 //void test_recursive_timed_mutex()
 //{
-//#if BOOST_VERSION >= 105000 // 1.49 has old timed lock interface
 //    test_lock<hpx::lcos::local::recursive_timed_mutex()();
 //    test_trylock<hpx::lcos::local::recursive_timed_mutex()();
 //    test_timedlock<hpx::lcos::local::recursive_timed_mutex()();
 //    test_recursive_lock<hpx::lcos::local::recursive_timed_mutex()();
-//#endif
 //}
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -331,10 +327,9 @@ int main(int argc, char* argv[])
     options_description cmdline("Usage: " HPX_APPLICATION_STRING " [options]");
 
     // We force this test to use several threads by default.
-    using namespace boost::assign;
-    std::vector<std::string> cfg;
-    cfg += "hpx.os_threads=" +
-        boost::lexical_cast<std::string>(hpx::threads::hardware_concurrency());
+    std::vector<std::string> const cfg = {
+        "hpx.os_threads=all"
+    };
 
     // Initialize and run HPX
     return hpx::init(cmdline, argc, argv, cfg);

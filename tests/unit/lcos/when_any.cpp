@@ -10,21 +10,18 @@
 #include <hpx/include/threads.hpp>
 #include <hpx/util/lightweight_test.hpp>
 
-#include <utility>
+#include <chrono>
+#include <deque>
+#include <list>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
-#include <list>
-#include <deque>
-
-#include <boost/move/move.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/assign/std/vector.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
 int make_int_slowly()
 {
-    hpx::this_thread::sleep_for(boost::chrono::milliseconds(100));
+    hpx::this_thread::sleep_for(std::chrono::milliseconds(100));
     return 42;
 }
 
@@ -786,10 +783,9 @@ int main(int argc, char* argv[])
     options_description cmdline("Usage: " HPX_APPLICATION_STRING " [options]");
 
     // We force this test to use several threads by default.
-    using namespace boost::assign;
-    std::vector<std::string> cfg;
-    cfg += "hpx.os_threads=" +
-        boost::lexical_cast<std::string>(hpx::threads::hardware_concurrency());
+    std::vector<std::string> const cfg = {
+        "hpx.os_threads=all"
+    };
 
     // Initialize and run HPX
     return hpx::init(cmdline, argc, argv, cfg);

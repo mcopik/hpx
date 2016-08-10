@@ -6,14 +6,12 @@
 #if !defined(HPX_TRAITS_IS_GPU_EXECUTOR)
 #define HPX_TRAITS_IS_GPU_EXECUTOR
 
-#include <hpx/traits.hpp>
+#include <hpx/config.hpp>
 #include <hpx/config/inline_namespace.hpp>
 #include <hpx/parallel/config/inline_namespace.hpp>
 #include <hpx/util/decay.hpp>
 
 #include <type_traits>
-
-#include <boost/type_traits/is_base_of.hpp>
 
 // Useful only if a compiler supporting GPU code generation is used
 #if defined(HPX_WITH_GPU_EXECUTOR)
@@ -28,7 +26,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         /// \cond NOINTERNAL
         template <typename T>
         struct is_gpu_executor
-          : boost::is_base_of<gpu_executor_tag, T>
+          : std::is_base_of<gpu_executor_tag, T>
         {};
 
         template <>

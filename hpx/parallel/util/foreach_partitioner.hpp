@@ -187,7 +187,7 @@ namespace hpx { namespace parallel { namespace util
 
 #if defined(HPX_WITH_AMP) || defined(HPX_WITH_SYCL)
         ///////////////////////////////////////////////////////////////////////
-		template <typename Result>
+/*		template <typename Result>
 		struct foreach_n_static_partitioner<gpu_execution_policy, Result>
 		{
 			template <typename ExPolicy, typename FwdIter, typename F1, typename GPUBuffer>
@@ -224,7 +224,7 @@ namespace hpx { namespace parallel { namespace util
 					 * The wrapping is necessary, otherwise the code in executor_traits will not be able to
 					 * correcly detect the return type of this lambda
 					 */
-					F1 _f1 = std::move(f1);				
+/*					F1 _f1 = std::move(f1);				
 					auto f = hpx::parallel::wrap_kernel(f1, [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
 						/**
@@ -232,7 +232,7 @@ namespace hpx { namespace parallel { namespace util
 						 *	HPX - doesn't work, segfault
 						 *	No HPX - doesn't work, segfault
 						 */
-						_f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem) );
+	//					_f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem) );
 
 						/**
 						 *	Test 2 : Each thread tries to write its ID into each element of the buffer (Writer After Write).
@@ -247,13 +247,13 @@ namespace hpx { namespace parallel { namespace util
 						 *	No HPX - instead of array position shows the same random value
 						 */
 						//(*std::get<0>(elem))[ std::get<1>(elem) ] = std::get<2>(elem);
-					});
+		//			});
 
 					//workitems.reserve(shape.size());
 					//workitems = executor_traits::async_execute(
 					//	policy.executor(), f, shape);
 
-					executor_traits::execute(policy.executor(),
+			/*		executor_traits::execute(policy.executor(),
 							//std::forward<decltype(f)>(f),
 							policy.parameters(),
 							std::move(f),
@@ -316,7 +316,7 @@ namespace hpx { namespace parallel { namespace util
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
 					 * one of them will point to the starting index and the second one will give the size.
 					 */
-					F1 _f1 = std::move(f1);	
+				/*	F1 _f1 = std::move(f1);	
 					auto f = hpx::parallel::wrap_kernel(f1, [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
 						return _f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem));
@@ -356,7 +356,7 @@ namespace hpx { namespace parallel { namespace util
                 gpu_task_execution_policy_shim<Executor, Parameters>,
                 Result>
           : foreach_n_static_partitioner<gpu_task_execution_policy, Result>
-        {};
+        {};*/
 #endif
 
         template <typename Executor, typename Parameters, typename Result>
@@ -409,7 +409,7 @@ namespace hpx { namespace parallel { namespace util
         };
 
 #if defined(HPX_WITH_GPU_EXECUTOR)
-		template <typename Result>
+/*		template <typename Result>
 		struct foreach_n_partitioner<gpu_execution_policy, Result,
 				parallel::traits::static_partitioner_tag>
 		{
@@ -483,7 +483,7 @@ namespace hpx { namespace parallel { namespace util
                 Result, parallel::traits::default_partitioner_tag>
           : foreach_n_partitioner<gpu_task_execution_policy, Result,
                 parallel::traits::static_partitioner_tag>
-        {};
+        {};*/
 #endif
 
         template <typename Executor, typename Parameters, typename Result>

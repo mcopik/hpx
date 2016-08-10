@@ -157,13 +157,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 				{
                    // auto _f2 = [](hpx::util::tuple<std::size_t,std::size_t,std::size_t   > & tup) {};
 					//dont'return right now - we have to sync buffers after the call
-					util::foreach_n_partitioner<gpu_execution_policy>::call(
+					util::foreach_partitioner<gpu_execution_policy>::call(
 						policy, first, count,
                        	hpx::parallel::make_kernel<kernel_name>([_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
 						{
 							for(std::size_t i = 0; i < part_size; ++i)
 								_f( _proj( (*gpu_buffer)[part_begin + i]) );
-						}), buffer);
+						}));
 					// the data needs to be transferred from gpu back to original buffer
 					buffer.sync();
 
@@ -194,13 +194,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 					 * Allocate data on the GPU.
 					 */
 					auto buffer = policy.executor().create_buffers_shared(first, count);
-					hpx::future<Iter> x = util::foreach_n_partitioner<gpu_task_execution_policy>::call(
+					hpx::future<Iter> x = util::foreach_partitioner<gpu_task_execution_policy>::call(
 							policy, first, count,
 							hpx::parallel::wrap_kernel(f, [_f, _proj](const gpu_buffer_type * gpu_buffer, std::size_t part_begin, std::size_t part_size)
 							{
 								for(std::size_t i = 0; i < part_size; ++i)
 									_f( _proj( (*gpu_buffer)[part_begin + i]) );
-							}), *buffer.get());
+							}));
 					/**
 					 * Sync the data after finishing GPU computation.
 					 */

@@ -41,6 +41,26 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 ################################################################################
+# Kalmar compiler configuration
+# It has to be done before any call to project()!
+################################################################################
+if(HPX_WITH_KALMAR)
+  #include(KalmarConfigure) works only after project()
+  include(cmake/KalmarConfigure.cmake)
+  kalmar_configure_cxx()
+endif()
+
+################################################################################
+# ComputeCPP compiler configuration
+# It has to be done before any call to project()!
+################################################################################
+if(HPX_WITH_COMPUTECPP)
+  #include(ComputeCPPConfigure) works only after project()
+  include(cmake/ComputeCPPConfigure.cmake)
+  computecpp_configure_cxx()
+endif()
+
+################################################################################
 # project metadata
 ################################################################################
 project(HPX CXX C)
@@ -1034,6 +1054,35 @@ if(HPX_WITH_CUDA AND HPX_WITH_CUDA_CLANG)
   hpx_libraries(cudart)
   hpx_library_dir(${CUDA_TOOLKIT_ROOT_DIR}/lib64)
   link_directories(${CUDA_TOOLKIT_ROOT_DIR}/lib64)
+endif()
+
+################################################################################
+# Kalmar compiler
+################################################################################
+
+hpx_option(HPX_WITH_KALMAR STRING
+	"Use the Kalmar C++AMP compiler for HPX. Requires the path to install directory"
+	"" ADVANCED)
+
+################################################################################
+# ComputeCPP compiler
+################################################################################
+
+hpx_option(HPX_WITH_COMPUTECPP STRING
+"Use the ComputeCpp SYCL compiler for HPX. Requires the path to install directory" "" ADVANCED)
+
+################################################################################
+# Kalmar configuration and flags
+################################################################################
+if(HPX_WITH_KALMAR)
+  kalmar_configure()
+endif()
+
+################################################################################
+# ComputeCPP configuration and flags
+################################################################################
+if(HPX_WITH_COMPUTECPP)
+  computecpp_configure()
 endif()
 
 ################################################################################

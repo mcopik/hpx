@@ -91,12 +91,12 @@ namespace hpx { namespace parallel {
 
 	template<typename F1, typename F2>
 	auto wrap_kernel(F1 && old_functor, F2 && new_functor) -> 
-		decltype( detail::wrap_kernel_helper<
+		decltype( v3::detail::wrap_kernel_helper<
 				typename std::decay<F1>::type, 
 				typename std::decay<F2>::type
 			>::call( std::forward<F1>(old_functor), std::forward<F2>(new_functor)) )
 	{
-		return detail::wrap_kernel_helper<
+		return v3::detail::wrap_kernel_helper<
 				typename std::decay<F1>::type, 
 				typename std::decay<F2>::type
 			>::call( std::forward<F1>(old_functor), std::forward<F2>(new_functor));

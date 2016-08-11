@@ -5,6 +5,8 @@
  *      Author: mcopik
  */
 
+#include <numeric>
+
 #include <hpx/hpx.hpp>
 #include <hpx/hpx_init.hpp>
 #include <hpx/include/parallel_for_each.hpp>
@@ -35,7 +37,8 @@ int hpx_main(boost::program_options::variables_map& vm)
 		 */
 		std::iota(boost::begin(c), boost::end(c), std::rand());
 		std::iota(boost::begin(d), boost::end(d), std::rand());
-		hpx::parallel::for_each(hpx::parallel::gpu,
+        hpx::parallel::gpu_sycl_executor exec;
+		hpx::parallel::for_each(hpx::parallel::par.on(exec),
 			boost::begin(c), boost::end(c),
 			[](std::size_t& v) {
 
@@ -72,10 +75,10 @@ int hpx_main(boost::program_options::variables_map& vm)
 		/**
 		 * First, size
 		 */
-		std::iota(boost::begin(c), boost::end(c), std::rand());
+		/*std::iota(boost::begin(c), boost::end(c), std::rand());
 		std::iota(boost::begin(d), boost::end(d), std::rand());
 		std::vector< hpx::future<std::vector<std::size_t>::iterator> > tasks;
-		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::gpu(hpx::parallel::task),
+		tasks.push_back( hpx::parallel::for_each_n(hpx::parallel::par(hpx::parallel::task).on(exec) ,
 			boost::begin(c), n,
 			[](std::size_t& v) {
 				v = 42;
@@ -87,7 +90,7 @@ int hpx_main(boost::program_options::variables_map& vm)
                                 v = 43;
                         }) );*/
 
-		hpx::wait_all(tasks);
+		/*hpx::wait_all(tasks);
 		// verify values
 		count = 0;
 		std::for_each(boost::begin(c), boost::end(c),

@@ -68,7 +68,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             template <typename Iter>
             HPX_HOST_DEVICE
             void operator()(std::size_t /*part_index*/,
-                Iter part_begin, std::size_t part_size)
+                Iter part_begin, std::size_t part_size) const
             {
                 typedef typename util::detail::loop_n<Iter>::type it_type;
 

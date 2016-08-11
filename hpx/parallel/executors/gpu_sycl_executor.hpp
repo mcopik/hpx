@@ -18,6 +18,7 @@
 #include <hpx/parallel/executors/dynamic_chunk_size.hpp>
 #include <hpx/runtime/threads/thread_executor.hpp>
 #include <hpx/util/decay.hpp>
+#include <hpx/util/iterator_adaptor.hpp>
 #include <hpx/util/result_of.hpp>
 #include <hpx/util/unwrapped.hpp>
 
@@ -34,6 +35,95 @@
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 {
 
+    namespace detail
+    {
+        template <typename T>
+        struct iterator
+          : hpx::util::iterator_facade<
+                iterator<T>,
+                cl::sycl::global_ptr<T>,
+                std::random_access_iterator_tag,
+                typename cl::sycl::global_ptr<T>::reference_t,
+                //typename cl::sycl::global_ptr<T>::difference_type
+                std::ptrdiff_t
+            >
+        {
+            typedef hpx::util::iterator_facade<
+                    iterator<T>,
+                    cl::sycl::global_ptr<T>,
+                    std::random_access_iterator_tag,
+                    typename cl::sycl::global_ptr<T>::reference_t,
+                    //typename cl::sycl::global_ptr<T>::difference_type
+                    std::ptrdiff_t
+            > base_type;
+            
+            typedef typename cl::sycl::global_ptr<T>::reference_t Reference;
+            //typedef typename cl::sycl::global_ptr<T>::difference_type Distance;
+            typedef typename std::ptrdiff_t Distance;
+
+            HPX_HOST_DEVICE iterator()
+              : base_type(), ptr(nullptr)
+            {}
+
+            HPX_HOST_DEVICE
+            iterator(cl::sycl::global_ptr<T> p, std::size_t pos)
+              : ptr(p + pos)
+            {}
+            
+            template<typename U>
+            HPX_HOST_DEVICE
+            iterator(cl::sycl::global_ptr<U> p, std::size_t pos)
+              : ptr(p + pos)
+            {}
+
+            HPX_HOST_DEVICE iterator(iterator const& other)
+              : base_type(other), ptr(other.ptr)
+            {}
+
+            template <typename Iterator1>
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            bool equal(Iterator1 const& other)
+            {
+                return ptr == other.ptr;
+            }
+
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            void increment()
+            {
+                ++ptr;
+            }
+
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            void decrement()
+            {
+                --ptr;
+            }
+
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            Reference dereference() const
+            {
+                return *ptr;
+            }
+
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            void advance(Distance n)
+            {
+                ptr += n;
+            }
+
+            template <typename Iterator1>
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            Distance distance_to(Iterator1 const& other)
+            {
+                return ptr.pointer() - other.ptr.pointer();
+            }
+
+        private:
+            mutable cl::sycl::global_ptr<T> ptr;
+        };
+
+    }
+
 	///////////////////////////////////////////////////////////////////////////
     /// A \a sequential_executor creates groups of sequential execution agents
     /// which execute in the calling thread. The sequential order is given by
@@ -44,10 +134,19 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		/// Returns always 1 if user doesn't provide a chunk size
 		typedef hpx::parallel::dynamic_chunk_size executor_parameters_type;
 
+		cl::sycl::default_selector selector;
+        std::shared_ptr<cl::sycl::queue> queue;
+
 		#if defined(DOXYGEN)
 				/// Create a new sequential executor
-				gpu_sycl_executor() {}
+				//gpu_sycl_executor() {}
 		#endif
+        //TODO: device selection
+        gpu_sycl_executor() :
+            queue(new cl::sycl::queue(selector))
+        {
+
+        }
 		
 		template<typename ValueType, typename BufferType>
 		struct gpu_sycl_buffer_view_wrapper
@@ -59,9 +158,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				typename value_type = typename std::iterator_traits<Iter>::value_type,
     			typename buffer_type = cl::sycl::buffer<typename std::iterator_traits<Iter>::value_type, 1>,
 				typename _buffer_view_type =  decltype( std::declval< buffer_type >().template get_access<cl::sycl::access::mode::read_write>( std::declval<cl::sycl::handler &>() ) )>
-    	struct gpu_sycl_buffer : detail::gpu_executor_buffer<Iter, _buffer_view_type>
+    	struct gpu_sycl_buffer// : detail::gpu_executor_buffer<Iter, _buffer_view_type>
 		{
-			cl::sycl::default_selector selector;
+		cl::sycl::default_selector selector;
 			cl::sycl::queue queue;
     		Iter cpu_buffer;
     		std::shared_ptr<buffer_type> buffer;
@@ -107,6 +206,31 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     		}
 		};
 
+        template<typename T>    	
+        struct sycl_buffer// : detail::gpu_executor_buffer<Iter, _buffer_view_type>
+		{
+            typedef cl::sycl::buffer<T> buffer_t;
+            typedef decltype(std::declval<buffer_t>().template get_access<cl::sycl::access::mode::read_write>(std::declval<cl::sycl::handler &>())) device_acc_t;
+            typedef decltype(std::declval<buffer_t>().template get_access<cl::sycl::access::mode::read, cl::sycl::access::target::host_buffer>()) host_acc_t;
+            std::shared_ptr<buffer_t> buffer;
+
+            template<typename Iter, typename std::enable_if< std::is_same<typename std::iterator_traits<Iter>::value_type, T>::value >::type* = nullptr>
+            sycl_buffer(Iter begin, Iter end):
+                buffer( new buffer_t(begin, end) )
+            {}
+
+            //TODO: implement iterators
+            device_acc_t get_access(cl::sycl::handler & cgh) const
+            {
+                return buffer->template get_access<cl::sycl::access::mode::read_write>(cgh);
+            }
+
+            host_acc_t get_access() const
+            {
+                return buffer->template get_access<cl::sycl::access::mode::read, cl::sycl::access::target::host_buffer>();
+            }
+		};
+
 		//TODO: move to buffer parent class?
 		template<typename Iter>
 		struct buffer_traits {
@@ -147,6 +271,124 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		{
 			throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
 		}
+
+		template <typename F, typename Shape, typename ... Ts>
+        std::vector<hpx::future<
+            typename detail::bulk_async_execute_result<F, Shape, Ts...>::type
+        > >
+        bulk_async_execute(F && f, Shape const& shape, Ts const &... ts)
+		{
+            typedef typename
+                    detail::bulk_async_execute_result<F, Shape, Ts...>::type
+                result_type;
+			//typedef typename GPUBuffer::buffer_view_type buffer_view_type;
+			//using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
+            static const int LOCAL_SIZE = 128;
+			std::vector<hpx::future<result_type> > results;
+
+            std::cout << boost::size(shape) << std::endl;
+			try {
+				for (auto const& elem: shape) {
+                                
+                    typedef typename boost::range_const_iterator<Shape>::type tuple_iterator_type;
+                    //tuple type
+                    typedef typename std::iterator_traits<tuple_iterator_type>::value_type tuple_type;
+                    //iterator stored in tuple
+                    typedef typename std::decay<decltype(hpx::util::get<1>(elem))>::type iterator_type;
+                    typedef typename std::iterator_traits<iterator_type>::value_type value_type;
+                    
+
+                    int offset = hpx::util::get<0>(elem);
+                    int data_count = hpx::util::get<2>(elem);
+                    int chunk_size = 1;
+                    auto begin = hpx::util::get<1>(elem);
+                    auto end = begin;
+                    std::advance(end, data_count);
+                    std::cout << data_count << std::endl;
+                    //iterator_type begin = hpx::util::get<1>(elem);
+                    sycl_buffer<value_type> buffer(begin, end);
+                    auto & queue_ = queue;
+                    F _f = std::move(f);
+                    //auto buffer_acc = buffer.get_access();
+                    //auto t = hpx::util::make_tuple(offset, buffer_acc.get_pointer(), chunk_size);
+                    //hpx::util::invoke(_f, t);
+                    auto command_group = [_f, buffer, begin, data_count, queue_, offset, chunk_size]() mutable {
+                        queue_->submit( [_f, buffer, data_count, offset, chunk_size](cl::sycl::handler & cgh) mutable {
+
+                            auto buffer_acc = buffer.get_access(cgh);
+                            auto kernel = [=] (cl::sycl::nd_item<1> idx) mutable {
+                                detail::iterator<value_type> it(buffer_acc.get_pointer(), idx.get_global_linear_id());
+                                auto t = hpx::util::make_tuple(offset, it, chunk_size);
+                                hpx::util::invoke(_f, t);
+                            };
+
+                            cgh.parallel_for<class kernel_name>(
+                                cl::sycl::nd_range<1>(cl::sycl::range<1>(data_count), cl::sycl::range<1>(LOCAL_SIZE)),
+                                kernel
+                            );
+                        });
+                        queue_->wait();
+                        auto data = buffer.get_access();
+                        std::copy(data.get_pointer(), data.get_pointer() + data_count, begin);
+                    };
+					//results.push_back(hpx::async(launch::async, command_group, ts...));
+/*
+                    std::size_t data_count = std::get<1>(elem);
+					std::size_t chunk_size = std::get<2>(elem);
+					std::size_t threads_to_run = data_count / chunk_size;
+					std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
+
+					F _f( std::move(f) );
+
+					auto kernelSubmit = [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk]() {
+						sycl_buffer.queue.submit( [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk](cl::sycl::handler & cgh) {
+							
+							buffer_view_type buffer_view = 
+								(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
+							auto syclKernel = [=] (cl::sycl::id<1> index) {	
+								if (true) {
+									// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
+									// Test 3 shows that hardcoded '1' is passed correctly.
+									auto _x = std::make_tuple(&buffer_view, index[0], 1);
+
+									// This doesn't. Obviously, x = 0 means that no work is done.
+									// Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
+									// auto _x = std::make_tuple(&buffer_view, index[0], x);
+
+									// This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
+									// auto _x = std::make_tuple(&buffer_view, index[0] + x, 1);
+									//auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
+
+									_f(_x);
+									//for(int i = 0; i < 10; ++i)
+									//buffer_view[ 0 ] = 1;//index[0];
+								} else {
+
+									// This would show that x has a inproper value here! 1 is written correctly
+									//buffer_view[ index[0] ] = 1;
+									//buffer_view[ index[0] ] = x;
+								}
+							};
+							cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count), syclKernel);
+
+						});
+					};
+
+					results.push_back(hpx::async(launch::async, kernelSubmit));*/
+				}
+			}
+			catch (std::bad_alloc const& ba) {
+				boost::throw_exception(ba);
+			}
+			catch (...) {
+				boost::throw_exception(
+				    exception_list(boost::current_exception())
+				);
+			}
+
+			return std::move(results);
+		}
+
 
 		template <typename F, typename Parameters,typename Shape, typename GPUBuffer>
 		static std::vector<hpx::future<

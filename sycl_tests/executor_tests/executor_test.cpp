@@ -38,8 +38,9 @@ int hpx_main(boost::program_options::variables_map& vm)
 		std::iota(boost::begin(c), boost::end(c), std::rand());
 		std::iota(boost::begin(d), boost::end(d), std::rand());
         hpx::parallel::gpu_sycl_executor exec;
+        c[0] = 401;
 		hpx::parallel::for_each(hpx::parallel::par.on(exec),
-			boost::begin(c), boost::end(c),
+			boost::begin(c) + 1, boost::end(c),
 			[](std::size_t& v) {
 
 				v = 400;
@@ -56,8 +57,9 @@ int hpx_main(boost::program_options::variables_map& vm)
 
 
 		// verify values
-		std::size_t count = 0;
-		std::for_each(boost::begin(c), boost::end(c),
+		std::size_t count = 1;
+        HPX_TEST_EQ(c[0], std::size_t(401));
+		std::for_each(boost::begin(c) + 1, boost::end(c),
 			[&count](std::size_t v) -> void {
 				HPX_TEST_EQ(v, std::size_t(400));
 				++count;

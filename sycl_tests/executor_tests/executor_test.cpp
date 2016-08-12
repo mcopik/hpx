@@ -39,13 +39,19 @@ int hpx_main(boost::program_options::variables_map& vm)
 		std::iota(boost::begin(d), boost::end(d), std::rand());
         hpx::parallel::gpu_sycl_executor exec;
         c[0] = 401;
-		hpx::parallel::for_each(hpx::parallel::par.on(exec),
-			boost::begin(c) + 1, boost::end(c),
-			[](std::size_t& v) {
+		//hpx::parallel::for_each(hpx::parallel::par.on(exec),
+		//	boost::begin(c) + 1, boost::end(c),
+		//	[](std::size_t& v) {
 
-				v = 400;
-			});
-
+		//		v = 400;
+		//	});
+        auto buffer = exec.copy_data(boost::begin(c) + 1, boost::end(c));
+        hpx::parallel::for_each(hpx::parallel::par.on(exec),
+            buffer.begin(), buffer.end(),
+            [](std::size_t & v) {
+                v = 400;
+            });
+        std::copy(buffer.begin(), buffer.end(), boost::begin(c) + 1);
 /*		std::iota(boost::begin(d), boost::end(d), std::rand());
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(d), boost::end(d),

@@ -45,13 +45,22 @@ int hpx_main(boost::program_options::variables_map& vm)
 
 		//		v = 400;
 		//	});
+        std::cout << std::distance(boost::begin(c) + 1, boost::end(c)) << std::endl;
         auto buffer = exec.copy_data(boost::begin(c) + 1, boost::end(c));
         hpx::parallel::for_each(hpx::parallel::par.on(exec),
             buffer.begin(), buffer.end(),
             [](std::size_t & v) {
                 v = 400;
             });
+        //auto c1 = buffer.begin(), c2 = buffer.end(); 
+        std::cout << *buffer.host_accessor->get_pointer() << (*buffer.host_accessor)[0] << std::endl; 
+        std::cout << *buffer.get_access().get_pointer() << std::endl;
+        
         std::copy(buffer.begin(), buffer.end(), boost::begin(c) + 1);
+        //std::cout << std::distance(c1, c2) << std::endl; 
+        //auto it = boost::begin(c) + 1; 
+        //while(c1 != c2)
+         //   *c1++ = *it;
 /*		std::iota(boost::begin(d), boost::end(d), std::rand());
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(d), boost::end(d),
@@ -59,7 +68,6 @@ int hpx_main(boost::program_options::variables_map& vm)
 				//printf("%lu \n", v); 
 				v = 43;
 			});*/
-
 
 
 		// verify values

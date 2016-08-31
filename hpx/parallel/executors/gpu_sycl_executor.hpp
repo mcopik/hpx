@@ -1,4 +1,4 @@
-//  Copyright (c) 2015 Marcin Copik
+//  Copyright (c) 2015-2016 Marcin Copik
 //
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -26,7 +26,7 @@
 #include <utility>
 #include <iterator>
 #include <memory>
-
+#include <iostream>
 #include <boost/range/functions.hpp>
 #include <boost/range/const_iterator.hpp>
 #include <boost/type_traits/is_void.hpp>
@@ -47,6 +47,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         typedef cl::sycl::buffer<T> buffer_t;
         typedef decltype(std::declval<buffer_t>().template get_access<cl::sycl::access::mode::read_write>(std::declval<cl::sycl::handler &>())) device_acc_t;
         typedef decltype(std::declval<buffer_t>().template get_access<cl::sycl::access::mode::read, cl::sycl::access::target::host_buffer>()) host_acc_t;
+
         std::shared_ptr<buffer_t> buffer;
         std::shared_ptr<host_acc_t> host_accessor;
 
@@ -56,7 +57,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             host_accessor(new host_acc_t(get_access()))
         {}
 
-        //TODO: implement iterators
         device_acc_t get_access(cl::sycl::handler & cgh) const
         {
             return buffer->template get_access<cl::sycl::access::mode::read_write>(cgh);
@@ -69,12 +69,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
         detail::host_iterator<T> begin()
         {
-            return detail::host_iterator<T>(host_accessor, this, 0);
+            return detail::host_iterator<T>(host_accessor.get(), this, 0);
         } 
         
         detail::host_iterator<T> end()
         {
-            return detail::host_iterator<T>(host_accessor, this, buffer->get_size());
+            return detail::host_iterator<T>(host_accessor.get(), this, buffer->get_count());
         } 
 	};
 
@@ -196,7 +196,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             {}
 
             HPX_HOST_DEVICE
-            host_iterator(std::shared_ptr<buffer_acc_t> p, buffer_t * buffer, Distance pos)
+            host_iterator(buffer_acc_t * p, buffer_t * buffer, Distance pos)
               : ptr(p), pos_(pos), buffer_(buffer)
             {}
 
@@ -252,17 +252,17 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 return buffer_;
             }
         private:
-            std::shared_ptr<buffer_acc_t> ptr;
+            buffer_acc_t * ptr;
             Distance pos_;
             buffer_t * buffer_;
         };
 
         template<typename Iter, typename value_type = typename std::iterator_traits<Iter>::value_type>
-        std::shared_ptr<sycl_buffer<value_type>> get_buffer(Iter begin, std::size_t count)
+        sycl_buffer<value_type> get_buffer(Iter begin, std::size_t count)
         {
             Iter end = begin;
             std::advance(end, count);
-            return std::shared_ptr<sycl_buffer<value_type>>(new sycl_buffer<value_type>(begin, end));
+            return sycl_buffer<value_type>(begin, end);
         }
         
         template<typename T>
@@ -280,9 +280,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         
         template<typename T, typename Iter>
         typename sycl_buffer<T>::device_acc_t
-        get_device_acc(cl::sycl::handler & cgh, const std::shared_ptr<sycl_buffer<T>> & buf, Iter begin)
+        get_device_acc(cl::sycl::handler & cgh, const sycl_buffer<T> & buf, Iter begin)
         {
-            return buf->get_access(cgh);
+            return buf.get_access(cgh);
         }
         
         template<typename T>
@@ -297,6 +297,19 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         get_device_it(const typename sycl_buffer<T>::device_acc_t & data, std::size_t idx)
         {
             return device_iterator<T>(data, idx);
+        }
+        
+        template<typename T, typename Iter>
+        void copy_back(const sycl_buffer<T> & buf, Iter begin)
+        {
+            //FIXME: efficient data movement from device
+            std::copy(buf.begin(), buf.end(), begin); 
+        }
+
+        template<typename T>
+        void copy_back(const sycl_buffer<T> * buf, detail::host_iterator<T> begin)
+        {
+            // No data movement for SYCL iterator
         }
     }
 
@@ -486,7 +499,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                             auto buffer_acc = detail::get_device_acc(cgh, buffer, begin);
                             //std::cout << buffer_acc.first.get_size() << " " << buffer_acc.second << std::endl;
                             auto kernel = [=] (cl::sycl::nd_item<1> idx) mutable {
-                                detail::device_iterator<value_type> it = detail::get_device_it<value_type>(buffer_acc, idx.get_global_linear_id());
+                                //detail::device_iterator<value_type> it = detail::get_device_it<value_type>(buffer_acc, idx.get_global_linear_id());
+                                cl::sycl::global_ptr<unsigned long> it = buffer_acc.first.get_pointer() + buffer_acc.second + idx.get_global_linear_id(); 
+                                typedef typename std::iterator_traits<decltype(it)>::value_type value_type;
+                                typedef typename std::iterator_traits<decltype(it)>::pointer pointer;
+                                typedef typename std::iterator_traits<decltype(it)>::reference reference; 
+                                typedef typename std::iterator_traits<decltype(it)>::difference_type difference_type;
+                                typedef typename std::iterator_traits<decltype(it)>::iterator_category cat;
+
                                 auto t = hpx::util::make_tuple(offset, it, chunk_size);
                                 hpx::util::invoke(_f, t);
                             };
@@ -497,15 +517,18 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                             );
                         });
                         queue_->wait();
-                        //std::cout << *buffer->get_access().get_pointer() << std::endl;
+                        copy_back(buffer, begin);
+                        //std::cout << *buffer->host_accessor->get_pointer() << *buffer->get_access().get_pointer() << std::endl;
                         //auto data = buffer->get_access();
                         //std::copy(data.get_pointer(), data.get_pointer() + data_count, begin);
                     };
-                    command_group();
-                    auto data = buffer->get_access();
-                    std::cout << *data.get_pointer() << " " << data_count << std::endl;
-                    std::copy(data.get_pointer(), data.get_pointer() + data_count, begin);
-					//results.push_back(hpx::async(launch::async, command_group, ts...));
+                    //command_group();
+                     
+                    //std::cout << *buffer->host_accessor->get_pointer() << *buffer->get_access().get_pointer() << std::endl;
+                    //auto data = buffer->get_access();
+                    //std::cout << *data.get_pointer() << " " << data_count << std::endl;
+                    //std::copy(data.get_pointer(), data.get_pointer() + data_count, begin);
+					results.push_back(hpx::async(launch::async, command_group, ts...));
 /*
                     std::size_t data_count = std::get<1>(elem);
 					std::size_t chunk_size = std::get<2>(elem);

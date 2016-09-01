@@ -32,6 +32,11 @@ int hpx_main(boost::program_options::variables_map& vm)
 		std::vector<float> c_(n);
 		std::vector<float> a_init(n);
 		std::vector<float> c_init(n);
+=======
+		std::vector<std::size_t> c(n);
+		std::vector<std::size_t> d(n);
+		std::vector<std::size_t> e(n);
+>>>>>>> 86c71300dd768238d3d6a908ef3641a7a6f932dc
 		std::size_t count = 0;
 
 		/**
@@ -45,7 +50,11 @@ int hpx_main(boost::program_options::variables_map& vm)
 		**/
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(c), boost::end(c),
+<<<<<<< HEAD
 			hpx::parallel::make_kernel<class ExecutorTest>([](std::size_t& v) {
+=======
+			hpx::parallel::make_kernel<class CorrectName_1>([](std::size_t& v) {
+>>>>>>> 86c71300dd768238d3d6a908ef3641a7a6f932dc
 
 				v = 400;
 			}));
@@ -59,7 +68,10 @@ int hpx_main(boost::program_options::variables_map& vm)
 		HPX_TEST_EQ(count, c.size());
 
 		count = 0;
+<<<<<<< HEAD
 		//std::iota(boost::begin(c), boost::end(c), std::rand());
+=======
+>>>>>>> 86c71300dd768238d3d6a908ef3641a7a6f932dc
 		/**
 			Kernel overrides parameter
 		**/
@@ -69,6 +81,15 @@ int hpx_main(boost::program_options::variables_map& vm)
 
 				v = 401;
 			}));
+<<<<<<< HEAD
+=======
+		hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32), hpx::parallel::kernel_name<class TransformKernel>()),
+                        boost::begin(c), boost::end(c), boost::begin(d), boost::begin(e),
+                        [](std::size_t v1, std::size_t v2) {
+                                //printf("%lu \n", v);
+                                return v1 + v2 + 300;
+                        });
+>>>>>>> 86c71300dd768238d3d6a908ef3641a7a6f932dc
 
 
 		std::for_each(boost::begin(d), boost::end(d),
@@ -77,6 +98,14 @@ int hpx_main(boost::program_options::variables_map& vm)
 				++count;
 			});
 		HPX_TEST_EQ(count, c.size());
+        count = 0;
+		std::for_each(boost::begin(e), boost::end(e),
+			[&count](std::size_t v) -> void {
+				HPX_TEST_EQ(v, std::size_t(401 + 400 + 300));
+				++count;
+			});
+		HPX_TEST_EQ(count, c.size());
+
 
 		int k = 3;
         {
@@ -86,7 +115,7 @@ int hpx_main(boost::program_options::variables_map& vm)
 
 
             std::fill(boost::begin(a), boost::end(a), 1.0);
-            std::fill(boost::begin(b), boost::end(b), 2.0);
+:q            std::fill(boost::begin(b), boost::end(b), 2.0);
             std::fill(boost::begin(c_), boost::end(c_), 0.0);
 
 

@@ -67,7 +67,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 typename Proj = util::projection_identity>
             static typename util::detail::algorithm_result<ExPolicy, Iter>::type
             parallel(ExPolicy policy, Iter first, std::size_t count,
-                F && f, Proj && proj)
+                F && f, Proj && proj = Proj())
             {
 				return parallel(std::forward<ExPolicy>(policy),
 				    first, std::size_t(count), std::forward<F>(f),
@@ -129,6 +129,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
 				if (count != 0)
 				{
+                   // auto _f2 = [](hpx::util::tuple<std::size_t,std::size_t,std::size_t   > & tup) {};
 					//dont'return right now - we have to sync buffers after the call
 					util::foreach_n_partitioner<gpu_execution_policy>::call(
 						policy, first, count,

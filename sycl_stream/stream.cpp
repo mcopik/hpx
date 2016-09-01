@@ -103,6 +103,8 @@ void check_results(std::size_t iterations,
     aSumErr = 0.0;
     bSumErr = 0.0;
     cSumErr = 0.0;
+    std::cout << "First: " << a[0] << " Second: " << b[0] << " Third: " << c[0] << std::endl;
+    std::cout << "First: " << aj << " Second: " << bj << " Third: " << cj << std::endl;
     for (std::size_t j=0; j<a.size(); j++) {
         aSumErr += std::abs(a[j] - aj);
         bSumErr += std::abs(b[j] - bj);
@@ -220,7 +222,7 @@ numa_domain_worker(std::size_t domain,
     iterator b_end = b_begin + part_size;
     iterator c_end = c_begin + part_size;
 
-    // Initialize arrays
+    // Initialize arrays    
     hpx::parallel::fill(policy, a_begin, a_end, 1.0);
     hpx::parallel::fill(policy, b_begin, b_end, 2.0);
     hpx::parallel::fill(policy, c_begin, c_end, 0.0);
@@ -297,48 +299,112 @@ numa_domain_worker(std::size_t domain,
     // Main Loop
     std::vector<std::vector<double> > timing(4, std::vector<double>(iterations));
 
+    auto buffera = hpx::parallel::gpu.executor().create_buffers(a.begin(), part_size);
+    auto bufferb = hpx::parallel::gpu.executor().create_buffers(b.begin(), part_size);
+    auto bufferc = hpx::parallel::gpu.executor().create_buffers(c.begin(), part_size);
+
     double scalar = 3.0;
+    std::cout << "Run with size: " << part_size << std::endl;
+    std::chrono::high_resolution_clock::time_point t1, t2,t3,t4,t5,t6;
+    double times = 0.0;
+    t3 = std::chrono::high_resolution_clock::now();
     for(std::size_t iteration = 0; iteration != iterations; ++iteration)
     {
+        t5 = std::chrono::high_resolution_clock::now();
         // Copy
-        timing[0][iteration] = mysecond();
-        hpx::parallel::copy(policy, a_begin, a_end, c_begin);
-        timing[0][iteration] = mysecond() - timing[0][iteration];
+        //timing[0][iteration] = mysecond();
+        //hpx::parallel::copy(policy, a_begin, a_end, c_begin);
+        t1 = std::chrono::high_resolution_clock::now();
+	    hpx::parallel::copy(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32), hpx::parallel::kernel_name<class CopyKernel>()),
+                part_size, buffera, bufferc);
+        //timing[0][iteration] = mysecond() - timing[0][iteration];
+  //  buffera.queue.wait();
+   // bufferb.queue.wait();
+   // bufferc.queue.wait();
+        t2 = std::chrono::high_resolution_clock::now();
+        timing[0][iteration] += std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
 
         // Scale
-        timing[1][iteration] = mysecond();
-        hpx::parallel::transform(policy,
+        //timing[1][iteration] = //mysecond();
+        /*hpx::parallel::transform(policy,
             c_begin, c_end, b_begin,
             [scalar](STREAM_TYPE val)
             {
                 return scalar * val;
             }
-        );
-        timing[1][iteration] = mysecond() - timing[1][iteration];
+        );*/
+        t1 = std::chrono::high_resolution_clock::now();
+        hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32), hpx::parallel::kernel_name<class Scale>()),
+            part_size, bufferc, bufferb,
+            [=](STREAM_TYPE v1) {
+                    //printf("%lu \n", v);
+                    //return v1 + k*v2;
+                    return scalar * v1;
+            });
+  //  buffera.queue.wait();
+  //  bufferb.queue.wait();
+  //  bufferc.queue.wait();
+        t2 = std::chrono::high_resolution_clock::now();
+        timing[1][iteration] += std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+        //timing[1][iteration] = mysecond() - timing[1][iteration];
 
         // Add
-        timing[2][iteration] = mysecond();
-        hpx::parallel::transform(policy,
+        //timing[2][iteration] = mysecond();
+        /*hpx::parallel::transform(policy,
             a_begin, a_end, b_begin, b_end, c_begin,
             [](STREAM_TYPE val1, STREAM_TYPE val2)
             {
                 return val1 + val2;
             }
-        );
-        timing[2][iteration] = mysecond() - timing[2][iteration];
+        );*/
+        t1 = std::chrono::high_resolution_clock::now();
+	    hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32), hpx::parallel::kernel_name<class Add>()),
+            part_size, buffera, bufferb, bufferc,
+            [=](STREAM_TYPE v1, STREAM_TYPE v2) {
+                    //printf("%lu \n", v);
+                    //return v1 + k*v2;
+                    return v2 + v1;
+            });
+  //  buffera.queue.wait();
+   // bufferb.queue.wait();
+   // bufferc.queue.wait();
+        t2 = std::chrono::high_resolution_clock::now();
+        timing[2][iteration] += std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+        //timing[2][iteration] = mysecond() - timing[2][iteration];
 
         // Triad
-        timing[3][iteration] = mysecond();
-        hpx::parallel::transform(policy,
+        //timing[3][iteration] = mysecond();
+        /*hpx::parallel::transform(policy,
             b_begin, b_end, c_begin, c_end, a_begin,
             [scalar](STREAM_TYPE val1, STREAM_TYPE val2)
             {
                 return val1 + scalar * val2;
             }
-        );
-        timing[3][iteration] = mysecond() - timing[3][iteration];
+        );*/
+        t1 = std::chrono::high_resolution_clock::now();
+        hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32), hpx::parallel::kernel_name<class Triad>()),
+            part_size, bufferb, bufferc, buffera,
+            [=](STREAM_TYPE v1, STREAM_TYPE v2) {
+                    //printf("%lu \n", v);
+                    //return v1 + k*v2;
+                    return scalar * v2 + v1;
+            });
+       // buffera.queue.wait();
+       // bufferb.queue.wait();
+        //bufferc.queue.wait();
+        t2 = std::chrono::high_resolution_clock::now();
+        timing[3][iteration] += std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+        t6 = std::chrono::high_resolution_clock::now();
+        //std::cout << "Iter: " << iteration << " Time: " << std::chrono::duration_cast<std::chrono::duration<double> >(t6 - t5).count() << std::endl;
+        //std::cout << timing[0][iteration] << " " << timing[1][iteration] << " " << timing[2][iteration] << " " << timing[2][iteration] << std::endl;
+        //timing[3][iteration] = mysecond() - timing[3][iteration];
     }
-
+    buffera.queue.wait();
+    //bufferb.queue.wait();
+    //bufferc.queue.wait();
+    t4 = std::chrono::high_resolution_clock::now();
+    std::cout << "Time: " << std::chrono::duration_cast<std::chrono::duration<double> >(t4 - t3).count() << std::endl;
+    std::cout << timing[0][2] << " " << timing[1][2] << " " << timing[2][2] << " " << timing[2][3] << std::endl;
     return timing;
 }
 
@@ -555,7 +621,7 @@ int hpx_main(boost::program_options::variables_map& vm)
         avgtime[j] = avgtime[j]/(double)(iterations-1);
 
         printf("%s%12.1f  %11.6f  %11.6f  %11.6f\n", label[j],
-           1.0E-06 * bytes[j]/mintime[j],
+           1.0E-06 * bytes[j]/avgtime[j],
            avgtime[j],
            mintime[j],
            maxtime[j]);

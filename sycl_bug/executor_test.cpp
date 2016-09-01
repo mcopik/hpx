@@ -2,10 +2,13 @@
 #include <hpx/hpx_init.hpp>
 #include <hpx/include/parallel_for_each.hpp>
 #include <hpx/parallel/executors/parallel_executor.hpp>
+//#include <hpx/parallel/algorithms/transform.hpp>
 #include <hpx/util/lightweight_test.hpp>
 #include <hpx/parallel/kernel.hpp>
 #include <hpx/parallel/executors/kernel_name.hpp>
-
+#include <hpx/parallel/algorithms/transform.hpp>
+#include <hpx/parallel/algorithms/copy.hpp>
+#include <hpx/parallel/execution_policy.hpp>
 #include <iostream>
 
 #include <boost/cstdint.hpp>
@@ -19,8 +22,16 @@ int hpx_main(boost::program_options::variables_map& vm)
 	boost::uint64_t n = vm["n-value"].as<boost::uint64_t>();
 	{
 		hpx::util::high_resolution_timer t;
-		std::vector<std::size_t> c(n);
-		std::vector<std::size_t> d(n);
+//		std::vector<std::size_t> c(n);
+	//	std::vector<std::size_t> d(n);
+		//std::vector<std::size_t> e(n);
+
+        
+		std::vector<float> a(n);
+		std::vector<float> b(n);
+		std::vector<float> c_(n);
+		std::vector<float> a_init(n);
+		std::vector<float> c_init(n);
 		std::size_t count = 0;
 
 		/**
@@ -28,16 +39,16 @@ int hpx_main(boost::program_options::variables_map& vm)
 		 */
 		std::iota(boost::begin(c), boost::end(c), std::rand());
 		std::iota(boost::begin(d), boost::end(d), std::rand());
-		
+
 		/**
 			Default
 		**/
 		hpx::parallel::for_each(hpx::parallel::gpu,
 			boost::begin(c), boost::end(c),
-			[](std::size_t& v) {
+			hpx::parallel::make_kernel<class ExecutorTest>([](std::size_t& v) {
 
 				v = 400;
-			});
+			}));
 
 		// verify values
 		std::for_each(boost::begin(c), boost::end(c),
@@ -48,22 +59,91 @@ int hpx_main(boost::program_options::variables_map& vm)
 		HPX_TEST_EQ(count, c.size());
 
 		count = 0;
-		std::iota(boost::begin(c), boost::end(c), std::rand());		
+		//std::iota(boost::begin(c), boost::end(c), std::rand());
 		/**
 			Kernel overrides parameter
 		**/
 		hpx::parallel::for_each(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(4), hpx::parallel::kernel_name<class FalseName_2>()),
-			boost::begin(c), boost::end(c),
+			boost::begin(d), boost::end(d),
 			hpx::parallel::make_kernel<class CorrectName_2>([](std::size_t& v) {
 
 				v = 401;
 			}));
-		std::for_each(boost::begin(c), boost::end(c),
+
+
+		std::for_each(boost::begin(d), boost::end(d),
 			[&count](std::size_t v) -> void {
 				HPX_TEST_EQ(v, std::size_t(401));
 				++count;
 			});
 		HPX_TEST_EQ(count, c.size());
+
+		int k = 3;
+        {
+        
+/*		    std::iota(boost::begin(a), boost::end(a), std::rand());
+		    std::iota(boost::begin(c_), boost::end(c_), std::rand());*/
+
+
+            std::fill(boost::begin(a), boost::end(a), 1.0);
+            std::fill(boost::begin(b), boost::end(b), 2.0);
+            std::fill(boost::begin(c_), boost::end(c_), 0.0);
+
+
+
+		    std::copy(boost::begin(a), boost::end(a), boost::begin(a_init));//std::rand());
+		    std::copy(boost::begin(a), boost::end(a), boost::begin(c_init));//std::rand());
+            auto buffera = hpx::parallel::gpu.executor().create_buffers(a.begin(), n);
+            auto bufferb = hpx::parallel::gpu.executor().create_buffers(b.begin(), n);
+            auto bufferc = hpx::parallel::gpu.executor().create_buffers(c_.begin(), n);
+
+
+		    hpx::util::high_resolution_timer t;
+		    hpx::parallel::copy(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32), hpx::parallel::kernel_name<class Copy>()),
+                            n, buffera, bufferc);
+
+		    hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32), hpx::parallel::kernel_name<class Scale>()),
+                            n, bufferc, bufferb,
+                            [=](float v1) {
+                                    //printf("%lu \n", v);
+                                    //return v1 + k*v2;
+                                    return k * v1;
+                            });
+
+		    hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32), hpx::parallel::kernel_name<class Add>()),
+                            n, buffera, bufferb, bufferc,
+                            [=](float v1, float v2) {
+                                    //printf("%lu \n", v);
+                                    //return v1 + k*v2;
+                                    return v2 + v1;
+                            });
+
+		    hpx::parallel::transform(hpx::parallel::gpu.with(hpx::parallel::static_chunk_size(32), hpx::parallel::kernel_name<class Triad>()),
+                            n, bufferb, bufferc, buffera,
+                            [=](float v1, float v2) {
+                                    //printf("%lu \n", v);
+                                    //return v1 + k*v2;
+                                    return k * v2 + v1;
+                            });
+
+	        double elapsed = t.elapsed();
+	        std::cout
+		        << ( boost::format("elapsed time == %2% [s]\n")
+		           % n  % elapsed);
+        }
+		count = 0;
+        std::for_each(boost::begin(a), boost::end(a),
+                [&count,&c_init,&a_init,k](float v) -> void {
+
+                        float cj = c_init[count];
+                        float aj = a_init[count];
+                        float bj = k*cj;
+                        cj = aj+bj;
+                        aj = bj+k*cj;
+                        HPX_TEST_EQ(v, aj);
+                        ++count;
+                });
+        HPX_TEST_EQ(count, e.size());
 
 
 		/**

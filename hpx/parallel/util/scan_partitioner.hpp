@@ -14,7 +14,6 @@
 #include <hpx/runtime/launch_policy.hpp>
 #include <hpx/util/bind.hpp>
 #include <hpx/util/decay.hpp>
-#include <hpx/util/deferred_call.hpp>
 
 #include <hpx/parallel/execution_policy.hpp>
 #include <hpx/parallel/executors/executor_parameter_traits.hpp>
@@ -26,8 +25,10 @@
 #include <hpx/parallel/util/detail/scoped_executor_parameters.hpp>
 
 #include <boost/exception_ptr.hpp>
+#include <boost/range/functions.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <list>
 #include <memory>
 #include <utility>
@@ -60,18 +61,12 @@ namespace hpx { namespace parallel { namespace util
                 typedef typename
                     hpx::util::decay<ExPolicy>::type::executor_parameters_type
                     parameters_type;
-
-                typedef typename hpx::util::tuple<
-                        FwdIter, std::size_t
-                    > tuple_type;
+                typedef executor_parameter_traits<parameters_type>
+                    parameters_traits;
 
                 // inform parameter traits
                 scoped_executor_parameters<parameters_type> scoped_param(
                     policy.parameters());
-
-                using hpx::util::get;
-                using hpx::util::placeholders::_1;
-                using hpx::util::deferred_call;
 
                 std::vector<hpx::shared_future<Result1> > workitems;
                 std::vector<hpx::future<Result2> > finalitems;
@@ -83,34 +78,42 @@ namespace hpx { namespace parallel { namespace util
 
                     HPX_ASSERT(count > 0);
                     FwdIter first_ = first;
-                    std::size_t test_chunk_size = count / 100;
+                    std::size_t count_ = count;
 
                     // estimate a chunk size based on number of cores used
-                    std::vector<tuple_type> shape =
-                        get_bulk_iteration_shape(policy, workitems, f1,
-                            first, count, 1);
+                    typedef typename parameters_traits::has_variable_chunk_size
+                        has_variable_chunk_size;
+
+                    auto shape = get_bulk_iteration_shape(policy, workitems,
+                        f1, first, count, 1, has_variable_chunk_size());
 
                     // schedule every chunk on a separate thread
-                    workitems.reserve(shape.size() + 1);
-                    finalitems.reserve(shape.size());
+// Before Boost V1.56 boost::size() does not respect the iterator category of
+// its argument.
+#if BOOST_VERSION < 105600
+                    std::size_t size =
+                        std::distance(boost::begin(shape), boost::end(shape));
+#else
+                    std::size_t size = boost::size(shape);
+#endif
+                    workitems.reserve(size + 1);
+                    finalitems.reserve(size);
 
                     // If the size of count was enough to warrant testing for a
                     // chunk, pre-initialize second intermediate result and
                     // start f3.
                     if (workitems.size() == 2)
                     {
-                        HPX_ASSERT(workitems.size() < 3);
+                        HPX_ASSERT(count_ > count);
 
+                        hpx::shared_future<Result1> curr = workitems[1];
                         workitems[1] = dataflow(hpx::launch::sync,
-                            f2, workitems[0], workitems[1]
-                        );
+                            f2, workitems[0], curr);
 
-                        finalitems.push_back(dataflow(
-                            policy.executor(),
-                            hpx::util::bind(
-                                f3, first_, test_chunk_size, _1),
-                            workitems[0], workitems[1])
-                        );
+                        // FIXME: this should really work with executors...
+                        finalitems.push_back(dataflow(hpx::launch::sync,
+                            //policy.executor(),
+                            f3, first_, count_ - count, workitems[0], curr));
                     }
 
                     std::size_t parts = workitems.size();
@@ -120,29 +123,23 @@ namespace hpx { namespace parallel { namespace util
                     // partition to the left is ready.
                     for(auto const& elem: shape)
                     {
-                        hpx::launch p = hpx::launch::async;
-                        if (parts & 0x7)
-                            p = hpx::launch::sync;
+                        // FIXME: this should really work with executors or async
+                        // continuations in general
+                        hpx::launch p = hpx::launch::sync;
+//                         if (parts & 0x7)
+//                             p = hpx::launch::sync;
 
-                        workitems.push_back(
-                            dataflow(
-                                p, f2, workitems.back(),
-                                executor_traits::async_execute(
-                                    policy.executor(),
-                                    f1, get<0>(elem), get<1>(elem)
-                                )
-                            )
-                        );
+                        FwdIter it = hpx::util::get<0>(elem);
+                        std::size_t size = hpx::util::get<1>(elem);
 
-                        finalitems.push_back(
-                            dataflow(
-                                policy.executor(),
-                                hpx::util::bind(
-                                    f3, get<0>(elem), get<1>(elem), _1
-                                ),
-                                workitems[parts - 1], workitems[parts]
-                            )
-                        );
+                        hpx::shared_future<Result1> prev = workitems.back();
+                        auto curr = executor_traits::async_execute(
+                            policy.executor(), f1, it, size).share();
+
+                        workitems.push_back(dataflow(p, f2, prev, curr));
+
+                        finalitems.push_back(dataflow(p, //olicy.executor(),
+                            f3, it, size, prev, curr));
 
                         ++parts;
                     }
@@ -189,22 +186,17 @@ namespace hpx { namespace parallel { namespace util
                 typedef typename
                     hpx::util::decay<ExPolicy>::type::executor_parameters_type
                     parameters_type;
+                typedef executor_parameter_traits<parameters_type>
+                    parameters_traits;
+
                 typedef scoped_executor_parameters<parameters_type>
                     scoped_executor_parameters;
-
-                typedef typename hpx::util::tuple<
-                        FwdIter, std::size_t
-                    > tuple_type;
 
                 // inform parameter traits
                 std::shared_ptr<scoped_executor_parameters>
                     scoped_param(std::make_shared<
                             scoped_executor_parameters
                         >(policy.parameters()));
-
-                using hpx::util::get;
-                using hpx::util::placeholders::_1;
-                using hpx::util::deferred_call;
 
                 std::vector<hpx::shared_future<Result1> > workitems;
                 std::vector<hpx::future<Result2> > finalitems;
@@ -216,34 +208,42 @@ namespace hpx { namespace parallel { namespace util
 
                     HPX_ASSERT(count > 0);
                     FwdIter first_ = first;
-                    std::size_t test_chunk_size = count / 100;
+                    std::size_t count_ = count;
 
                     // estimate a chunk size based on number of cores used
-                    std::vector<tuple_type> shape =
-                        get_bulk_iteration_shape(policy, workitems, f1,
-                            first, count, 1);
+                    typedef typename parameters_traits::has_variable_chunk_size
+                        has_variable_chunk_size;
+
+                    auto shape = get_bulk_iteration_shape(policy, workitems,
+                        f1, first, count, 1, has_variable_chunk_size());
 
                     // schedule every chunk on a separate thread
-                    workitems.reserve(shape.size() + 1);
-                    finalitems.reserve(shape.size());
+// Before Boost V1.56 boost::size() does not respect the iterator category of
+// its argument.
+#if BOOST_VERSION < 105600
+                    std::size_t size =
+                        std::distance(boost::begin(shape), boost::end(shape));
+#else
+                    std::size_t size = boost::size(shape);
+#endif
+                    workitems.reserve(size + 1);
+                    finalitems.reserve(size);
 
                     // If the size of count was enough to warrant testing for a
                     // chunk, pre-initialize second intermediate result and
                     // start f3.
                     if (workitems.size() == 2)
                     {
-                        HPX_ASSERT(workitems.size() < 3);
+                        HPX_ASSERT(count_ > count);
 
+                        hpx::shared_future<Result1> curr = workitems[1];
                         workitems[1] = dataflow(hpx::launch::sync,
-                            f2, workitems[0], workitems[1]
-                        );
+                            f2, workitems[0], curr);
 
-                        finalitems.push_back(dataflow(
-                            policy.executor(),
-                            hpx::util::bind(
-                                f3, first_, test_chunk_size, _1),
-                            workitems[0], workitems[1])
-                        );
+                        // FIXME: this should really work with executors...
+                        finalitems.push_back(dataflow(hpx::launch::sync,
+                            //policy.executor(),
+                            f3, first_, count_ - count, workitems[0], curr));
                     }
 
                     std::size_t parts = workitems.size();
@@ -253,29 +253,23 @@ namespace hpx { namespace parallel { namespace util
                     // partition to the left is ready.
                     for(auto const& elem: shape)
                     {
-                        hpx::launch p = hpx::launch::async;
-                        if (parts & 0x7)
-                            p = hpx::launch::sync;
+                        // FIXME: this should really work with executors or async
+                        // continuations in general
+                        hpx::launch p = hpx::launch::sync;
+//                         if (parts & 0x7)
+//                             p = hpx::launch::sync;
 
-                        workitems.push_back(
-                            dataflow(
-                                p, f2, workitems.back(),
-                                executor_traits::async_execute(
-                                    policy.executor(),
-                                    f1, get<0>(elem), get<1>(elem)
-                                )
-                            )
-                        );
+                        FwdIter it = hpx::util::get<0>(elem);
+                        std::size_t size = hpx::util::get<1>(elem);
 
-                        finalitems.push_back(
-                            dataflow(
-                                policy.executor(),
-                                hpx::util::bind(
-                                    f3, get<0>(elem), get<1>(elem), _1
-                                ),
-                                workitems[parts - 1], workitems[parts]
-                            )
-                        );
+                        hpx::shared_future<Result1> prev = workitems.back();
+                        auto curr = executor_traits::async_execute(
+                            policy.executor(), f1, it, size).share();
+
+                        workitems.push_back(dataflow(p, f2, prev, curr));
+
+                        finalitems.push_back(dataflow(p, //olicy.executor(),
+                            f3, it, size, prev, curr));
 
                         ++parts;
                     }

@@ -13,6 +13,9 @@
 #include <hpx/throw_exception.hpp>
 #include <hpx/util/logging.hpp>
 
+#include <cstddef>
+#include <sstream>
+
 namespace hpx { namespace threads { namespace detail
 {
     inline void create_thread(
@@ -24,6 +27,7 @@ namespace hpx { namespace threads { namespace detail
         // verify parameters
         switch (initial_state) {
         case pending:
+        case pending_do_not_schedule:
         case suspended:
             break;
 

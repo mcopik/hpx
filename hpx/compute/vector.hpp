@@ -13,9 +13,11 @@
 #include <hpx/compute/traits/access_target.hpp>
 #include <hpx/compute/traits/allocator_traits.hpp>
 #include <hpx/parallel/util/transfer.hpp>
+#include <hpx/runtime/report_error.hpp>
 #include <hpx/traits/is_iterator.hpp>
 #include <hpx/util/assert.hpp>
 
+#include <cstddef>
 #include <initializer_list>
 #include <memory>
 #include <type_traits>
@@ -86,7 +88,7 @@ namespace hpx { namespace compute
           , alloc_(alloc)
           , data_(alloc_traits::allocate(alloc_, size_))
         {
-            hpx::parallel::util::copy_helper(first, last, begin());
+            hpx::parallel::util::copy(first, last, begin());
         }
 
         vector(vector const& other)
@@ -95,7 +97,7 @@ namespace hpx { namespace compute
           , alloc_(other.alloc_)
           , data_(alloc_traits::allocate(alloc_, capacity_))
         {
-            hpx::parallel::util::copy_helper(other.begin(), other.end(), begin());
+            hpx::parallel::util::copy(other.begin(), other.end(), begin());
         }
 
         vector(vector const& other, Allocator const& alloc)
@@ -104,7 +106,7 @@ namespace hpx { namespace compute
           , alloc_(alloc)
           , data_(alloc_traits::allocate(alloc_, capacity_))
         {
-            hpx::parallel::util::copy_helper(other.begin(), other.end(), begin());
+            hpx::parallel::util::copy(other.begin(), other.end(), begin());
         }
 
         vector(vector && other)
@@ -113,6 +115,7 @@ namespace hpx { namespace compute
           , alloc_(std::move(other.alloc_))
           , data_(std::move(other.data_))
         {
+            other.data_ = nullptr;
             other.size_ = 0;
             other.capacity_ = 0;
         }
@@ -123,6 +126,7 @@ namespace hpx { namespace compute
           , alloc_(alloc)
           , data_(std::move(other.data_))
         {
+            other.data_ = nullptr;
             other.size_ = 0;
             other.capacity_ = 0;
         }
@@ -133,16 +137,26 @@ namespace hpx { namespace compute
           , alloc_(alloc)
           , data_(alloc_traits::allocate(alloc_, capacity_))
         {
-            hpx::parallel::util::copy_helper(init.begin(), init.end(), begin());
+            hpx::parallel::util::copy(init.begin(), init.end(), begin());
         }
 
         ~vector()
         {
-            if(data_ != nullptr)
-            {
+            if(data_ == nullptr)
+                return;
+
+#if !defined(__CUDA_ARCH__)
+            try {
+#endif
                 alloc_traits::bulk_destroy(alloc_, data_, size_);
                 alloc_traits::deallocate(alloc_, data_, capacity_);
+#if !defined(__CUDA_ARCH__)
             }
+            catch(...) {
+                // make sure no exception escapes this destructor
+                hpx::report_error(boost::current_exception());
+            }
+#endif
         }
 
         vector& operator=(vector const& other)
@@ -151,7 +165,7 @@ namespace hpx { namespace compute
                 return *this;
 
             pointer data = alloc_traits::allocate(other.alloc_, other.capacity_);
-            hpx::parallel::util::copy_helper(other.begin(), other.end(),
+            hpx::parallel::util::copy(other.begin(), other.end(),
                 iterator(data, 0, alloc_traits::target(other.alloc_)));
 
             if(data_ != nullptr)
@@ -173,11 +187,13 @@ namespace hpx { namespace compute
             if (this == &other)
                 return *this;
 
+
             size_ = other.size_;
             capacity_ = other.capacity_;
             alloc_ = std::move(other.alloc_);
             data_ = std::move(other.data_);
 
+            other.data_ = nullptr;
             other.size_ = 0;
             other.capacity_ = 0;
 

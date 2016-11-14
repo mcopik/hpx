@@ -13,6 +13,8 @@
 #include <hpx/throw_exception.hpp>
 #include <hpx/util/logging.hpp>
 
+#include <sstream>
+
 namespace hpx { namespace threads { namespace detail
 {
     inline void create_work(policies::scheduler_base* scheduler,
@@ -23,6 +25,7 @@ namespace hpx { namespace threads { namespace detail
         // verify parameters
         switch (initial_state) {
         case pending:
+        case pending_do_not_schedule:
         case suspended:
             break;
 

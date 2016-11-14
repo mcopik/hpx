@@ -23,8 +23,9 @@
 #include <hpx/util/logging.hpp>
 #include <hpx/util/tuple.hpp>
 
-#include <boost/cstdint.hpp>
-
+#include <cstddef>
+#include <cstdint>
+#include <deque>
 #include <list>
 #include <map>
 #include <memory>
@@ -226,7 +227,7 @@ namespace hpx { namespace util
         ///          true. If a connection could not be found and space could
         ///          not be returned, \a conn is unmodified and this function
         ///          returns false.
-        ///          If force_nsert is true, a new connection entry will be
+        ///          If force_insert is true, a new connection entry will be
         ///          created even if that means the cache limits will be
         ///          exceeded.
         ///
@@ -508,31 +509,31 @@ namespace hpx { namespace util
         }
 
         // access statistics
-        boost::int64_t get_cache_insertions(bool reset)
+        std::int64_t get_cache_insertions(bool reset)
         {
             std::lock_guard<mutex_type> lock(mtx_);
             return util::get_and_reset_value(insertions_, reset);
         }
 
-        boost::int64_t get_cache_evictions(bool reset)
+        std::int64_t get_cache_evictions(bool reset)
         {
             std::lock_guard<mutex_type> lock(mtx_);
             return util::get_and_reset_value(evictions_, reset);
         }
 
-        boost::int64_t get_cache_hits(bool reset)
+        std::int64_t get_cache_hits(bool reset)
         {
             std::lock_guard<mutex_type> lock(mtx_);
             return util::get_and_reset_value(hits_, reset);
         }
 
-        boost::int64_t get_cache_misses(bool reset)
+        std::int64_t get_cache_misses(bool reset)
         {
             std::lock_guard<mutex_type> lock(mtx_);
             return util::get_and_reset_value(misses_, reset);
         }
 
-        boost::int64_t get_cache_reclaims(bool reset)
+        std::int64_t get_cache_reclaims(bool reset)
         {
             std::lock_guard<mutex_type> lock(mtx_);
             return util::get_and_reset_value(reclaims_, reset);
@@ -644,11 +645,11 @@ namespace hpx { namespace util
         bool shutting_down_;
 
         // statistics support
-        boost::int64_t insertions_;
-        boost::int64_t evictions_;
-        boost::int64_t hits_;
-        boost::int64_t misses_;
-        boost::int64_t reclaims_;
+        std::int64_t insertions_;
+        std::int64_t evictions_;
+        std::int64_t hits_;
+        std::int64_t misses_;
+        std::int64_t reclaims_;
     };
 }}
 

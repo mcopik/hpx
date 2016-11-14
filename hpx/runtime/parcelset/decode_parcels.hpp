@@ -11,11 +11,17 @@
 #include <hpx/exception.hpp>
 #include <hpx/performance_counters/parcels/data_point.hpp>
 #include <hpx/runtime/naming/name.hpp>
+#include <hpx/runtime/naming/resolver_client.hpp>
 #include <hpx/runtime/parcelset/parcel.hpp>
+#include <hpx/runtime/parcelset/detail/parcel_route_handler.hpp>
 #include <hpx/runtime/serialization/serialize.hpp>
 #include <hpx/runtime_fwd.hpp>
 #include <hpx/util/high_resolution_timer.hpp>
+#include <hpx/util/logging.hpp>
 
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -31,14 +37,14 @@ namespace hpx { namespace parcelset
 
         std::size_t num_zero_copy_chunks =
             static_cast<std::size_t>(
-                static_cast<boost::uint32_t>(buffer.num_chunks_.first));
+                static_cast<std::uint32_t>(buffer.num_chunks_.first));
 
         if (num_zero_copy_chunks != 0)
         {
             // decode chunk information
             std::size_t num_non_zero_copy_chunks =
                 static_cast<std::size_t>(
-                    static_cast<boost::uint32_t>(buffer.num_chunks_.second));
+                    static_cast<std::uint32_t>(buffer.num_chunks_.second));
 
             chunks.resize(num_zero_copy_chunks + num_non_zero_copy_chunks);
 
@@ -46,7 +52,7 @@ namespace hpx { namespace parcelset
             for (std::size_t i = 0; i != num_zero_copy_chunks; ++i)
             {
                 transmission_chunk_type& c = buffer.transmission_chunks_[i];
-                boost::uint64_t first = c.first, second = c.second;
+                std::uint64_t first = c.first, second = c.second;
 
                 HPX_ASSERT(buffer.chunks_[i].size() == second);
 
@@ -60,7 +66,7 @@ namespace hpx { namespace parcelset
                  ++i)
             {
                 transmission_chunk_type& c = buffer.transmission_chunks_[i];
-                boost::uint64_t first = c.first, second = c.second;
+                std::uint64_t first = c.first, second = c.second;
 
                 // find next free entry
                 while (chunks[index].size_ != 0)
@@ -86,23 +92,22 @@ namespace hpx { namespace parcelset
 
     ///////////////////////////////////////////////////////////////////////////
     template <typename Parcelport, typename Buffer>
-    void decode_message(
+    void decode_message_with_chunks(
         Parcelport & pp
       , Buffer buffer
       , std::size_t parcel_count
+      , std::vector<serialization::serialization_chunk> &chunks
       , std::size_t num_thread = -1
     )
     {
-        std::vector<serialization::serialization_chunk> chunks(
-            decode_chunks(buffer));
-        boost::uint64_t inbound_data_size = buffer.data_size_;
+        std::uint64_t inbound_data_size = buffer.data_size_;
 
         // protect from un-handled exceptions bubbling up
         try {
             try {
                 // mark start of serialization
                 util::high_resolution_timer timer;
-                boost::int64_t overall_add_parcel_time = 0;
+                std::int64_t overall_add_parcel_time = 0;
                 performance_counters::parcels::data_point& data =
                     buffer.data_point_;
 
@@ -115,11 +120,27 @@ namespace hpx { namespace parcelset
                         archive >> parcel_count; //-V128
                     for(std::size_t i = 0; i != parcel_count; ++i)
                     {
+#if defined(HPX_HAVE_PARCELPORT_ACTION_COUNTERS)
+                        std::size_t archive_pos = archive.current_pos();
+                        std::int64_t serialize_time = timer.elapsed_nanoseconds();
+#endif
                         // de-serialize parcel and add it to incoming parcel queue
                         parcel p;
-                        archive >> p;
-                        // make sure this parcel ended up on the right locality
+                        bool migrated = p.load_schedule(archive, num_thread);
 
+                        std::int64_t add_parcel_time = timer.elapsed_nanoseconds();
+
+#if defined(HPX_HAVE_PARCELPORT_ACTION_COUNTERS)
+                        performance_counters::parcels::data_point action_data;
+                        action_data.bytes_ = archive.current_pos() - archive_pos;
+                        action_data.serialization_time_ =
+                            add_parcel_time - serialize_time;
+                        action_data.num_parcels_ = 1;
+                        pp.add_received_data(p.get_action()->get_action_name(),
+                            action_data);
+#endif
+
+                        // make sure this parcel ended up on the right locality
                         naming::gid_type const& here = hpx::get_locality();
                         if (hpx::get_runtime_ptr() && here &&
                             (naming::get_locality_id_from_gid(
@@ -136,9 +157,17 @@ namespace hpx { namespace parcelset
                             return;
                         }
 
+                        if (migrated)
+                        {
+                            naming::resolver_client& client =
+                                hpx::naming::get_agas_client();
+                            client.route(
+                                std::move(p),
+                                &detail::parcel_route_handler,
+                                threads::thread_priority_normal);
+                        }
+
                         // be sure not to measure add_parcel as serialization time
-                        boost::int64_t add_parcel_time = timer.elapsed_nanoseconds();
-                        pp.add_received_parcel(std::move(p), num_thread);
                         overall_add_parcel_time += timer.elapsed_nanoseconds() -
                             add_parcel_time;
                     }
@@ -186,6 +215,21 @@ namespace hpx { namespace parcelset
         }
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    template <typename Parcelport, typename Buffer>
+    void decode_message(
+        Parcelport & pp
+      , Buffer buffer
+      , std::size_t parcel_count
+      , std::size_t num_thread = -1
+    )
+    {
+        std::vector<serialization::serialization_chunk>
+            chunks(decode_chunks(buffer));
+        decode_message_with_chunks(pp, std::move(buffer),
+            parcel_count, chunks, num_thread);
+    }
+
     template <typename Parcelport, typename Buffer>
     void decode_parcel(Parcelport & parcelport, Buffer buffer, std::size_t num_thread)
     {
@@ -194,7 +238,7 @@ namespace hpx { namespace parcelset
 //             hpx::applier::register_thread_nullary(
 //                 util::bind(
 //                     util::one_shot(&decode_message<Parcelport, Buffer>),
-//                     boost::ref(parcelport), std::move(buffer), 1, num_thread),
+//                     std::ref(parcelport), std::move(buffer), 1, num_thread),
 //                 "decode_parcels",
 //                 threads::pending, true, threads::thread_priority_boost,
 //                 parcelport.get_next_num_thread());
@@ -213,7 +257,7 @@ namespace hpx { namespace parcelset
 //             hpx::applier::register_thread_nullary(
 //                 util::bind(
 //                     util::one_shot(&decode_message<Parcelport, Buffer>),
-//                     boost::ref(parcelport), std::move(buffer), 0, num_thread),
+//                     std::ref(parcelport), std::move(buffer), 0, num_thread),
 //                 "decode_parcels",
 //                 threads::pending, true, threads::thread_priority_boost,
 //                 parcelport.get_next_num_thread());

@@ -17,6 +17,7 @@
 #include <hpx/traits/action_decorate_function.hpp>
 #include <hpx/util/bind.hpp>
 
+#include <cstdint>
 #include <mutex>
 #include <type_traits>
 #include <utility>
@@ -97,7 +98,7 @@ namespace hpx { namespace components
                 });
         }
 
-        boost::uint32_t pin_count() const
+        std::uint32_t pin_count() const
         {
             std::lock_guard<mutex_type> l(mtx_);
             return pin_count_;
@@ -167,10 +168,10 @@ namespace hpx { namespace components
         // Return whether the given object was migrated, if it was not
         // migrated, it also returns a pinned pointer.
         static std::pair<bool, components::pinned_ptr>
-        was_object_migrated(hpx::id_type const& id,
+        was_object_migrated(hpx::naming::gid_type const& id,
             naming::address::address_type lva)
         {
-            return agas::was_object_migrated(id.get_gid(),
+            return agas::was_object_migrated(id,
                 [lva]() -> components::pinned_ptr
                 {
                     return components::pinned_ptr::create<this_component_type>(lva);
@@ -180,7 +181,7 @@ namespace hpx { namespace components
     protected:
         // Execute the wrapped action. This function is bound in decorate_action
         // above. The bound object performs the pinning/unpinning.
-        threads::thread_state_enum thread_function(
+        threads::thread_result_type thread_function(
             threads::thread_state_ex_enum state,
             threads::thread_function_type && f,
             components::pinned_ptr)
@@ -190,7 +191,7 @@ namespace hpx { namespace components
 
     private:
         mutable mutex_type mtx_;
-        boost::uint32_t pin_count_;
+        std::uint32_t pin_count_;
         hpx::lcos::local::promise<void> trigger_migration_;
         bool was_marked_for_migration_;
     };

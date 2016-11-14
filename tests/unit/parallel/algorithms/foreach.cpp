@@ -7,6 +7,7 @@
 #include <hpx/hpx_init.hpp>
 #include <hpx/hpx.hpp>
 
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -21,7 +22,7 @@ void test_for_each()
     test_for_each(seq, IteratorTag());
     test_for_each(par, IteratorTag());
     test_for_each(par_vec, IteratorTag());
-    test_for_each(gpu, IteratorTag());
+    //test_for_each(gpu, IteratorTag());
 
     test_for_each_async(seq(task), IteratorTag());
     test_for_each_async(par(task), IteratorTag());

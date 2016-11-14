@@ -33,6 +33,8 @@
 #include <boost/asio/write.hpp>
 #include <boost/atomic.hpp>
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -48,7 +50,7 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
     {
         typedef hpx::lcos::local::spinlock mutex_type;
     public:
-        receiver(boost::asio::io_service& io_service, boost::uint64_t max_inbound_size,
+        receiver(boost::asio::io_service& io_service, std::uint64_t max_inbound_size,
             connection_handler& parcelport)
           : socket_(io_service)
           , max_inbound_size_(max_inbound_size)
@@ -56,6 +58,7 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
           , parcelport_(parcelport)
           , timer_()
           , mtx_()
+          , operation_in_flight_(0)
         {}
 
         ~receiver()
@@ -126,6 +129,13 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
                 socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
                 socket_.close(ec);    // close the socket to give it back to the OS
             }
+
+            while(operation_in_flight_ != 0)
+            {
+                if(threads::get_self_ptr())
+                    hpx::this_thread::suspend(hpx::threads::pending,
+                        "tcp::reveiver::shutdown");
+            }
         }
 
     private:
@@ -135,6 +145,7 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
         void handle_read_header(boost::system::error_code const& e,
             std::size_t bytes_transferred, Handler handler)
         {
+            HPX_ASSERT(operation_in_flight_ == 0);
             if (e) {
                 handler(e);
 
@@ -142,8 +153,9 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
 //                 async_read(handler);
             }
             else {
+                ++operation_in_flight_;
                 // Determine the length of the serialized data.
-                boost::uint64_t inbound_size = buffer_.size_;
+                std::uint64_t inbound_size = buffer_.size_;
 
                 if (inbound_size > max_inbound_size_)
                 {
@@ -161,10 +173,10 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
                 // determine the size of the chunk buffer
                 std::size_t num_zero_copy_chunks =
                     static_cast<std::size_t>(
-                        static_cast<boost::uint32_t>(buffer_.num_chunks_.first));
+                        static_cast<std::uint32_t>(buffer_.num_chunks_.first));
                 std::size_t num_non_zero_copy_chunks =
                     static_cast<std::size_t>(
-                        static_cast<boost::uint32_t>(buffer_.num_chunks_.second));
+                        static_cast<std::uint32_t>(buffer_.num_chunks_.second));
 
                 void (receiver::*f)(boost::system::error_code const&,
                         Handler) = nullptr;
@@ -229,6 +241,7 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
         {
             if (e) {
                 handler(e);
+                --operation_in_flight_;
 
                 // Issue a read operation to read the next parcel.
 //                 async_read(handler);
@@ -240,7 +253,7 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
                 // add appropriately sized chunk buffers for the zero-copy data
                 std::size_t num_zero_copy_chunks =
                     static_cast<std::size_t>(
-                        static_cast<boost::uint32_t>(buffer_.num_chunks_.first));
+                        static_cast<std::uint32_t>(buffer_.num_chunks_.first));
 
                 buffer_.chunks_.resize(num_zero_copy_chunks);
                 for (std::size_t i = 0; i != num_zero_copy_chunks; ++i)
@@ -286,6 +299,7 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
         {
             if (e) {
                 handler(e);
+                --operation_in_flight_;
 
                 // Issue a read operation to read the next parcel.
 //                 async_read(handler);
@@ -328,8 +342,10 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
         void handle_write_ack(boost::system::error_code const& e,
             Handler handler)
         {
+            HPX_ASSERT(operation_in_flight_ != 0);
             // Inform caller that data has been received ok.
             handler(e);
+            --operation_in_flight_;
 
             // Issue a read operation to read the next parcel.
             if (!e)
@@ -342,7 +358,7 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
         /// Socket for the parcelport_connection.
         boost::asio::ip::tcp::socket socket_;
 
-        boost::uint64_t max_inbound_size_;
+        std::uint64_t max_inbound_size_;
 
         bool ack_;
 
@@ -353,6 +369,7 @@ namespace hpx { namespace parcelset { namespace policies { namespace tcp
         util::high_resolution_timer timer_;
 
         mutex_type mtx_;
+        hpx::util::atomic_count operation_in_flight_;
     };
 }}}}
 

@@ -13,6 +13,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <iostream>
 #include <memory>
@@ -84,10 +86,6 @@ hpx::lcos::local::spinlock                 FuturesMutex;
 #endif
 
 //----------------------------------------------------------------------------
-// Used at start and end of each loop for synchronization
-hpx::lcos::barrier unique_barrier;
-
-//----------------------------------------------------------------------------
 //
 // Each locality allocates a buffer of memory which is used to host transfers
 //
@@ -96,11 +94,11 @@ hpx::lcos::local::spinlock storage_mutex;
 
 //
 typedef struct {
-    boost::uint64_t iterations;
-    boost::uint64_t local_storage_MB;
-    boost::uint64_t global_storage_MB;
-    boost::uint64_t transfer_size_B;
-    boost::uint64_t threads;
+    std::uint64_t iterations;
+    std::uint64_t local_storage_MB;
+    std::uint64_t global_storage_MB;
+    std::uint64_t transfer_size_B;
+    std::uint64_t threads;
     std::string     network;
     bool            all2all;
     bool            distribution;
@@ -373,26 +371,6 @@ int reduce(hpx::future<std::vector<hpx::future<int> > > futvec)
 }
 
 //----------------------------------------------------------------------------
-// Create a new barrier and register its gid with the given symbolic name.
-hpx::lcos::barrier create_barrier(std::size_t num_localities, char const* symname)
-{
-    DEBUG_OUTPUT(2,
-        std::cout << "Creating barrier based on N localities "
-                  << num_localities << std::endl;
-    );
-
-    hpx::lcos::barrier b = hpx::lcos::barrier::create(hpx::find_here(), num_localities);
-    hpx::agas::register_name(hpx::launch::sync, symname, b.get_id());
-    return b;
-}
-
-//----------------------------------------------------------------------------
-void barrier_wait()
-{
-    unique_barrier.wait();
-}
-
-//----------------------------------------------------------------------------
 // Test speed of write/put
 void test_write(
     uint64_t rank, uint64_t nranks, uint64_t num_transfer_slots,
@@ -407,7 +385,7 @@ void test_write(
         std::cout << "Entering Barrier at start of write on rank " << rank << std::endl;
     );
     //
-    barrier_wait();
+    hpx::lcos::barrier::synchronize();
     //
     DEBUG_OUTPUT(1,
         std::cout << "Passed Barrier at start of write on rank " << rank << std::endl;
@@ -416,7 +394,7 @@ void test_write(
     hpx::util::high_resolution_timer timerWrite;
 
     bool active = (rank==0) | (rank>0 && options.all2all);
-    for(boost::uint64_t i = 0; active && i < options.iterations; i++) {
+    for(std::uint64_t i = 0; active && i < options.iterations; i++) {
         DEBUG_OUTPUT(1,
             std::cout << "Starting iteration " << i << " on rank " << rank << std::endl;
         );
@@ -518,7 +496,7 @@ void test_write(
             << futuretimer.elapsed() << " Move time " << movetime << std::endl;
         );
     }
-    barrier_wait();
+    hpx::lcos::barrier::synchronize();
     //
     double writeMB   = static_cast<double>
         (nranks*options.local_storage_MB*options.iterations);
@@ -575,7 +553,7 @@ void test_read(
         std::cout << "Entering Barrier at start of read on rank " << rank << std::endl;
     );
     //
-    barrier_wait();
+    hpx::lcos::barrier::synchronize();
     //
     DEBUG_OUTPUT(1,
         std::cout << "Passed Barrier at start of read on rank " << rank << std::endl;
@@ -587,7 +565,7 @@ void test_read(
     hpx::util::high_resolution_timer timerRead;
     //
     bool active = (rank==0) || (rank>0 && options.all2all);
-    for(boost::uint64_t i = 0; active && i < options.iterations; i++) {
+    for(std::uint64_t i = 0; active && i < options.iterations; i++) {
       DEBUG_OUTPUT(1,
           std::cout << "Starting iteration " << i << " on rank " << rank << std::endl;
       );
@@ -697,7 +675,7 @@ void test_read(
             << futuretimer.elapsed() << " Move time " << movetime << std::endl;
         );
     }
-    barrier_wait();
+    hpx::lcos::barrier::synchronize();
     //
     double readMB = static_cast<double>
         (nranks*options.local_storage_MB*options.iterations);
@@ -718,33 +696,6 @@ void test_read(
         std::cout << (boost::format(msg) % options.network % nranks
             % options.threads % readMB % options.transfer_size_B
           % IOPs_s % readBW ) << std::endl;
-    }
-}
-
-//----------------------------------------------------------------------------
-void create_barrier_startup()
-{
-    hpx::id_type here = hpx::find_here();
-    uint64_t rank = hpx::naming::get_locality_id_from_id(here);
-
-    // create a barrier we will use at the start and end of each run to
-    // synchronize
-    if(0 == rank) {
-        uint64_t nranks = hpx::get_num_localities().get();
-        unique_barrier = create_barrier(nranks, "/0/DSM_barrier");
-    }
-}
-
-//----------------------------------------------------------------------------
-void find_barrier_startup()
-{
-    hpx::id_type here = hpx::find_here();
-    uint64_t rank = hpx::naming::get_locality_id_from_id(here);
-
-    if (rank != 0) {
-        hpx::id_type id =
-            hpx::agas::resolve_name(hpx::launch::sync, "/0/DSM_barrier");
-        unique_barrier = hpx::lcos::barrier(id);
     }
 }
 
@@ -776,14 +727,14 @@ int hpx_main(boost::program_options::variables_map& vm)
     //
     // extract command line argument
     test_options options;
-    options.transfer_size_B   = vm["transferKB"].as<boost::uint64_t>() * 1024;
-    options.local_storage_MB  = vm["localMB"].as<boost::uint64_t>();
-    options.global_storage_MB = vm["globalMB"].as<boost::uint64_t>();
-    options.iterations        = vm["iterations"].as<boost::uint64_t>();
+    options.transfer_size_B   = vm["transferKB"].as<std::uint64_t>() * 1024;
+    options.local_storage_MB  = vm["localMB"].as<std::uint64_t>();
+    options.global_storage_MB = vm["globalMB"].as<std::uint64_t>();
+    options.iterations        = vm["iterations"].as<std::uint64_t>();
     options.threads           = hpx::get_os_thread_count();
     options.network           = vm["parceltype"].as<std::string>();
     options.all2all           = vm["all-to-all"].as<bool>();
-    options.distribution      = vm["distribution"].as<boost::uint64_t>() ? true : false;
+    options.distribution      = vm["distribution"].as<std::uint64_t>() ? true : false;
 
     //
     if (options.global_storage_MB>0) {
@@ -814,14 +765,6 @@ int hpx_main(boost::program_options::variables_map& vm)
     //
     delete_local_storage();
 
-    // release barrier object
-    unique_barrier = hpx::invalid_id;
-    DEBUG_OUTPUT(2,
-        std::cout << "Unregistering Barrier " << rank << std::endl;
-    );
-    if (0 == rank)
-        hpx::agas::unregister_name(hpx::launch::sync, "/0/DSM_barrier");
-
     DEBUG_OUTPUT(2,
         std::cout << "Calling finalize" << rank << std::endl;
     );
@@ -839,14 +782,14 @@ int main(int argc, char* argv[])
 
     desc_commandline.add_options()
         ( "localMB",
-          boost::program_options::value<boost::uint64_t>()->default_value(256),
+          boost::program_options::value<std::uint64_t>()->default_value(256),
           "Sets the storage capacity (in MB) on each node.\n"
           "The total storage will be num_ranks * localMB")
         ;
 
     desc_commandline.add_options()
         ( "globalMB",
-          boost::program_options::value<boost::uint64_t>()->default_value(0),
+          boost::program_options::value<std::uint64_t>()->default_value(0),
           "Sets the storage capacity (in MB) for the entire job.\n"
           "The storage per node will be globalMB / num_ranks\n"
           "By default, localMB is used, setting this overrides localMB value."
@@ -855,14 +798,14 @@ int main(int argc, char* argv[])
 
     desc_commandline.add_options()
         ( "transferKB",
-          boost::program_options::value<boost::uint64_t>()->default_value(64),
+          boost::program_options::value<std::uint64_t>()->default_value(64),
           "Sets the default block transfer size (in KB).\n"
           "Each put/get IOP will be this size")
         ;
 
     desc_commandline.add_options()
         ( "iterations",
-          boost::program_options::value<boost::uint64_t>()->default_value(5),
+          boost::program_options::value<std::uint64_t>()->default_value(5),
           "The number of iterations over the global memory.\n")
         ;
 
@@ -886,7 +829,7 @@ int main(int argc, char* argv[])
 
     desc_commandline.add_options()
         ( "distribution",
-          boost::program_options::value<boost::uint64_t>()->default_value(1),
+          boost::program_options::value<std::uint64_t>()->default_value(1),
           "Specify the distribution of data blocks to send/receive,\n"
           "in random mode, blocks of data are sent from one rank to \
             any other rank (including itself),"
@@ -895,16 +838,6 @@ int main(int argc, char* argv[])
           "0 : random \n"
           "1 : block cyclic")
         ;
-
-    // make sure our barrier was already created before hpx_main runs
-    DEBUG_OUTPUT(2,
-        std::cout << "Registering create_barrier startup function " << std::endl;
-    );
-    hpx::register_pre_startup_function(&create_barrier_startup);
-    DEBUG_OUTPUT(2,
-        std::cout << "Registering find_barrier startup function " << std::endl;
-    );
-    hpx::register_startup_function(&find_barrier_startup);
 
     // Initialize and run HPX, this test requires to run hpx_main on all localities
     std::vector<std::string> const cfg = {

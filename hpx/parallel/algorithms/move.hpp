@@ -23,6 +23,7 @@
 #include <hpx/traits/segmented_iterator_traits.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <iterator>
 #include <type_traits>
 #include <utility>
@@ -47,7 +48,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             static std::pair<InIter, OutIter>
             sequential(ExPolicy, InIter first, InIter last, OutIter dest)
             {
-                return util::move_helper(first, last, dest);
+                return util::move(first, last, dest);
             }
 
             template <typename ExPolicy, typename FwdIter, typename OutIter>
@@ -65,14 +66,13 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                         std::forward<ExPolicy>(policy),
                         hpx::util::make_zip_iterator(first, dest),
                         std::distance(first, last),
-                        [](std::size_t, zip_iterator part_begin,
-                            std::size_t part_size)
+                        [](zip_iterator part_begin, std::size_t part_size,
+                            std::size_t)
                         {
                             using hpx::util::get;
 
-                            auto const& iters = part_begin.get_iterator_tuple();
-                            util::move_n_helper(get<0>(iters), part_size,
-                                get<1>(iters));
+                            auto iters = part_begin.get_iterator_tuple();
+                            util::move_n(get<0>(iters), part_size, get<1>(iters));
                         },
                         [](zip_iterator && last) -> zip_iterator
                         {

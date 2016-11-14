@@ -11,7 +11,10 @@
 
 #include <hpx/config.hpp>
 
+#include <hpx/runtime/threads/thread_helpers.hpp>
+
 #include <chrono>
+#include <cstddef>
 
 namespace hpx { namespace util { namespace detail {
     inline void yield_k(std::size_t k, const char *thread_name)

@@ -23,6 +23,7 @@
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
+#include <cstddef>
 #include <memory>
 #include <set>
 #include <string>
@@ -46,6 +47,7 @@ namespace hpx { namespace parcelset
         typedef policies::tcp::sender connection_type;
         typedef std::true_type  send_early_parcel;
         typedef std::false_type do_background_work;
+        typedef std::false_type send_immediate_parcels;
 
         static const char * type()
         {

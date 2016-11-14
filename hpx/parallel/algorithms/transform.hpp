@@ -18,16 +18,18 @@
 #include <hpx/util/tuple.hpp>
 
 #include <hpx/parallel/algorithms/detail/dispatch.hpp>
-#include <hpx/parallel/algorithms/for_each.hpp>
 #include <hpx/parallel/config/inline_namespace.hpp>
 #include <hpx/parallel/execution_policy.hpp>
 #include <hpx/parallel/tagspec.hpp>
 #include <hpx/parallel/traits/projected.hpp>
 #include <hpx/parallel/util/detail/algorithm_result.hpp>
+#include <hpx/parallel/util/foreach_partitioner.hpp>
+#include <hpx/parallel/util/transform_loop.hpp>
 #include <hpx/parallel/util/projection_identity.hpp>
 #include <hpx/parallel/util/zip_iterator.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <iterator>
 #include <type_traits>
 #include <utility>
@@ -39,34 +41,80 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     namespace detail
     {
         /// \cond NOINTERNAL
-        template <typename InIter1, typename OutIter, typename F,
-            typename Proj>
-        HPX_HOST_DEVICE
-        HPX_FORCEINLINE std::pair<InIter1, OutIter>
-        sequential_transform(InIter1 first1, InIter1 last1,
-            OutIter dest, F && f, Proj && proj)
-        {
-            while (first1 != last1)
-            {
-                using hpx::util::invoke;
-                *dest++ = invoke(f, invoke(proj, *first1++));
-            }
-            return std::make_pair(first1, dest);
-        }
-
         template <typename F, typename Proj>
+        struct transform_projected
+        {
+            typename hpx::util::decay<F>::type& f_;
+            typename hpx::util::decay<Proj>::type& proj_;
+
+            template <typename Iter>
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            auto operator()(Iter curr)
+            ->  decltype(
+                    hpx::util::invoke(f_, hpx::util::invoke(proj_, *curr))
+                )
+            {
+                return hpx::util::invoke(f_, hpx::util::invoke(proj_, *curr));
+            }
+        };
+
+        template <typename ExPolicy, typename F, typename Proj>
         struct transform_iteration
         {
-            typename hpx::util::decay<F>::type f_;
-            typename hpx::util::decay<Proj>::type proj_;
+            typedef typename hpx::util::decay<ExPolicy>::type execution_policy_type;
+            typedef typename hpx::util::decay<F>::type fun_type;
+            typedef typename hpx::util::decay<Proj>::type proj_type;
 
-            template <typename Tuple>
-            HPX_HOST_DEVICE
-            void operator()(Tuple && t)
+            execution_policy_type policy_;
+            fun_type f_;
+            proj_type proj_;
+
+            template <typename ExPolicy_, typename F_, typename Proj_>
+            HPX_HOST_DEVICE transform_iteration(
+                    ExPolicy_ && policy, F_ && f, Proj_ && proj)
+              : policy_(std::forward<ExPolicy_>(policy))
+              , f_(std::forward<F_>(f))
+              , proj_(std::forward<Proj_>(proj))
+            {}
+
+#if defined(HPX_HAVE_CXX11_DEFAULTED_FUNCTIONS) && !defined(__NVCC__)
+            transform_iteration(transform_iteration const&) = default;
+            transform_iteration(transform_iteration&&) = default;
+#else
+            HPX_HOST_DEVICE transform_iteration(transform_iteration const& rhs)
+              : policy_(rhs.policy_)
+              , f_(rhs.f_)
+              , proj_(rhs.proj_)
+            {}
+
+            HPX_HOST_DEVICE transform_iteration(transform_iteration && rhs)
+              : policy_(std::move(rhs.policy_))
+              , f_(std::move(rhs.f_))
+              , proj_(std::move(rhs.proj_))
+            {}
+#endif
+
+            HPX_DELETE_COPY_ASSIGN(transform_iteration);
+            HPX_DELETE_MOVE_ASSIGN(transform_iteration);
+
+            template <typename Iter>
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            std::pair<
+                typename hpx::util::tuple_element<
+                    0, typename Iter::iterator_tuple_type
+                >::type,
+                typename hpx::util::tuple_element<
+                    1, typename Iter::iterator_tuple_type
+                >::type
+            >
+            operator()(Iter part_begin, std::size_t part_size,
+                std::size_t /*part_index*/)
             {
-                using hpx::util::get;
-                using hpx::util::invoke;
-                get<1>(t) = invoke(f_, invoke(proj_, get<0>(t))); //-V573
+                auto iters = part_begin.get_iterator_tuple();
+                return util::transform_loop_n(policy_,
+                    hpx::util::get<0>(iters), part_size,
+                    hpx::util::get<1>(iters),
+                    transform_projected<F, Proj>{f_, proj_});
             }
         };
 
@@ -82,11 +130,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 typename F, typename Proj>
             HPX_HOST_DEVICE
             static std::pair<InIter, OutIter>
-            sequential(ExPolicy, InIter first, InIter last,
+            sequential(ExPolicy && policy, InIter first, InIter last,
                 OutIter dest, F && f, Proj && proj)
             {
-                return sequential_transform(first, last, dest,
-                    std::forward<F>(f), std::forward<Proj>(proj));
+                return util::transform_loop(std::forward<ExPolicy>(policy),
+                    first, last, dest, transform_projected<F, Proj>{f, proj});
             }
 
             template <typename ExPolicy, typename FwdIter, typename OutIter,
@@ -97,18 +145,22 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             parallel(ExPolicy && policy, FwdIter first, FwdIter last,
                 OutIter dest, F && f, Proj && proj)
             {
-                typedef hpx::util::zip_iterator<FwdIter, OutIter>
-                    zip_iterator;
-                typedef typename zip_iterator::reference reference;
+                if (first != last)
+                {
+                    auto f1 = transform_iteration<ExPolicy, F, Proj>(policy,
+                        std::forward<F>(f), std::forward<Proj>(proj));
 
-                return get_iter_pair(
-                    for_each_n<zip_iterator>().call(
-                        std::forward<ExPolicy>(policy), std::false_type(),
-                        hpx::util::make_zip_iterator(first, dest),
-                        std::distance(first, last),
-                        transform_iteration<F, Proj>{std::forward<F>(f),
-                            std::forward<Proj>(proj)},
-                        util::projection_identity()));
+                    return get_iter_pair(
+                        util::foreach_partitioner<ExPolicy>::call(
+                            std::forward<ExPolicy>(policy),
+                            hpx::util::make_zip_iterator(first, dest),
+                            std::distance(first, last),
+                            std::move(f1), util::projection_identity()));
+                }
+
+                return util::detail::algorithm_result<
+                        ExPolicy, std::pair<FwdIter, OutIter>
+                    >::get(std::make_pair(std::move(first), std::move(dest)));
             }
         };
         /// \endcond
@@ -186,20 +238,24 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///           copied.
     ///
     template <typename ExPolicy, typename InIter, typename OutIter, typename F,
-        typename Proj,
+        typename Proj = util::projection_identity,
     HPX_CONCEPT_REQUIRES_(
         is_execution_policy<ExPolicy>::value &&
         hpx::traits::is_iterator<InIter>::value &&
         hpx::traits::is_iterator<OutIter>::value &&
-        traits::is_projected<Proj, InIter>::value &&
+        traits::is_projected<Proj, InIter>::value)
+#if defined(HPX_MSVC) && HPX_MSVC <= 1800       // MSVC12 can't pattern match this
+  , HPX_CONCEPT_REQUIRES_(
         traits::is_indirect_callable<
             F, traits::projected<Proj, InIter>
-        >::value)>
+        >::value)
+#endif
+    >
     typename util::detail::algorithm_result<ExPolicy,
         hpx::util::tagged_pair<tag::in(InIter), tag::out(OutIter)>
     >::type
     transform(ExPolicy && policy, InIter first, InIter last, OutIter dest,
-        F && f, Proj && proj)
+        F && f, Proj && proj = Proj())
     {
         static_assert(
             (hpx::traits::is_input_iterator<InIter>::value),
@@ -222,87 +278,108 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 std::forward<Proj>(proj)));
     }
 
-    /// \cond NOINTERNAL
-    template <typename ExPolicy, typename InIter, typename OutIter, typename F,
-    HPX_CONCEPT_REQUIRES_(
-        is_execution_policy<ExPolicy>::value &&
-        hpx::traits::is_iterator<InIter>::value &&
-        hpx::traits::is_iterator<OutIter>::value &&
-        traits::is_projected<util::projection_identity, InIter>::value &&
-        traits::is_indirect_callable<
-            F, traits::projected<util::projection_identity, InIter>
-        >::value)>
-    typename util::detail::algorithm_result<ExPolicy,
-        hpx::util::tagged_pair<tag::in(InIter), tag::out(OutIter)>
-    >::type
-    transform(ExPolicy && policy, InIter first, InIter last, OutIter dest,
-        F && f)
-    {
-        static_assert(
-            (hpx::traits::is_input_iterator<InIter>::value),
-            "Requires at least input iterator.");
-        static_assert(
-            (hpx::traits::is_output_iterator<OutIter>::value ||
-                hpx::traits::is_input_iterator<OutIter>::value),
-            "Requires at least output iterator.");
-
-        typedef std::integral_constant<bool,
-                is_sequential_execution_policy<ExPolicy>::value ||
-               !hpx::traits::is_forward_iterator<InIter>::value ||
-               !hpx::traits::is_forward_iterator<OutIter>::value
-            > is_seq;
-
-        return hpx::util::make_tagged_pair<tag::in, tag::out>(
-            detail::transform<std::pair<InIter, OutIter> >().call(
-                std::forward<ExPolicy>(policy), is_seq(),
-                first, last, dest, std::forward<F>(f),
-                util::projection_identity()));
-    }
-    /// \endcond
-
     ///////////////////////////////////////////////////////////////////////////
     // transform binary predicate
     namespace detail
     {
         /// \cond NOINTERNAL
         template <typename F, typename Proj1, typename Proj2>
-        struct transform_binary_iteration
+        struct transform_binary_projected
         {
-            typename hpx::util::decay<F>::type f_;
-            typename hpx::util::decay<Proj1>::type proj1_;
-            typename hpx::util::decay<Proj2>::type proj2_;
+            typename hpx::util::decay<F>::type& f_;
+            typename hpx::util::decay<Proj1>::type& proj1_;
+            typename hpx::util::decay<Proj2>::type& proj2_;
 
-            template <typename Tuple>
-            HPX_HOST_DEVICE
-            void operator()(Tuple && t)
+            template <typename Iter1, typename Iter2>
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            auto operator()(Iter1 curr1, Iter2 curr2)
+            ->  decltype(
+                    hpx::util::invoke(f_,
+                        hpx::util::invoke(proj1_, *curr1),
+                        hpx::util::invoke(proj2_, *curr2))
+                )
             {
-                using hpx::util::get;
-                using hpx::util::invoke;
-                get<2>(t) = invoke(f_, //-V573
-                        invoke(proj1_, get<0>(t)),
-                        invoke(proj2_, get<1>(t)));
+                return hpx::util::invoke(f_,
+                    hpx::util::invoke(proj1_, *curr1),
+                    hpx::util::invoke(proj2_, *curr2));
             }
         };
 
-        template <typename InIter1, typename InIter2, typename OutIter,
-            typename F, typename Proj1, typename Proj2>
-        HPX_HOST_DEVICE
-        HPX_FORCEINLINE hpx::util::tuple<InIter1, InIter2, OutIter>
-        sequential_transform(InIter1 first1, InIter1 last1,
-            InIter2 first2,  OutIter dest, F && f,
-            Proj1 && proj1, Proj2 && proj2)
+        template <typename ExPolicy, typename F, typename Proj1, typename Proj2>
+        struct transform_binary_iteration
         {
-            while (first1 != last1)
-            {
-                using hpx::util::invoke;
-                *dest++ =
-                    invoke(f,
-                        invoke(proj1, *first1++),
-                        invoke(proj2, *first2++));
-            }
-            return hpx::util::make_tuple(first1, first2, dest);
-        }
+            typedef typename hpx::util::decay<ExPolicy>::type execution_policy_type;
+            typedef typename hpx::util::decay<F>::type fun_type;
+            typedef typename hpx::util::decay<Proj1>::type proj1_type;
+            typedef typename hpx::util::decay<Proj2>::type proj2_type;
 
+            execution_policy_type policy_;
+            fun_type f_;
+            proj1_type proj1_;
+            proj2_type proj2_;
+
+            template <typename ExPolicy_, typename F_, typename Proj1_,
+                typename Proj2_>
+            HPX_HOST_DEVICE
+            transform_binary_iteration(ExPolicy_ && policy, F_ && f,
+                    Proj1_ && proj1, Proj2_ && proj2)
+              : policy_(std::forward<ExPolicy_>(policy))
+              , f_(std::forward<F_>(f))
+              , proj1_(std::forward<Proj1_>(proj1))
+              , proj2_(std::forward<Proj2_>(proj2))
+            {}
+
+#if defined(HPX_HAVE_CXX11_DEFAULTED_FUNCTIONS) && !defined(__NVCC__)
+            transform_binary_iteration(transform_binary_iteration const&) = default;
+            transform_binary_iteration(transform_binary_iteration&&) = default;
+#else
+            HPX_HOST_DEVICE
+            transform_binary_iteration(transform_binary_iteration const& rhs)
+              : policy_(rhs.policy_)
+              , f_(rhs.f_)
+              , proj1_(rhs.proj1_)
+              , proj2_(rhs.proj2_)
+            {}
+
+            HPX_HOST_DEVICE
+            transform_binary_iteration(transform_binary_iteration && rhs)
+              : policy_(std::move(rhs.policy_))
+              , f_(std::move(rhs.f_))
+              , proj1_(std::move(rhs.proj1_))
+              , proj2_(std::move(rhs.proj2_))
+            {}
+#endif
+
+            HPX_DELETE_COPY_ASSIGN(transform_binary_iteration);
+            HPX_DELETE_MOVE_ASSIGN(transform_binary_iteration);
+
+            template <typename Iter>
+            HPX_HOST_DEVICE HPX_FORCEINLINE
+            hpx::util::tuple<
+                typename hpx::util::tuple_element<
+                    0, typename Iter::iterator_tuple_type
+                >::type,
+                typename hpx::util::tuple_element<
+                    1, typename Iter::iterator_tuple_type
+                >::type,
+                typename hpx::util::tuple_element<
+                    2, typename Iter::iterator_tuple_type
+                >::type
+            >
+            operator()(Iter part_begin, std::size_t part_size,
+                std::size_t /*part_index*/)
+            {
+                auto iters = part_begin.get_iterator_tuple();
+                return util::transform_binary_loop_n(policy_,
+                    hpx::util::get<0>(iters), part_size,
+                    hpx::util::get<1>(iters), hpx::util::get<2>(iters),
+                    transform_binary_projected<F, Proj1, Proj2>{
+                        f_, proj1_, proj2_
+                    });
+            }
+        };
+
+        ///////////////////////////////////////////////////////////////////////
         template <typename IterTuple>
         struct transform_binary
           : public detail::algorithm<transform_binary<IterTuple>, IterTuple>
@@ -314,12 +391,15 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             template <typename ExPolicy, typename InIter1, typename InIter2,
                 typename OutIter, typename F, typename Proj1, typename Proj2>
             static hpx::util::tuple<InIter1, InIter2, OutIter>
-            sequential(ExPolicy, InIter1 first1, InIter1 last1, InIter2 first2,
-                OutIter dest, F && f, Proj1 && proj1, Proj2 && proj2)
+            sequential(ExPolicy && policy, InIter1 first1, InIter1 last1,
+                InIter2 first2, OutIter dest, F && f, Proj1 && proj1,
+                Proj2 && proj2)
             {
-                return sequential_transform(first1, last1, first2, dest,
-                    std::forward<F>(f), std::forward<Proj1>(proj1),
-                    std::forward<Proj2>(proj2));
+                return util::transform_binary_loop(
+                    std::forward<ExPolicy>(policy), first1, last1, first2, dest,
+                    transform_binary_projected<F, Proj1, Proj2>{
+                        f, proj1, proj2
+                    });
             }
 
             template <typename ExPolicy, typename FwdIter1, typename FwdIter2,
@@ -328,24 +408,27 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 ExPolicy, hpx::util::tuple<FwdIter1, FwdIter2, OutIter>
             >::type
             parallel(ExPolicy && policy, FwdIter1 first1, FwdIter1 last1,
-                FwdIter2 first2, OutIter dest, F && f,
-                Proj1 && proj1, Proj2 && proj2)
+                FwdIter2 first2, OutIter dest, F && f, Proj1 && proj1,
+                Proj2 && proj2)
             {
-                typedef hpx::util::zip_iterator<
-                        FwdIter1, FwdIter2, OutIter
-                    > zip_iterator;
-                typedef typename zip_iterator::reference reference;
+                if (first1 != last1)
+                {
+                    auto f1 = transform_binary_iteration<ExPolicy, F, Proj1, Proj2>(
+                        policy, std::forward<F>(f), std::forward<Proj1>(proj1),
+                        std::forward<Proj2>(proj2));
 
-                return get_iter_tuple(
-                    for_each_n<zip_iterator>().call(
-                        std::forward<ExPolicy>(policy), std::false_type(),
-                        hpx::util::make_zip_iterator(first1, first2, dest),
-                        std::distance(first1, last1),
-                        transform_binary_iteration<F, Proj1, Proj2>{
-                            std::forward<F>(f), std::forward<Proj1>(proj1),
-                            std::forward<Proj2>(proj2)
-                        },
-                        util::projection_identity()));
+                    return get_iter_tuple(
+                        util::foreach_partitioner<ExPolicy>::call(
+                            std::forward<ExPolicy>(policy),
+                            hpx::util::make_zip_iterator(first1, first2, dest),
+                            std::distance(first1, last1),
+                            std::move(f1), util::projection_identity()));
+                }
+
+                return util::detail::algorithm_result<
+                        ExPolicy, hpx::util::tuple<FwdIter1, FwdIter2, OutIter>
+                    >::get(hpx::util::make_tuple(std::move(first1),
+                        std::move(first2), std::move(dest)));
             }
         };
         /// \endcond
@@ -555,18 +638,24 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///
     template <
         typename ExPolicy, typename InIter1, typename InIter2,
-        typename OutIter, typename F, typename Proj1, typename Proj2,
+        typename OutIter, typename F,
+        typename Proj1 = util::projection_identity,
+        typename Proj2 = util::projection_identity,
     HPX_CONCEPT_REQUIRES_(
         is_execution_policy<ExPolicy>::value &&
         hpx::traits::is_iterator<InIter1>::value &&
         hpx::traits::is_iterator<InIter2>::value &&
         hpx::traits::is_iterator<OutIter>::value &&
         traits::is_projected<Proj1, InIter1>::value &&
-        traits::is_projected<Proj2, InIter2>::value &&
+        traits::is_projected<Proj2, InIter2>::value)
+#if defined(HPX_MSVC) && HPX_MSVC <= 1800       // MSVC12 can't pattern match this
+  , HPX_CONCEPT_REQUIRES_(
         traits::is_indirect_callable<
             F, traits::projected<Proj1, InIter1>,
                 traits::projected<Proj2, InIter2>
-        >::value)>
+        >::value)
+#endif
+    >
     typename util::detail::algorithm_result<
         ExPolicy,
         hpx::util::tagged_tuple<
@@ -575,7 +664,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     >::type
     transform(ExPolicy && policy,
         InIter1 first1, InIter1 last1, InIter2 first2, OutIter dest, F && f,
-        Proj1 && proj1, Proj2 && proj2)
+        Proj1 && proj1 = Proj1(), Proj2 && proj2 = Proj2())
     {
         static_assert(
             (hpx::traits::is_input_iterator<InIter1>::value),
@@ -604,88 +693,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 std::forward<Proj1>(proj1), std::forward<Proj2>(proj2)));
     }
 
-    /// \cond NOINTERNAL
-    template <
-        typename ExPolicy, typename InIter1, typename InIter2,
-        typename OutIter, typename F, typename Proj1,
-    HPX_CONCEPT_REQUIRES_(
-        is_execution_policy<ExPolicy>::value &&
-        hpx::traits::is_iterator<InIter1>::value &&
-        hpx::traits::is_iterator<InIter2>::value &&
-        hpx::traits::is_iterator<OutIter>::value &&
-        traits::is_projected<Proj1, InIter1>::value &&
-        traits::is_projected<util::projection_identity, InIter2>::value &&
-        traits::is_indirect_callable<
-            F, traits::projected<Proj1, InIter1>,
-                traits::projected<util::projection_identity, InIter2>
-        >::value)>
-    typename util::detail::algorithm_result<
-        ExPolicy,
-        hpx::util::tagged_tuple<
-            tag::in1(InIter1), tag::in2(InIter2), tag::out(OutIter)
-        >
-    >::type
-    transform(ExPolicy && policy,
-        InIter1 first1, InIter1 last1, InIter2 first2, OutIter dest, F && f,
-        Proj1 && proj1)
-    {
-        return transform(std::forward<ExPolicy>(policy),
-            first1, last1, first2, dest, std::forward<F>(f),
-            std::forward<Proj1>(proj1), util::projection_identity());
-    }
-
-    template <
-        typename ExPolicy, typename InIter1, typename InIter2,
-        typename OutIter, typename F,
-    HPX_CONCEPT_REQUIRES_(
-        is_execution_policy<ExPolicy>::value &&
-        hpx::traits::is_iterator<InIter1>::value &&
-        hpx::traits::is_iterator<InIter2>::value &&
-        hpx::traits::is_iterator<OutIter>::value &&
-        traits::is_projected<util::projection_identity, InIter1>::value &&
-        traits::is_projected<util::projection_identity, InIter2>::value &&
-        traits::is_indirect_callable<
-            F, traits::projected<util::projection_identity, InIter1>,
-                traits::projected<util::projection_identity, InIter2>
-        >::value)>
-    typename util::detail::algorithm_result<
-        ExPolicy,
-        hpx::util::tagged_tuple<
-            tag::in1(InIter1), tag::in2(InIter2), tag::out(OutIter)
-        >
-    >::type
-    transform(ExPolicy && policy,
-        InIter1 first1, InIter1 last1, InIter2 first2, OutIter dest, F && f)
-    {
-        return transform(std::forward<ExPolicy>(policy),
-            first1, last1, first2, dest, std::forward<F>(f),
-            util::projection_identity(), util::projection_identity());
-    }
-    /// \endcond
-
     ///////////////////////////////////////////////////////////////////////////
     // transform binary predicate
     namespace detail
     {
         /// \cond NOINTERNAL
-        template <typename InIter1, typename InIter2, typename OutIter,
-            typename F, typename Proj1, typename Proj2>
-        HPX_FORCEINLINE hpx::util::tuple<InIter1, InIter2, OutIter>
-        sequential_transform(InIter1 first1, InIter1 last1,
-            InIter2 first2, InIter2 last2, OutIter dest, F && f,
-            Proj1 && proj1, Proj2 && proj2)
-        {
-            while (first1 != last1 && first2 != last2)
-            {
-                using hpx::util::invoke;
-                *dest++ =
-                    invoke(f,
-                        invoke(proj1, *first1++),
-                        invoke(proj2, *first2++));
-            }
-            return hpx::util::make_tuple(first1, first2, dest);
-        }
-
         template <typename IterTuple>
         struct transform_binary2
           : public detail::algorithm<transform_binary2<IterTuple>, IterTuple>
@@ -697,13 +709,16 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
             template <typename ExPolicy, typename InIter1, typename InIter2,
                 typename OutIter, typename F, typename Proj1, typename Proj2>
             static hpx::util::tuple<InIter1, InIter2, OutIter>
-            sequential(ExPolicy, InIter1 first1, InIter1 last1,
+            sequential(ExPolicy && policy, InIter1 first1, InIter1 last1,
                 InIter2 first2, InIter2 last2,
                 OutIter dest, F && f, Proj1 && proj1, Proj2 && proj2)
             {
-                return sequential_transform(first1, last1, first2, last2, dest,
-                    std::forward<F>(f), std::forward<Proj1>(proj1),
-                    std::forward<Proj2>(proj2));
+                return util::transform_binary_loop(
+                    std::forward<ExPolicy>(policy),
+                    first1, last1, first2, last2, dest,
+                    transform_binary_projected<F, Proj1, Proj2>{
+                        f, proj1, proj2
+                    });
             }
 
             template <typename ExPolicy, typename FwdIter1, typename FwdIter2,
@@ -715,23 +730,26 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 FwdIter2 first2, FwdIter2 last2, OutIter dest, F && f,
                 Proj1 && proj1, Proj2 && proj2)
             {
-                typedef hpx::util::zip_iterator<
-                        FwdIter1, FwdIter2, OutIter
-                    > zip_iterator;
-                typedef typename zip_iterator::reference reference;
+                if (first1 != last1 && first2 != last2)
+                {
+                    auto f1 = transform_binary_iteration<ExPolicy, F, Proj1, Proj2>(
+                        policy, std::forward<F>(f), std::forward<Proj1>(proj1),
+                        std::forward<Proj2>(proj2));
 
-                return get_iter_tuple(
-                    for_each_n<zip_iterator>().call(
-                        std::forward<ExPolicy>(policy), std::false_type(),
-                        hpx::util::make_zip_iterator(first1, first2, dest),
-                        (std::min)(
-                            std::distance(first1, last1),
-                            std::distance(first2, last2)),
-                        transform_binary_iteration<F, Proj1, Proj2>{
-                            std::forward<F>(f), std::forward<Proj1>(proj1),
-                            std::forward<Proj2>(proj2)
-                        },
-                        util::projection_identity()));
+                    return get_iter_tuple(
+                        util::foreach_partitioner<ExPolicy>::call(
+                            std::forward<ExPolicy>(policy),
+                            hpx::util::make_zip_iterator(first1, first2, dest),
+                            (std::min)(
+                                std::distance(first1, last1),
+                                std::distance(first2, last2)),
+                            std::move(f1), util::projection_identity()));
+                }
+
+                return util::detail::algorithm_result<
+                        ExPolicy, hpx::util::tuple<FwdIter1, FwdIter2, OutIter>
+                    >::get(hpx::util::make_tuple(std::move(first1),
+                        std::move(first2), std::move(dest)));
             }
         };
         /// \endcond
@@ -835,18 +853,24 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
     ///
     template <
         typename ExPolicy, typename InIter1, typename InIter2,
-        typename OutIter, typename F, typename Proj1, typename Proj2,
+        typename OutIter, typename F,
+        typename Proj1 = util::projection_identity,
+        typename Proj2 = util::projection_identity,
     HPX_CONCEPT_REQUIRES_(
         is_execution_policy<ExPolicy>::value &&
         hpx::traits::is_iterator<InIter1>::value &&
         hpx::traits::is_iterator<InIter2>::value &&
         hpx::traits::is_iterator<OutIter>::value &&
         traits::is_projected<Proj1, InIter1>::value &&
-        traits::is_projected<Proj2, InIter2>::value &&
+        traits::is_projected<Proj2, InIter2>::value)
+#if defined(HPX_MSVC) && HPX_MSVC <= 1800       // MSVC12 can't pattern match this
+  , HPX_CONCEPT_REQUIRES_(
         traits::is_indirect_callable<
             F, traits::projected<Proj1, InIter1>,
                 traits::projected<Proj2, InIter2>
-        >::value)>
+        >::value)
+#endif
+    >
     typename util::detail::algorithm_result<
             ExPolicy,
             hpx::util::tagged_tuple<
@@ -855,7 +879,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
         >::type
     transform(ExPolicy && policy,
         InIter1 first1, InIter1 last1, InIter2 first2, InIter2 last2,
-        OutIter dest, F && f, Proj1 && proj1, Proj2 && proj2)
+        OutIter dest, F && f, Proj1 && proj1 = Proj1(), Proj2 && proj2 = Proj2())
     {
         static_assert(
             (hpx::traits::is_input_iterator<InIter1>::value),
@@ -883,66 +907,6 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 first1, last1, first2, last2, dest, std::forward<F>(f),
                 std::forward<Proj1>(proj1), std::forward<Proj2>(proj2)));
     }
-
-    /// \cond NOINTERNAL
-    template <
-        typename ExPolicy, typename InIter1, typename InIter2,
-        typename OutIter, typename F, typename Proj1,
-    HPX_CONCEPT_REQUIRES_(
-        is_execution_policy<ExPolicy>::value &&
-        hpx::traits::is_iterator<InIter1>::value &&
-        hpx::traits::is_iterator<InIter2>::value &&
-        hpx::traits::is_iterator<OutIter>::value &&
-        traits::is_projected<Proj1, InIter1>::value &&
-        traits::is_projected<util::projection_identity, InIter2>::value &&
-        traits::is_indirect_callable<
-            F, traits::projected<Proj1, InIter1>,
-                traits::projected<util::projection_identity, InIter2>
-        >::value)>
-    typename util::detail::algorithm_result<
-            ExPolicy,
-            hpx::util::tagged_tuple<
-                tag::in1(InIter1), tag::in2(InIter2), tag::out(OutIter)
-            >
-        >::type
-    transform(ExPolicy && policy,
-        InIter1 first1, InIter1 last1, InIter2 first2, InIter2 last2,
-        OutIter dest, F && f, Proj1 && proj1)
-    {
-        return transform(std::forward<ExPolicy>(policy),
-            first1, last1, first2, last2, dest, std::forward<F>(f),
-            std::forward<Proj1>(proj1), util::projection_identity());
-    }
-
-    template <
-        typename ExPolicy, typename InIter1, typename InIter2,
-        typename OutIter, typename F,
-    HPX_CONCEPT_REQUIRES_(
-        is_execution_policy<ExPolicy>::value &&
-        hpx::traits::is_iterator<InIter1>::value &&
-        hpx::traits::is_iterator<InIter2>::value &&
-        hpx::traits::is_iterator<OutIter>::value &&
-        traits::is_projected<util::projection_identity, InIter1>::value &&
-        traits::is_projected<util::projection_identity, InIter2>::value &&
-        traits::is_indirect_callable<
-            F, traits::projected<util::projection_identity, InIter1>,
-                traits::projected<util::projection_identity, InIter2>
-        >::value)>
-    typename util::detail::algorithm_result<
-            ExPolicy,
-            hpx::util::tagged_tuple<
-                tag::in1(InIter1), tag::in2(InIter2), tag::out(OutIter)
-            >
-        >::type
-    transform(ExPolicy && policy,
-        InIter1 first1, InIter1 last1, InIter2 first2, InIter2 last2,
-        OutIter dest, F && f)
-    {
-        return transform(std::forward<ExPolicy>(policy),
-            first1, last1, first2, last2, dest, std::forward<F>(f),
-            util::projection_identity(), util::projection_identity());
-    }
-    /// \endcond
 }}}
 
 #endif

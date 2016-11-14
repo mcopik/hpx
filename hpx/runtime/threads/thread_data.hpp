@@ -10,6 +10,7 @@
 
 #include <hpx/config.hpp>
 #include <hpx/runtime/get_locality_id.hpp>
+#include <hpx/runtime/naming_fwd.hpp>
 #include <hpx/runtime/threads/coroutines/coroutine.hpp>
 #include <hpx/runtime/threads/detail/combined_tagged_state.hpp>
 #include <hpx/runtime/threads/thread_data_fwd.hpp>
@@ -264,7 +265,7 @@ namespace hpx { namespace threads
 
     public:
         /// Return the id of the component this thread is running in
-        naming::address::address_type get_component_id() const
+        naming::address_type get_component_id() const
         {
 #ifndef HPX_HAVE_THREAD_TARGET_ADDRESS
             return 0;
@@ -507,14 +508,15 @@ namespace hpx { namespace threads
         ///                 should be scheduled from this point on. The thread
         ///                 manager will use the returned value to set the
         ///                 thread's scheduling status.
-        thread_state_enum operator()()
+        coroutine_type::result_type operator()()
         {
-            HPX_ASSERT(this_() == coroutine_.get_thread_id());
+            HPX_ASSERT(this == coroutine_.get_thread_id());
             return coroutine_(set_state_ex(wait_signaled));
         }
 
         thread_id_type get_thread_id() const
         {
+            HPX_ASSERT(this == coroutine_.get_thread_id());
             return thread_id_type(
                     reinterpret_cast<thread_data*>(coroutine_.get_thread_id())
                 );
@@ -529,7 +531,6 @@ namespace hpx { namespace threads
 #endif
         }
 
-#ifdef HPX_HAVE_THREAD_LOCAL_STORAGE
         std::size_t get_thread_data() const
         {
             return coroutine_.get_thread_data();
@@ -539,7 +540,6 @@ namespace hpx { namespace threads
         {
             return coroutine_.set_thread_data(data);
         }
-#endif
 
         void rebind(thread_init_data& init_data,
             thread_state_enum newstate)
@@ -550,8 +550,7 @@ namespace hpx { namespace threads
 
             rebind_base(init_data, newstate);
 
-            coroutine_.rebind(std::move(init_data.func),
-                std::move(init_data.target), this_());
+            coroutine_.rebind(std::move(init_data.func), this_());
 
             HPX_ASSERT(init_data.stacksize != 0);
             HPX_ASSERT(coroutine_.is_ready());
@@ -593,7 +592,7 @@ namespace hpx { namespace threads
             scheduler_base_(init_data.scheduler_base),
             count_(0),
             stacksize_(init_data.stacksize),
-            coroutine_(std::move(init_data.func), std::move(init_data.target),
+            coroutine_(std::move(init_data.func),
                 this_(), init_data.stacksize),
             pool_(&pool)
         {
@@ -675,7 +674,7 @@ namespace hpx { namespace threads
         ///////////////////////////////////////////////////////////////////////
         // Debugging/logging information
 #ifdef HPX_HAVE_THREAD_TARGET_ADDRESS
-        naming::address::address_type component_id_;
+        naming::address_type component_id_;
 #endif
 
 #ifdef HPX_HAVE_THREAD_DESCRIPTION

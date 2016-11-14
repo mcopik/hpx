@@ -15,6 +15,7 @@
 #include <hpx/components/iostreams/ostream.hpp>
 #include <hpx/components/iostreams/standard_streams.hpp>
 
+#include <functional>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -55,7 +56,7 @@ namespace hpx { namespace iostreams { namespace detail
         }
 
         // the console locality will create the ostream during startup
-        return agas::on_symbol_namespace_event(cout_name, agas::symbol_ns_bind, true);
+        return agas::on_symbol_namespace_event(cout_name, true);
     }
 
     ///////////////////////////////////////////////////////////////////////////

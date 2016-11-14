@@ -25,6 +25,7 @@
 #include <hpx/util/unwrapped.hpp>
 #include <hpx/parallel/config/inline_namespace.hpp>
 
+#include <functional>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -313,7 +314,15 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                         typename hpx::util::decay<Executor>::type,
                         typename bulk_async_execute_result<F, S, Ts...>::type
                     >::type> results;
+
+// Before Boost V1.56 boost::size() does not respect the iterator category of
+// its argument.
+#if BOOST_VERSION < 105600
+                results.reserve(
+                    std::distance(boost::begin(shape), boost::end(shape)));
+#else
                 results.reserve(boost::size(shape));
+#endif
 
                 for (auto const& elem: shape)
                 {
@@ -403,7 +412,15 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                         typename hpx::util::decay<Executor>::type,
                         typename bulk_async_execute_result<F, S, Ts...>::type
                     >::type> results;
+
+// Before Boost V1.56 boost::size() does not respect the iterator category of
+// its argument.
+#if BOOST_VERSION < 105600
+                results.reserve(
+                    std::distance(boost::begin(shape), boost::end(shape)));
+#else
                 results.reserve(boost::size(shape));
+#endif
 
                 try {
                     for (auto const& elem: shape)

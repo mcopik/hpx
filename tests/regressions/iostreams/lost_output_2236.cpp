@@ -9,7 +9,7 @@
 #include <hpx/util/lightweight_test.hpp>
 
 #include <string>
-#include <strstream>
+#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -305,8 +305,8 @@ namespace server {
         state();
         if (w < weight)
         {
+            HPX_ASSERT(strong_count > 0);
             strong_count--;
-            HPX_ASSERT(strong_count >= 0);
         }
         else
         {

@@ -14,6 +14,7 @@
 
 #define HPX_BACKTRACE_SOURCE
 #include <hpx/async.hpp>
+#include <hpx/runtime/threads/thread.hpp>
 
 #include <boost/config.hpp>
 
@@ -45,15 +46,17 @@
 #endif
 #ifdef BOOST_HAVE_UNWIND
 #include <unwind.h>
-#include <boost/cstdint.hpp>
 #endif
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <iomanip>
 #include <ostream>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
-#include <string.h>
-#include <stdlib.h>
 
 #if defined(HPX_MSVC)
 #include <windows.h>
@@ -76,7 +79,7 @@ namespace hpx { namespace util {
 
             void **array_;      // storage for the stack trace
             std::size_t size_;  // number of frames
-            boost::uint64_t cfa_;  // canonical frame address
+            std::uint64_t cfa_;  // canonical frame address
             std::size_t count_;
         };
 
@@ -95,7 +98,7 @@ namespace hpx { namespace util {
                 d.array_[d.count_] = reinterpret_cast<void *>(_Unwind_GetIP(ctx));
 
                 // Get the CFA.
-                boost::uint64_t cfa = _Unwind_GetCFA(ctx);
+                std::uint64_t cfa = _Unwind_GetCFA(ctx);
 
                 // Check if we're at the end of the stack.
                 if ((0 < d.count_) &&
@@ -410,9 +413,13 @@ namespace hpx { namespace util {
             util::bind(stack_trace::get_symbols, &frames_.front(), frames_.size()));
 
         error_code ec(lightweight);
-        p.apply(launch::fork, threads::thread_priority_default,
+        threads::thread_id_type tid = p.apply(
+            launch::fork, threads::thread_priority_default,
             threads::thread_stacksize_medium, ec);
         if (ec) return "<couldn't retrieve stack backtrace>";
+
+        // make sure this thread is executed last
+        hpx::this_thread::yield_to(thread::id(std::move(tid)));
 
         return p.get_future().get(ec);
     }

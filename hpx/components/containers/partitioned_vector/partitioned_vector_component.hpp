@@ -29,6 +29,7 @@
 
 #include <boost/preprocessor/cat.hpp>
 
+#include <cstddef>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -41,7 +42,7 @@ namespace hpx { namespace server
     /// \brief This is the basic wrapper class for stl vector.
     ///
     /// This contain the implementation of the partitioned_vector_partition's
-    /// fcomponent unctionality.
+    /// component functionality.
     template <typename T, typename Data>
     class partitioned_vector
       : public components::locking_hook<
@@ -514,10 +515,10 @@ namespace hpx
         {}
 
         // Return the pinned pointer to the underlying component
-        std::shared_ptr<server::partitioned_vector<T> > get_ptr() const
+        std::shared_ptr<server::partitioned_vector<T, Data> > get_ptr() const
         {
             error_code ec(lightweight);
-            return hpx::get_ptr<server::partitioned_vector<T> >(
+            return hpx::get_ptr<server::partitioned_vector<T, Data> >(
                 this->get_id()).get(ec);
         }
 

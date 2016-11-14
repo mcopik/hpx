@@ -16,20 +16,17 @@
 
 #include <boost/intrusive_ptr.hpp>
 
+#include <cstddef>
 #include <cstdint>
+#include <utility>
 
 namespace hpx { namespace threads
 {
     /// \cond NOINTERNAL
     struct HPX_EXPORT threadmanager_base;
-    class HPX_EXPORT thread_data;
 
     template <typename SchedulingPolicy>
     class HPX_EXPORT threadmanager_impl;
-
-    typedef thread_state_enum thread_function_sig(thread_state_ex_enum);
-    typedef util::unique_function_nonser<thread_function_sig>
-        thread_function_type;
 
     class HPX_EXPORT executor;
 
@@ -39,8 +36,13 @@ namespace hpx { namespace threads
     typedef coroutines::detail::coroutine_impl thread_self_impl_type;
 
     typedef void * thread_id_repr_type;
-
     typedef boost::intrusive_ptr<thread_data> thread_id_type;
+
+    typedef std::pair<thread_state_enum, thread_id_type> thread_result_type;
+    typedef thread_state_ex_enum thread_arg_type;
+
+    typedef thread_result_type thread_function_sig(thread_arg_type);
+    typedef util::unique_function_nonser<thread_function_sig> thread_function_type;
 
     HPX_API_EXPORT void intrusive_ptr_add_ref(thread_data* p);
     HPX_API_EXPORT void intrusive_ptr_release(thread_data* p);
@@ -105,9 +107,11 @@ namespace hpx { namespace threads
     ///       being defined.
     HPX_API_EXPORT std::uint64_t get_self_component_id();
 
-    /// The function \a get_thread_manager returns a reference to the
-    /// current thread manager.
+    /// \cond NOINTERNAL
+    // The function get_thread_manager returns a reference to the
+    // current thread manager.
     HPX_API_EXPORT threadmanager_base& get_thread_manager();
+    /// \endcond
 
     /// The function \a get_thread_count returns the number of currently
     /// known threads.
@@ -136,6 +140,18 @@ namespace hpx { namespace threads
     ///       converted into threads yet).
     HPX_API_EXPORT std::int64_t get_thread_count(
         thread_priority priority, thread_state_enum state = unknown);
+
+    /// The function \a enumerate_threads will invoke the given function \a f
+    /// for each thread with a matching thread state.
+    ///
+    /// \param f        [in] The function which should be called for each
+    ///                 matching thread. Returning 'false' from this function
+    ///                 will stop the enumeration process.
+    /// \param state    [in] This specifies the thread-state for which the
+    ///                 threads should be enumerated.
+    HPX_API_EXPORT bool enumerate_threads(
+        util::function_nonser<bool(thread_id_type)> const& f,
+        thread_state_enum state = unknown);
 }}
 
 #endif

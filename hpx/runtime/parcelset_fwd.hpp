@@ -13,6 +13,8 @@
 
 #include <boost/system/error_code.hpp>
 
+#include <cstddef>
+
 namespace hpx {
     ///////////////////////////////////////////////////////////////////////////
     /// \namespace parcelset
@@ -27,6 +29,11 @@ namespace hpx {
         namespace policies
         {
             struct message_handler;
+        }
+
+        namespace detail
+        {
+            struct create_parcel;
         }
 
         HPX_API_EXPORT policies::message_handler* get_message_handler(

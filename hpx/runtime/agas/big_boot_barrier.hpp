@@ -15,16 +15,20 @@
 #include <hpx/runtime/naming/address.hpp>
 #include <hpx/runtime/parcelset/parcelhandler.hpp>
 #include <hpx/runtime/parcelset/parcelport.hpp>
+#include <hpx/runtime/parcelset/put_parcel.hpp>
+#include <hpx/runtime/parcelset/detail/parcel_await.hpp>
 #include <hpx/util/connection_cache.hpp>
 #include <hpx/util/io_service_pool.hpp>
 #include <hpx/util_fwd.hpp>
 #include <boost/lockfree/queue.hpp>
 
-#include <boost/cstdint.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include <hpx/config/warnings_prefix.hpp>
@@ -93,35 +97,46 @@ struct HPX_EXPORT big_boot_barrier
 
     template <typename Action, typename... Args>
     void apply(
-        boost::uint32_t source_locality_id
-      , boost::uint32_t target_locality_id
-      , parcelset::locality const & dest
+        std::uint32_t source_locality_id
+      , std::uint32_t target_locality_id
+      , parcelset::locality dest
       , Action act
       , Args &&... args
     ) { // {{{
         HPX_ASSERT(pp);
         naming::address addr(naming::get_gid_from_locality_id(target_locality_id));
-        parcelset::parcel p(naming::get_id_from_locality_id(target_locality_id),
-                addr, act, std::forward<Args>(args)...);
+        parcelset::parcel p(
+            parcelset::detail::create_parcel::call(std::false_type(),
+                naming::get_gid_from_locality_id(target_locality_id),
+                std::move(addr), act, std::forward<Args>(args)...));
+#if defined(HPX_HAVE_PARCEL_PROFILING)
         if (!p.parcel_id())
+        {
             p.parcel_id() = parcelset::parcel::generate_unique_id(source_locality_id);
-        pp->send_early_parcel(dest, std::move(p));
+        }
+#endif
+        auto f = [this, dest](parcelset::parcel&& p)
+            {
+                pp->send_early_parcel(dest, std::move(p));
+            };
+        parcelset::detail::parcel_await(std::move(p), 0, std::move(f)).apply();
     } // }}}
 
     template <typename Action, typename... Args>
     void apply_late(
-        boost::uint32_t source_locality_id
-      , boost::uint32_t target_locality_id
+        std::uint32_t source_locality_id
+      , std::uint32_t target_locality_id
       , parcelset::locality const & dest
       , Action act
       , Args &&... args
     ) { // {{{
         naming::address addr(naming::get_gid_from_locality_id(target_locality_id));
-        parcelset::parcel p(naming::get_id_from_locality_id(target_locality_id),
-                addr, act, std::forward<Args>(args)...);
-        if (!p.parcel_id())
-            p.parcel_id() = parcelset::parcel::generate_unique_id(source_locality_id);
-        get_runtime().get_parcel_handler().put_parcel(std::move(p));
+
+        parcelset::put_parcel(
+            naming::id_type(
+                naming::get_gid_from_locality_id(target_locality_id),
+                naming::id_type::unmanaged),
+            std::move(addr), act, std::forward<Args>(args)...);
     } // }}}
 
     void wait_bootstrap();

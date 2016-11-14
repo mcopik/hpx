@@ -32,7 +32,6 @@
 
 #include <hpx/config.hpp>
 
-#include <hpx/runtime/naming/id_type.hpp>
 #include <hpx/runtime/threads/coroutines/coroutine_fwd.hpp>
 #include <hpx/runtime/threads/coroutines/detail/coroutine_accessor.hpp>
 #include <hpx/runtime/threads/coroutines/detail/coroutine_impl.hpp>
@@ -55,31 +54,25 @@ namespace hpx { namespace threads { namespace coroutines
     public:
         friend struct detail::coroutine_accessor;
 
-        typedef thread_state_enum result_type;
-        typedef thread_state_ex_enum arg_type;
-
         typedef detail::coroutine_impl impl_type;
         typedef impl_type::pointer impl_ptr;
         typedef impl_type::thread_id_repr_type thread_id_repr_type;
 
-        typedef util::unique_function_nonser<
-            thread_state_enum(thread_state_ex_enum)
-        > functor_type;
+        typedef impl_type::result_type result_type;
+        typedef impl_type::arg_type arg_type;
+
+        typedef util::unique_function_nonser<result_type(arg_type)> functor_type;
 
         coroutine() : m_pimpl(nullptr) {}
 
-        coroutine(functor_type&& f, naming::id_type&& target,
-            thread_id_repr_type id = nullptr, std::ptrdiff_t stack_size =
-            detail::default_stack_size)
+        coroutine(functor_type&& f,
+                thread_id_repr_type id = nullptr,
+                std::ptrdiff_t stack_size = detail::default_stack_size)
           : m_pimpl(impl_type::create(
-                std::move(f), std::move(target), id, stack_size))
+                std::move(f), id, stack_size))
         {
             HPX_ASSERT(m_pimpl->is_ready());
         }
-
-        //coroutine (impl_ptr p)
-        //  : m_pimpl(p)
-        //{}
 
         coroutine(coroutine && src)
           : m_pimpl(src.m_pimpl)
@@ -116,7 +109,6 @@ namespace hpx { namespace threads { namespace coroutines
         }
 #endif
 
-#if defined(HPX_HAVE_THREAD_LOCAL_STORAGE)
         std::size_t get_thread_data() const
         {
             return m_pimpl.get() ? m_pimpl->get_thread_data() : 0;
@@ -126,14 +118,11 @@ namespace hpx { namespace threads { namespace coroutines
         {
             return m_pimpl.get() ? m_pimpl->set_thread_data(data) : 0;
         }
-#endif
 
-        void rebind(functor_type&& f, naming::id_type&& target,
-            thread_id_repr_type id = nullptr)
+        void rebind(functor_type&& f, thread_id_repr_type id = nullptr)
         {
             HPX_ASSERT(exited());
-            impl_type::rebind(m_pimpl.get(), std::move(f),
-                std::move(target), id);
+            impl_type::rebind(m_pimpl.get(), std::move(f), id);
         }
 
         HPX_FORCEINLINE result_type operator()(arg_type arg = arg_type())
@@ -147,13 +136,12 @@ namespace hpx { namespace threads { namespace coroutines
 
             m_pimpl->invoke();
 
-            return *m_pimpl->result();
+            return std::move(*m_pimpl->result());
         }
 
-        typedef void(coroutine::*bool_type)();
-        operator bool_type() const
+        explicit operator bool() const
         {
-            return good() ? &coroutine::bool_type_f : nullptr;
+            return good();
         }
 
         bool operator==(const coroutine& rhs) const
@@ -206,8 +194,6 @@ namespace hpx { namespace threads { namespace coroutines
         }
 
     protected:
-        void bool_type_f() {}
-
         bool good() const
         {
             return !empty() && !exited() && !waiting();

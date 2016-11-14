@@ -20,10 +20,9 @@
 #include <hpx/util/deferred_call.hpp>
 #include <hpx/util/steady_clock.hpp>
 
+#include <functional>
 #include <type_traits>
 #include <utility>
-
-#include <boost/ref.hpp>
 
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 {
@@ -52,7 +51,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     .then(
                         hpx::util::bind(
                             hpx::util::one_shot(apply_execute_at_helper()),
-                            hpx::util::placeholders::_1, boost::ref(exec),
+                            hpx::util::placeholders::_1, std::ref(exec),
                             hpx::util::deferred_call(
                                 std::forward<F>(f), std::forward<Ts>(ts)...
                             )
@@ -139,7 +138,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     .then(
                         hpx::util::bind(
                             hpx::util::one_shot(async_execute_at_helper()),
-                            hpx::util::placeholders::_1, boost::ref(exec),
+                            hpx::util::placeholders::_1, std::ref(exec),
                             hpx::util::deferred_call(
                                 std::forward<F>(f), std::forward<Ts>(ts)...
                             )
@@ -242,7 +241,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     .then(
                         hpx::util::bind(
                             hpx::util::one_shot(execute_at_helper()),
-                            hpx::util::placeholders::_1, boost::ref(exec),
+                            hpx::util::placeholders::_1, std::ref(exec),
                             hpx::util::deferred_call(
                                 std::forward<F>(f), std::forward<Ts>(ts)...
                             )
@@ -318,7 +317,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     ///////////////////////////////////////////////////////////////////////////
     /// The timed_executor_traits type is used to request execution agents from
     /// an executor. It is analogous to the interaction between containers and
-    /// allocator_traits. The generated generated execution agents support
+    /// allocator_traits. The generated execution agents support
     /// timed scheduling functionality (in addition to what is supported
     /// execution agents generated using execution_traits type).
     ///

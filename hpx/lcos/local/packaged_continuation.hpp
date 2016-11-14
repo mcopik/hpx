@@ -240,7 +240,7 @@ namespace hpx { namespace lcos { namespace detail
             run(f, throws);
         }
 
-        threads::thread_state_enum
+        threads::thread_result_type
         async_impl(
             typename traits::detail::shared_state_ptr_for<
                 Future
@@ -250,7 +250,7 @@ namespace hpx { namespace lcos { namespace detail
 
             Future future = traits::future_access<Future>::create(f);
             invoke_continuation(f_, future, *this);
-            return threads::terminated;
+            return threads::thread_result_type(threads::terminated, nullptr);
         }
 
         void async(
@@ -271,7 +271,7 @@ namespace hpx { namespace lcos { namespace detail
             }
 
             boost::intrusive_ptr<continuation> this_(this);
-            threads::thread_state_enum (continuation::*async_impl_ptr)(
+            threads::thread_result_type (continuation::*async_impl_ptr)(
                 typename traits::detail::shared_state_ptr_for<Future>::type const&
             ) = &continuation::async_impl;
 
@@ -301,7 +301,7 @@ namespace hpx { namespace lcos { namespace detail
             }
 
             boost::intrusive_ptr<continuation> this_(this);
-            threads::thread_state_enum (continuation::*async_impl_ptr)(
+            threads::thread_result_type (continuation::*async_impl_ptr)(
                 typename traits::detail::shared_state_ptr_for<Future>::type const&
             ) = &continuation::async_impl;
 
@@ -331,7 +331,7 @@ namespace hpx { namespace lcos { namespace detail
             }
 
             boost::intrusive_ptr<continuation> this_(this);
-            threads::thread_state_enum (continuation::*async_impl_ptr)(
+            threads::thread_result_type (continuation::*async_impl_ptr)(
                 typename traits::detail::shared_state_ptr_for<Future>::type const&
             ) = &continuation::async_impl;
 
@@ -447,7 +447,7 @@ namespace hpx { namespace lcos { namespace detail
                 traits::detail::get_shared_state(future);
             state->execute_deferred();
             state->set_on_completed(util::bind(cb, std::move(this_),
-                state, boost::ref(sched)));
+                state, std::ref(sched)));
         }
 
         template <typename Executor>
@@ -467,7 +467,7 @@ namespace hpx { namespace lcos { namespace detail
                 traits::detail::get_shared_state(future);
             state->execute_deferred();
             state->set_on_completed(util::bind(cb, std::move(this_),
-                state, boost::ref(exec)));
+                state, std::ref(exec)));
         }
 
     protected:

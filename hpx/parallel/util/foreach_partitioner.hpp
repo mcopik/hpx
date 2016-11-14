@@ -10,10 +10,8 @@
 #include <hpx/dataflow.hpp>
 #include <hpx/exception_list.hpp>
 #include <hpx/lcos/wait_all.hpp>
-#include <hpx/util/bind.hpp>
 #include <hpx/util/decay.hpp>
 #include <hpx/util/deferred_call.hpp>
-#include <hpx/util/invoke_fused.hpp>
 #include <hpx/util/tuple.hpp>
 
 #include <hpx/parallel/algorithms/detail/predicates.hpp>
@@ -23,11 +21,13 @@
 #include <hpx/parallel/traits/extract_partitioner.hpp>
 #include <hpx/parallel/util/detail/chunk_size.hpp>
 #include <hpx/parallel/util/detail/handle_local_exceptions.hpp>
+#include <hpx/parallel/util/detail/partitioner_iteration.hpp>
 #include <hpx/parallel/util/detail/scoped_executor_parameters.hpp>
 
 #include <boost/exception_ptr.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <list>
 #include <memory>
 #include <utility>
@@ -58,10 +58,8 @@ namespace hpx { namespace parallel { namespace util
                 typedef typename
                     hpx::util::decay<ExPolicy>::type::executor_parameters_type
                     parameters_type;
-
-                typedef hpx::util::tuple<
-                        std::size_t, FwdIter, std::size_t
-                    > tuple_type;
+                typedef executor_parameter_traits<parameters_type>
+                    parameters_traits;
 
                 // inform parameter traits
                 scoped_executor_parameters<parameters_type> scoped_param(
@@ -74,18 +72,18 @@ namespace hpx { namespace parallel { namespace util
 
                 try {
                     // estimates a chunk size based on number of cores used
-                    std::vector<tuple_type> shape =
+                    typedef typename parameters_traits::has_variable_chunk_size
+                        has_variable_chunk_size;
+
+                    auto shapes =
                         get_bulk_iteration_shape_idx(
-                            policy, inititems, f1, first, count, 1);
+                            policy, inititems, f1, first, count, 1,
+                            has_variable_chunk_size());
 
-                    workitems.reserve(shape.size());
-
-                    using hpx::util::functional::invoke_fused;
-                    using hpx::util::placeholders::_1;
                     workitems = executor_traits::bulk_async_execute(
                         policy.executor(),
-                        hpx::util::bind(invoke_fused(), std::forward<F1>(f1), _1),
-                        std::move(shape));
+                        partitioner_iteration<Result, F1>{std::forward<F1>(f1)},
+                        std::move(shapes));
                 }
                 catch (...) {
                     handle_local_exceptions<ExPolicy>::call(
@@ -127,12 +125,11 @@ namespace hpx { namespace parallel { namespace util
                 typedef typename
                     hpx::util::decay<ExPolicy>::type::executor_parameters_type
                     parameters_type;
+                typedef executor_parameter_traits<parameters_type>
+                    parameters_traits;
+
                 typedef scoped_executor_parameters<parameters_type>
                     scoped_executor_parameters;
-
-                typedef hpx::util::tuple<
-                        std::size_t, FwdIter, std::size_t
-                    > tuple_type;
 
                 // inform parameter traits
                 std::shared_ptr<scoped_executor_parameters>
@@ -147,19 +144,18 @@ namespace hpx { namespace parallel { namespace util
 
                 try {
                     // estimates a chunk size based on number of cores used
-                    std::vector<tuple_type> shape =
+                    typedef typename parameters_traits::has_variable_chunk_size
+                        has_variable_chunk_size;
+
+                    auto shapes =
                         get_bulk_iteration_shape_idx(
-                            policy, inititems, f1, first, count, 1);
+                            policy, inititems, f1, first, count, 1,
+                            has_variable_chunk_size());
 
-                    workitems.reserve(shape.size());
-
-                    using hpx::util::bind;
-                    using hpx::util::functional::invoke_fused;
-                    using hpx::util::placeholders::_1;
                     workitems = executor_traits::bulk_async_execute(
                         policy.executor(),
-                        bind(invoke_fused(), std::forward<F1>(f1), _1),
-                        std::move(shape));
+                        partitioner_iteration<Result, F1>{std::forward<F1>(f1)},
+                        std::move(shapes));
                 }
                 catch (std::bad_alloc const&) {
                     return hpx::make_exceptional_future<FwdIter>(
@@ -210,7 +206,7 @@ namespace hpx { namespace parallel { namespace util
 
 				try {
 
-					std::size_t chunk_size = traits::get_chunk_size(policy.parameters(), policy.executor(), 
+					std::size_t chunk_size = traits::get_chunk_size(policy.parameters(), policy.executor(),
                         [](){ return 0; }, count);
 					// 0 when no parameter is specified
 					chunk_size = chunk_size == 0 ? 1 : chunk_size;
@@ -224,7 +220,7 @@ namespace hpx { namespace parallel { namespace util
 					 * The wrapping is necessary, otherwise the code in executor_traits will not be able to
 					 * correcly detect the return type of this lambda
 					 */
-/*					F1 _f1 = std::move(f1);				
+/*					F1 _f1 = std::move(f1);
 					auto f = hpx::parallel::wrap_kernel(f1, [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
 						/**
@@ -276,8 +272,8 @@ namespace hpx { namespace parallel { namespace util
 
                 return last;
 			}
-		};       
-		
+		};
+
 		template <typename Executor, typename Parameters, typename Result>
         struct foreach_n_static_partitioner<
                 gpu_execution_policy_shim<Executor, Parameters>,
@@ -307,7 +303,7 @@ namespace hpx { namespace parallel { namespace util
 				std::list<boost::exception_ptr> errors;
 
 				try {
-					std::size_t chunk_size = traits::get_chunk_size(policy.parameters(), policy.executor(), 
+					std::size_t chunk_size = traits::get_chunk_size(policy.parameters(), policy.executor(),
 						[](){ return 0; }, count);
                     chunk_size = std::min(chunk_size, count);
 					std::vector< std::tuple<const buffer_view *, std::size_t, std::size_t> > shape{ std::make_tuple(nullptr, count, chunk_size) };
@@ -316,7 +312,7 @@ namespace hpx { namespace parallel { namespace util
 					 * Wrap the GPU lambda - the new functor will take a pair of two ints as an argument,
 					 * one of them will point to the starting index and the second one will give the size.
 					 */
-				/*	F1 _f1 = std::move(f1);	
+				/*	F1 _f1 = std::move(f1);
 					auto f = hpx::parallel::wrap_kernel(f1, [_f1](std::tuple<const buffer_view *, std::size_t, std::size_t> const& elem)
 					{
 						return _f1(std::get<0>(elem), std::get<1>(elem), std::get<2>(elem));
@@ -349,7 +345,7 @@ namespace hpx { namespace parallel { namespace util
 					},
 					std::move(inititems), std::move(workitems));
 			}
-		};        
+		};
 
 		template <typename Executor, typename Parameters, typename Result>
         struct foreach_n_static_partitioner<
@@ -484,6 +480,24 @@ namespace hpx { namespace parallel { namespace util
           : foreach_n_partitioner<gpu_task_execution_policy, Result,
                 parallel::traits::static_partitioner_tag>
         {};*/
+#endif
+#if defined(HPX_HAVE_DATAPAR)
+        template <typename Result>
+        struct foreach_partitioner<datapar_task_execution_policy, Result,
+                parallel::traits::static_partitioner_tag>
+        {
+            template <typename ExPolicy, typename FwdIter, typename F1,
+                typename F2>
+            static hpx::future<FwdIter> call(ExPolicy && policy,
+                FwdIter first, std::size_t count, F1 && f1, F2 && f2)
+            {
+                return foreach_static_partitioner<
+                        parallel_task_execution_policy, Result
+                    >::call(
+                        std::forward<ExPolicy>(policy), first, count,
+                        std::forward<F1>(f1), std::forward<F2>(f2));
+            }
+        };
 #endif
 
         template <typename Executor, typename Parameters, typename Result>

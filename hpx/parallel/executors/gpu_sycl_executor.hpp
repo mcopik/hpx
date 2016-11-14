@@ -41,7 +41,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         struct host_iterator;
     }
 
-    template<typename T>    	
+    template<typename T>
     struct sycl_buffer
 	{
         typedef cl::sycl::buffer<T> buffer_t;
@@ -70,12 +70,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         detail::host_iterator<T> begin()
         {
             return detail::host_iterator<T>(host_accessor.get(), this, 0);
-        } 
-        
+        }
+
         detail::host_iterator<T> end()
         {
             return detail::host_iterator<T>(host_accessor.get(), this, buffer->get_count());
-        } 
+        }
 	};
 
     namespace detail
@@ -114,7 +114,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             device_iterator(cl::sycl::global_ptr<T> p, std::size_t pos = 0)
               : ptr(p + pos)
             {}
-            
+
             template<typename U>
             HPX_HOST_DEVICE
             device_iterator(cl::sycl::global_ptr<U> p, std::size_t pos)
@@ -173,7 +173,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 host_iterator<T>,
                 T,
                 std::random_access_iterator_tag,
-                T&, 
+                T&,
                 //typename cl::sycl::global_ptr<T>::difference_type
                 std::ptrdiff_t
             >
@@ -246,7 +246,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             {
                 return pos_;
             }
-            
+
             buffer_t * buffer() const
             {
                 return buffer_;
@@ -264,46 +264,46 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
             std::advance(end, count);
             return sycl_buffer<value_type>(begin, end);
         }
-        
+
         template<typename T>
         sycl_buffer<T> * get_buffer(detail::host_iterator<T> begin, std::size_t count)
         {
             return begin.buffer();
         }
-        
+
         template<typename T>
         std::pair<typename sycl_buffer<T>::device_acc_t, std::ptrdiff_t>
         get_device_acc(cl::sycl::handler & cgh, sycl_buffer<T> * buf, detail::host_iterator<T> begin)
         {
             return std::make_pair(buf->get_access(cgh), begin.pos());
         }
-        
+
         template<typename T, typename Iter>
         typename sycl_buffer<T>::device_acc_t
         get_device_acc(cl::sycl::handler & cgh, const sycl_buffer<T> & buf, Iter begin)
         {
             return buf.get_access(cgh);
         }
-        
+
         template<typename T>
         device_iterator<T>
         get_device_it(const std::pair<typename sycl_buffer<T>::device_acc_t, std::ptrdiff_t> & data, std::size_t idx)
         {
             return device_iterator<T>(data.first, data.second + idx);
         }
-        
+
         template<typename T>
         device_iterator<T>
         get_device_it(const typename sycl_buffer<T>::device_acc_t & data, std::size_t idx)
         {
             return device_iterator<T>(data, idx);
         }
-        
+
         template<typename T, typename Iter>
         void copy_back(const sycl_buffer<T> & buf, Iter begin)
         {
             //FIXME: efficient data movement from device
-            std::copy(buf.begin(), buf.end(), begin); 
+            std::copy(buf.begin(), buf.end(), begin);
         }
 
         template<typename T>
@@ -336,14 +336,14 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         {
 
         }
-	    
+
         template<typename Iter,
             typename value_type = typename std::iterator_traits<Iter>::value_type>
         sycl_buffer<value_type> copy_data(Iter begin, Iter end)
         {
             return sycl_buffer<value_type>(begin, end);
         }
-	
+
 		template<typename ValueType, typename BufferType>
 		struct gpu_sycl_buffer_view_wrapper
 		{
@@ -372,7 +372,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     			Iter last = first;
     			std::advance(last, count);
 				std::shared_ptr<value_type> buf{new value_type[count], [first, count](value_type * ptr) {
-								std::cout << "Copy values: " << *ptr << " " << count << std::endl;								
+								std::cout << "Copy values: " << *ptr << " " << count << std::endl;
 								std::copy(ptr, ptr + count, first);
 								delete[] ptr;
 							}};
@@ -401,17 +401,17 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     			std::cout << "buffer: " << *cpu_buffer << std::endl;
     		}
 		};
-        
+
 
 		//TODO: move to buffer parent class?
 		template<typename Iter>
 		struct buffer_traits {
-			typedef typename gpu_sycl_buffer<Iter>::buffer_view_type type;		
+			typedef typename gpu_sycl_buffer<Iter>::buffer_view_type type;
 		};
 
 		template<typename buffer_type>
 		struct buffer_view_type {
-			typedef decltype( std::declval< buffer_type >().template get_access<cl::sycl::access::mode::read_write>( std::declval<cl::sycl::handler &>() ) ) type;		
+			typedef decltype( std::declval< buffer_type >().template get_access<cl::sycl::access::mode::read_write>( std::declval<cl::sycl::handler &>() ) ) type;
 		};
 
     	template<typename Iter>
@@ -460,15 +460,15 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
 			try {
 				for (auto const& elem: shape) {
-                                
+
                     typedef typename boost::range_const_iterator<Shape>::type tuple_iterator_type;
                     //tuple type
                     typedef typename std::iterator_traits<tuple_iterator_type>::value_type tuple_type;
                     //iterator stored in tuple
                     typedef typename std::decay<decltype(hpx::util::get<1>(elem))>::type iterator_type;
                     typedef typename std::iterator_traits<iterator_type>::value_type value_type;
-                    
-                    
+
+
                     int offset = hpx::util::get<0>(elem);
                     int data_count = hpx::util::get<2>(elem);
                     int local_size = std::min(LOCAL_SIZE, data_count);
@@ -482,8 +482,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     auto buffer = detail::get_buffer(begin, data_count);
                     auto & queue_ = queue;
                     F _f = std::move(f);
-                    
-                    
+
                     //auto data_ = buffer.get_access();
                     //std::cout << data_[0] << " " << *data_.get_pointer() << " " << data_count << " " << offset << " " << chunk_size << std::endl;
                     //auto buffer_acc = buffer.get_access();
@@ -500,12 +499,12 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                             //std::cout << buffer_acc.first.get_size() << " " << buffer_acc.second << std::endl;
                             auto kernel = [=] (cl::sycl::nd_item<1> idx) mutable {
                                 //detail::device_iterator<value_type> it = detail::get_device_it<value_type>(buffer_acc, idx.get_global_linear_id());
-                                cl::sycl::global_ptr<unsigned long> it = buffer_acc.first.get_pointer() + buffer_acc.second + idx.get_global_linear_id(); 
-                                typedef typename std::iterator_traits<decltype(it)>::value_type value_type;
-                                typedef typename std::iterator_traits<decltype(it)>::pointer pointer;
-                                typedef typename std::iterator_traits<decltype(it)>::reference reference; 
-                                typedef typename std::iterator_traits<decltype(it)>::difference_type difference_type;
-                                typedef typename std::iterator_traits<decltype(it)>::iterator_category cat;
+                                cl::sycl::global_ptr<unsigned long> it = buffer_acc.first.get_pointer() + buffer_acc.second + idx.get_global_linear_id();
+                                //typedef typename std::iterator_traits<decltype(it)>::value_type value_type;
+                                //typedef typename std::iterator_traits<decltype(it)>::pointer pointer;
+                                //typedef typename std::iterator_traits<decltype(it)>::reference reference;
+                                //typedef typename std::iterator_traits<decltype(it)>::difference_type difference_type;
+                                //typedef typename std::iterator_traits<decltype(it)>::iterator_category cat;
 
                                 auto t = hpx::util::make_tuple(offset, it, chunk_size);
                                 hpx::util::invoke(_f, t);
@@ -523,7 +522,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                         //std::copy(data.get_pointer(), data.get_pointer() + data_count, begin);
                     };
                     //command_group();
-                     
+
                     //std::cout << *buffer->host_accessor->get_pointer() << *buffer->get_access().get_pointer() << std::endl;
                     //auto data = buffer->get_access();
                     //std::cout << *data.get_pointer() << " " << data_count << std::endl;
@@ -539,10 +538,10 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
 					auto kernelSubmit = [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk]() {
 						sycl_buffer.queue.submit( [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk](cl::sycl::handler & cgh) {
-							
-							buffer_view_type buffer_view = 
+
+							buffer_view_type buffer_view =
 								(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-							auto syclKernel = [=] (cl::sycl::id<1> index) {	
+							auto syclKernel = [=] (cl::sycl::id<1> index) {
 								if (true) {
 									// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
 									// Test 3 shows that hardcoded '1' is passed correctly.
@@ -609,10 +608,10 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
 					auto kernelSubmit = [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk]() {
 						sycl_buffer.queue.submit( [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk](cl::sycl::handler & cgh) {
-							
-							buffer_view_type buffer_view = 
+
+							buffer_view_type buffer_view =
 								(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-							auto syclKernel = [=] (cl::sycl::id<1> index) {	
+							auto syclKernel = [=] (cl::sycl::id<1> index) {
 								if (true) {
 									// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
 									// Test 3 shows that hardcoded '1' is passed correctly.
@@ -672,18 +671,18 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 
 				std::size_t data_count = std::get<1>(elem);
 				std::size_t chunk_size = std::get<2>(elem);
-				
+
 				std::size_t threads_to_run = data_count / chunk_size;
 				std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
 
 				sycl_buffer.queue.submit( [_f, &sycl_buffer, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
 
-					buffer_view_type buffer_view = 
+					buffer_view_type buffer_view =
 						(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
 
 					cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count),
 						[=] (cl::sycl::id<1> index)
-						{	
+						{
 							if (true) {
 								// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
 								// Test 3 shows that hardcoded '1' is passed correctly.
@@ -704,7 +703,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 								//buffer_view[ index[0] ] = 1;
 								//buffer_view[ index[0] ] = data_count;
 							}
-							
+
 						});
 				});
                 sycl_buffer.queue.wait();
@@ -724,23 +723,23 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		        //for(auto const & elem : shape) {
 			        F _f( std::move(f) );
 
-			
+
 			        std::size_t threads_to_run = data_count / chunk_size;
 			        std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
                     //std::cout << "Runs: " << data_count << std::endl;
 
 			        sycl_buffer.queue.submit( [_f, &sycl_buffer,&sycl_buffer2,&sycl_buffer3, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
 
-				        buffer_view_type buffer_view = 
+				        buffer_view_type buffer_view =
 					        (*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-				        buffer_view_type buffer_view2 = 
+				        buffer_view_type buffer_view2 =
 					        (*sycl_buffer2.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-				        buffer_view_type buffer_view3 = 
+				        buffer_view_type buffer_view3 =
 					        (*sycl_buffer3.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
 
 				        cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count),
 					        [=] (cl::sycl::id<1> index)
-					        {	
+					        {
 						        if (true) {
 							        // This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
 							        // Test 3 shows that hardcoded '1' is passed correctly.
@@ -761,7 +760,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 							        //buffer_view[ index[0] ] = 1;
 							        //buffer_view[ index[0] ] = data_count;
 						        }
-						
+
 					        });
 			        });
                     sycl_buffer.queue.wait();
@@ -780,20 +779,20 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 		        //for(auto const & elem : shape) {
 			        F _f( std::move(f) );
 
-			
+
 			        std::size_t threads_to_run = data_count / chunk_size;
 			        std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
                     //std::cout << "Runs: " << data_count << std::endl;
 			        sycl_buffer.queue.submit( [_f, &sycl_buffer,&sycl_buffer2, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
 
-				        buffer_view_type buffer_view = 
+				        buffer_view_type buffer_view =
 					        (*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-				        buffer_view_type buffer_view2 = 
+				        buffer_view_type buffer_view2 =
 					        (*sycl_buffer2.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
 
 				        cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count),
 					        [=] (cl::sycl::id<1> index)
-					        {	
+					        {
 						        if (true) {
 							        // This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
 							        // Test 3 shows that hardcoded '1' is passed correctly.
@@ -814,7 +813,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 							        //buffer_view[ index[0] ] = 1;
 							        //buffer_view[ index[0] ] = data_count;
 						        }
-						
+
 					        });
 			        });
                     sycl_buffer.queue.wait();

@@ -12,13 +12,12 @@
 #include <hpx/performance_counters/registry.hpp>
 #include <hpx/runtime.hpp>
 #include <hpx/runtime/agas/addressing_service.hpp>
-#include <hpx/runtime/agas/big_boot_barrier.hpp>
 #include <hpx/runtime/components/runtime_support.hpp>
 #include <hpx/runtime/components/server/memory.hpp>
 #include <hpx/runtime/components/server/memory_block.hpp>
 #include <hpx/runtime/components/server/runtime_support.hpp>
 #include <hpx/runtime/components/server/simple_component_base.hpp>    // EXPORTS get_next_id
-#include <hpx/runtime/get_config_entry.hpp>
+#include <hpx/runtime/config_entry.hpp>
 #include <hpx/runtime/launch_policy.hpp>
 #include <hpx/runtime/threads/coroutines/coroutine.hpp>
 #include <hpx/runtime/threads/policies/scheduler_mode.hpp>
@@ -43,6 +42,8 @@
 #include <boost/atomic.hpp>
 #include <boost/exception_ptr.hpp>
 
+#include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -61,10 +62,13 @@
 namespace hpx
 {
     ///////////////////////////////////////////////////////////////////////////
-    void handle_termination(char const* reason)
+    HPX_ATTRIBUTE_NORETURN void handle_termination(char const* reason)
     {
         if (get_config_entry("hpx.attach_debugger", "") == "exception")
+        {
             util::attach_debugger();
+        }
+
         std::cerr
 #if defined(HPX_HAVE_STACKTRACES)
             << "{stack-trace}: " << hpx::util::trace() << "\n"
@@ -114,7 +118,7 @@ namespace hpx
 namespace hpx
 {
     ///////////////////////////////////////////////////////////////////////////
-    HPX_EXPORT void termination_handler(int signum)
+    HPX_EXPORT HPX_ATTRIBUTE_NORETURN void termination_handler(int signum)
     {
         if (signum != SIGINT &&
             get_config_entry("hpx.attach_debugger", "") == "exception")
@@ -146,7 +150,7 @@ namespace hpx
         message_handler_registrations;
 
     ///////////////////////////////////////////////////////////////////////////
-    HPX_EXPORT void new_handler()
+    HPX_EXPORT void HPX_CDECL new_handler()
     {
         HPX_THROW_EXCEPTION(out_of_memory, "new_handler",
             "new allocator failed to allocate memory");
@@ -453,7 +457,7 @@ namespace hpx
     }
 
     components::security::signed_certificate const&
-        runtime::get_locality_certificate(boost::uint32_t locality_id,
+        runtime::get_locality_certificate(std::uint32_t locality_id,
             error_code& ec) const
     {
         HPX_ASSERT(security_data_.get() != 0);
@@ -529,7 +533,7 @@ namespace hpx
     ///////////////////////////////////////////////////////////////////////////
     util::thread_specific_ptr<runtime*, runtime::tls_tag> runtime::runtime_;
     util::thread_specific_ptr<std::string, runtime::tls_tag> runtime::thread_name_;
-    util::thread_specific_ptr<boost::uint64_t, runtime::tls_tag> runtime::uptime_;
+    util::thread_specific_ptr<std::uint64_t, runtime::tls_tag> runtime::uptime_;
 
     void runtime::init_tss()
     {
@@ -539,7 +543,7 @@ namespace hpx
             HPX_ASSERT(nullptr == threads::thread_self::get_self());
 
             runtime::runtime_.reset(new runtime* (this));
-            runtime::uptime_.reset(new boost::uint64_t);
+            runtime::uptime_.reset(new std::uint64_t);
             *runtime::uptime_.get() = util::high_resolution_clock::now();
 
             threads::thread_self::init_self();
@@ -563,11 +567,11 @@ namespace hpx
         return str ? *str : "<unknown>";
     }
 
-    boost::uint64_t runtime::get_system_uptime()
+    std::uint64_t runtime::get_system_uptime()
     {
-        boost::int64_t diff =
+        std::int64_t diff =
             util::high_resolution_clock::now() - *runtime::uptime_.get();
-        return diff < 0LL ? 0ULL : static_cast<boost::uint64_t>(diff);
+        return diff < 0LL ? 0ULL : static_cast<std::uint64_t>(diff);
     }
 
     performance_counters::registry& runtime::get_counter_registry()
@@ -814,8 +818,8 @@ namespace hpx
             sizeof(arithmetic_counter_types)/sizeof(arithmetic_counter_types[0]));
     }
 
-    boost::uint32_t runtime::assign_cores(std::string const& locality_basename,
-        boost::uint32_t cores_needed)
+    std::uint32_t runtime::assign_cores(std::string const& locality_basename,
+        std::uint32_t cores_needed)
     {
         std::lock_guard<boost::mutex> l(mtx_);
 
@@ -827,12 +831,12 @@ namespace hpx
             return 0;
         }
 
-        boost::uint32_t current = (*it).second;
+        std::uint32_t current = (*it).second;
         (*it).second += cores_needed;
         return current;
     }
 
-    boost::uint32_t runtime::assign_cores()
+    std::uint32_t runtime::assign_cores()
     {
         // initialize thread affinity settings in the scheduler
         if (affinity_init_.used_cores_ == 0) {
@@ -841,7 +845,7 @@ namespace hpx
                 this->get_config().get_first_used_core());
         }
 
-        return static_cast<boost::uint32_t>(
+        return static_cast<std::uint32_t>(
             this->get_thread_manager().init(affinity_init_));
     }
 
@@ -930,18 +934,48 @@ namespace hpx
         return (nullptr == rt) ? 0 : rt->get_instance_number();
     }
 
+    ///////////////////////////////////////////////////////////////////////////
     std::string get_config_entry(std::string const& key, std::string const& dflt)
     {
         if (nullptr == get_runtime_ptr())
-            return "";
+            return dflt;
         return get_runtime().get_config().get_entry(key, dflt);
     }
 
     std::string get_config_entry(std::string const& key, std::size_t dflt)
     {
-        if (nullptr == get_runtime_ptr())
-            return "";
+        runtime* rt = get_runtime_ptr();
+        if (nullptr == rt)
+            return std::to_string(dflt);
         return get_runtime().get_config().get_entry(key, dflt);
+    }
+
+    // set entries
+    void set_config_entry(std::string const& key, std::string const& value)
+    {
+        runtime* rt = get_runtime_ptr();
+        if (nullptr == rt)
+            return;
+        return rt->get_config().add_entry(key, value);
+    }
+
+    void set_config_entry(std::string const& key, std::size_t value)
+    {
+        runtime* rt = get_runtime_ptr();
+        if (nullptr == rt)
+            return;
+        return rt->get_config().add_entry(key, std::to_string(value));
+    }
+
+    void set_config_entry_callback(std::string const& key,
+        util::function_nonser<
+            void(std::string const&, std::string const&)
+        > const& callback)
+    {
+        runtime* rt = get_runtime_ptr();
+        if (nullptr == rt)
+            return;
+        return rt->get_config().add_notification_callback(key, callback);
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -1065,7 +1099,7 @@ namespace hpx
 
     /// \brief Return the number of localities which are currently registered
     ///        for the running application.
-    boost::uint32_t get_num_localities(hpx::launch::sync_policy, error_code& ec)
+    std::uint32_t get_num_localities(hpx::launch::sync_policy, error_code& ec)
     {
         if (nullptr == hpx::get_runtime_ptr())
             return 0;
@@ -1073,7 +1107,7 @@ namespace hpx
         return get_runtime().get_agas_client().get_num_localities(ec);
     }
 
-    boost::uint32_t get_initial_num_localities()
+    std::uint32_t get_initial_num_localities()
     {
         if (nullptr == hpx::get_runtime_ptr())
             return 0;
@@ -1081,7 +1115,7 @@ namespace hpx
         return get_runtime().get_config().get_num_localities();
     }
 
-    boost::uint32_t get_num_localities(hpx::launch::sync_policy,
+    std::uint32_t get_num_localities(hpx::launch::sync_policy,
         components::component_type type, error_code& ec)
     {
         if (nullptr == hpx::get_runtime_ptr())
@@ -1090,19 +1124,19 @@ namespace hpx
         return get_runtime().get_agas_client().get_num_localities(type, ec);
     }
 
-    lcos::future<boost::uint32_t> get_num_localities()
+    lcos::future<std::uint32_t> get_num_localities()
     {
         if (nullptr == hpx::get_runtime_ptr())
-            return lcos::make_ready_future<boost::uint32_t>(0);
+            return lcos::make_ready_future<std::uint32_t>(0);
 
         return get_runtime().get_agas_client().get_num_localities_async();
     }
 
-    lcos::future<boost::uint32_t> get_num_localities(
+    lcos::future<std::uint32_t> get_num_localities(
         components::component_type type)
     {
         if (nullptr == hpx::get_runtime_ptr())
-            return lcos::make_ready_future<boost::uint32_t>(0);
+            return lcos::make_ready_future<std::uint32_t>(0);
 
         return get_runtime().get_agas_client().get_num_localities_async(type);
     }
@@ -1130,7 +1164,13 @@ namespace hpx
     {
         runtime* rt = get_runtime_ptr();
         if (nullptr == rt)
+        {
+            HPX_THROW_EXCEPTION(
+                invalid_status,
+                "hpx::get_os_thread_count()",
+                "the runtime system has not been initialized yet");
             return std::size_t(0);
+        }
         return rt->get_config().get_os_thread_count();
     }
 
@@ -1138,7 +1178,13 @@ namespace hpx
     {
         runtime* rt = get_runtime_ptr();
         if (nullptr == rt)
+        {
+            HPX_THROW_EXCEPTION(
+                invalid_status,
+                "hpx::get_os_thread_count(exec)",
+                "the runtime system has not been initialized yet");
             return std::size_t(0);
+        }
 
         if (!exec)
             return rt->get_config().get_os_thread_count();
@@ -1152,7 +1198,13 @@ namespace hpx
     {
         runtime* rt = get_runtime_ptr();
         if (nullptr == rt)
+        {
+            HPX_THROW_EXCEPTION(
+                invalid_status,
+                "hpx::get_worker_thread_num",
+                "the runtime system has not been initialized yet");
             return std::size_t(-1);
+        }
         return rt->get_thread_manager().get_worker_thread_num();
     }
 
@@ -1160,7 +1212,14 @@ namespace hpx
     {
         runtime* rt = get_runtime_ptr();
         if (nullptr == rt)
+        {
+            HPX_THROW_EXCEPTION(
+                invalid_status,
+                "hpx::get_num_worker_threads",
+                "the runtime system has not been initialized yet");
             return std::size_t(0);
+        }
+
         error_code ec(lightweight);
         return static_cast<std::size_t>(
             rt->get_agas_client().get_num_overall_threads(ec));
@@ -1170,7 +1229,13 @@ namespace hpx
     {
         runtime* rt = get_runtime_ptr();
         if (nullptr == rt)
+        {
+            HPX_THROW_EXCEPTION(
+                invalid_status,
+                "hpx::is_scheduler_numa_sensitive",
+                "the runtime system has not been initialized yet");
             return false;
+        }
 
         bool numa_sensitive = false;
         if (std::size_t(-1) !=
@@ -1185,6 +1250,11 @@ namespace hpx
         runtime* rt = get_runtime_ptr();
         if (nullptr != rt)
             return rt->keep_factory_alive(type);
+
+        HPX_THROW_EXCEPTION(
+            invalid_status,
+            "hpx::keep_factory_alive",
+            "the runtime system has not been initialized yet");
         return false;
     }
 
@@ -1227,6 +1297,12 @@ namespace hpx
     {
         runtime* rt = get_runtime_ptr();
         return nullptr != rt ? rt->get_state() <= state_startup : true;
+    }
+
+    bool HPX_EXPORT is_pre_startup()
+    {
+        runtime* rt = get_runtime_ptr();
+        return nullptr != rt ? rt->get_state() < state_startup : true;
     }
 }
 
@@ -1332,7 +1408,7 @@ namespace hpx
     /// \returns This function returns the signed certificate for the locality
     ///          identified by the parameter \a id.
     components::security::signed_certificate const&
-        get_locality_certificate(boost::uint32_t locality_id, error_code& ec)
+        get_locality_certificate(std::uint32_t locality_id, error_code& ec)
     {
         runtime* rt = get_runtime_ptr();
         if (0 == rt ||
@@ -1395,7 +1471,7 @@ namespace hpx
 ///////////////////////////////////////////////////////////////////////////////
 namespace hpx
 {
-    boost::uint32_t get_locality_id(error_code& ec)
+    std::uint32_t get_locality_id(error_code& ec)
     {
         return agas::get_locality_id(ec);
     }
@@ -1405,7 +1481,7 @@ namespace hpx
         return runtime::get_thread_name();
     }
 
-    boost::uint64_t get_system_uptime()
+    std::uint64_t get_system_uptime()
     {
         return runtime::get_system_uptime();
     }

@@ -4,7 +4,7 @@
 # Copyright (c)      2011 Bryce Lelbach
 # Copyright (c)      2011 Vinay C Amatya
 # Copyright (c)      2013 Jeroen Habraken
-# Copyright (c)      2014 Andreas Schaefer
+# Copyright (c) 2014-2016 Andreas Schaefer
 #
 # Distributed under the Boost Software License, Version 1.0. (See accompanying
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -146,7 +146,7 @@ hpx_option(HPX_WITH_MALLOC
 
 hpx_option(HPX_WITH_HWLOC
   BOOL
-  "Use Hwloc for hardware topolgy information and thread pinning. If disabled, performance might be reduced."
+  "Use Hwloc for hardware topology information and thread pinning. If disabled, performance might be reduced."
   ON ADVANCED)
 
 hpx_option(HPX_WITH_SECURITY BOOL "Enable security support via libsodium." OFF)
@@ -177,7 +177,7 @@ hpx_option(HPX_WITH_DOCUMENTATION BOOL
   OFF CATEGORY "Build Targets")
 
 hpx_option(HPX_WITH_DOCUMENTATION_SINGLEPAGE BOOL
-  "The HPX documentation should be build as a single page HTML (default OFF)."
+  "The HPX documentation should be built as a single page HTML (default OFF)."
   OFF CATEGORY "Build Targets")
 
 if(MSVC)
@@ -256,9 +256,37 @@ if(HPX_WITH_CUDA)
   hpx_add_config_define(HPX_HAVE_COMPUTE)
 endif()
 hpx_option(HPX_WITH_HCC BOOL
-  "Enable hcc support (default: OFF)" ADVANCED)
+  "Enable hcc support (default: OFF)" OFF ADVANCED)
 hpx_option(HPX_WITH_SYCL BOOL
-  "Enable sycl support (default: OFF)" ADVANCED)
+  "Enable sycl support (default: OFF)" OFF ADVANCED)
+
+################################################################################
+# HPX datapar configuration
+################################################################################
+hpx_option(HPX_WITH_DATAPAR_LIBFLATARRAY BOOL
+  "Enable data parallel algorithm support using the external LibFlatArray (default: OFF)" OFF ADVANCED)
+hpx_option(HPX_WITH_DATAPAR_VC BOOL
+  "Enable data parallel algorithm support using the external Vc library (default: OFF)" OFF ADVANCED)
+hpx_option(HPX_WITH_DATAPAR_BOOST_SIMD BOOL
+  "Enable data parallel algorithm support using the external Boost.SIMD library (default: OFF)" OFF ADVANCED)
+if((HPX_WITH_DATAPAR_VC AND HPX_WITH_DATAPAR_BOOST_SIMD) OR
+   (HPX_WITH_DATAPAR_VC AND HPX_WITH_DATAPAR_BOOST_LIBFLATARRAY) OR
+   (HPX_WITH_DATAPAR_BOOST_SIMD AND HPX_WITH_DATAPAR_BOOST_LIBFLATARRAY))
+  hpx_error("Please select only one of the supported external vectorization libraries (HPX_WITH_DATAPAR_VC, HPX_WITH_DATAPAR_BOOST_SIMD, OR HPX_WITH_DATAPAR_BOOST_LIBFLATARRAY)")
+endif()
+
+if(HPX_WITH_DATAPAR_LIBFLATARRAY)
+  include(HPX_SetupLibFlatArray)
+endif()
+if(HPX_WITH_DATAPAR_VC)
+  include(HPX_SetupVc)
+endif()
+if(HPX_WITH_DATAPAR_BOOST_SIMD)
+  include(HPX_SetupBoostSIMD)
+endif()
+if((NOT HPX_WITH_DATAPAR_VC) AND (NOT HPX_WITH_DATAPAR_BOOST_SIMD) AND (NOT HPX_WITH_DATAPAR_LIBFLATARRAY))
+hpx_info("No vectorization library configured")
+endif()
 
 ################################################################################
 # Native TLS configuration
@@ -437,6 +465,30 @@ hpx_option(HPX_WITH_SWAP_CONTEXT_EMULATION BOOL
   "Emulate SwapContext API for coroutines (default: OFF)"
   OFF CATEGORY "Thread Manager" ADVANCED)
 
+## Profiling related build options
+hpx_option(HPX_WITH_APEX BOOL
+  "Enable APEX instrumentation support." OFF CATEGORY "Profiling")
+if(HPX_WITH_APEX)
+  hpx_add_config_define(HPX_HAVE_APEX)   # tell HPX that we use APEX
+  hpx_option(HPX_WITH_APEX_NO_UPDATE BOOL
+    "Do not update code from remote APEX repository." OFF CATEGORY "Profiling")
+endif()
+hpx_option(HPX_WITH_PAPI BOOL
+  "Enable the PAPI based performance counter." OFF CATEGORY "Profiling")
+if(HPX_WITH_PAPI)
+  hpx_add_config_define(HPX_HAVE_PAPI)
+endif()
+hpx_option(HPX_WITH_GOOGLE_PERFTOOLS BOOL
+  "Enable Google Perftools instrumentation support." OFF CATEGORY "Profiling")
+if(HPX_WITH_GOOGLE_PERFTOOLS)
+  hpx_add_config_define(HPX_HAVE_GOOGLE_PERFTOOLS)
+endif()
+hpx_option(HPX_WITH_ITTNOTIFY BOOL
+  "Enable Amplifier (ITT) instrumentation support." OFF CATEGORY "Profiling")
+#if(HPX_WITH_ITTNOTIFY)
+  #hpx_add_config_define(HPX_HAVE_ITTNOTIFY)
+#endif()
+
 ################################################################################
 # Scheduler configuration
 ################################################################################
@@ -494,32 +546,32 @@ if(HPX_WITH_AGAS_DUMP_REFCNT_ENTRIES)
 endif()
 
 ## Parcelport related build options
-hpx_option(HPX_WITH_PARCELPORT_IBVERBS BOOL
-  "Enable the ibverbs based parcelport. This is currently an experimental feature"
-  OFF CATEGORY "Parcelport" ADVANCED)
-hpx_option(HPX_WITH_PARCELPORT_IPC BOOL
-  "Enable the IPC (inter process communication) based parcelport. This is currently an experimental feature"
-  OFF CATEGORY "Parcelport" ADVANCED)
+set(_parcel_profiling_default OFF)
+if(HPX_WITH_APEX)
+  set(_parcel_profiling_default ON)
+endif()
+
+hpx_option(HPX_WITH_PARCEL_PROFILING BOOL
+  "Enable profiling data for parcels"
+  ${_parcel_profiling_default} CATEGORY "Parcelport" ADVANCED)
+
+if(HPX_WITH_PARCEL_PROFILING)
+  hpx_add_config_define(HPX_HAVE_PARCEL_PROFILING)
+endif()
+
+## Parcelport related build options
 hpx_option(HPX_WITH_PARCELPORT_MPI BOOL
   "Enable the MPI based parcelport."
   OFF CATEGORY "Parcelport")
 hpx_option(HPX_WITH_PARCELPORT_TCP BOOL
   "Enable the TCP based parcelport."
   ON CATEGORY "Parcelport")
-
-## ibverbs parcelport settings
-hpx_option(HPX_WITH_PARCELPORT_IBVERBS_IFNAME STRING
-  "The interface name of the ibverbs capable network adapter (default: ib0)"
-  "ib0" CATEGORY "Parcelport" ADVANCED)
-hpx_option(HPX_WITH_PARCELPORT_IBVERBS_MESSAGE_PAYLOAD STRING
-  "Size of the message payload not sent with RDMA (default: 512 byte)"
-  "512" CATEGORY "Parcelport" ADVANCED)
-hpx_option(HPX_WITH_PARCELPORT_IBVERBS_MEMORY_CHUNK_SIZE STRING
-  "Number of bytes a chunk in the memory pool can hold (default: 64MB)"
-  "67108864" CATEGORY "Parcelport" ADVANCED)
-hpx_option(HPX_WITH_PARCELPORT_IBVERBS_MAX_MEMORY_CHUNKS STRING
-  "Maximum number of chunks that can be allocated (default: 100)"
-  "100" CATEGORY "Parcelport" ADVANCED)
+hpx_option(HPX_WITH_PARCELPORT_ACTION_COUNTERS BOOL
+  "Enable performance counters reporting parcelport statistics on a per-action basis."
+  OFF CATEGORY "Parcelport")
+if(HPX_WITH_PARCELPORT_ACTION_COUNTERS)
+  hpx_add_config_define(HPX_HAVE_PARCELPORT_ACTION_COUNTERS)
+endif()
 
 ## mpi parcelport settings
 hpx_option(HPX_WITH_PARCELPORT_MPI_ENV STRING
@@ -528,33 +580,6 @@ hpx_option(HPX_WITH_PARCELPORT_MPI_ENV STRING
 hpx_option(HPX_WITH_PARCELPORT_MPI_MULTITHREADED BOOL
   "Turn on MPI multithreading support (default: ON)."
   ON CATEGORY "Parcelport" ADVANCED)
-
-## Profiling related build options
-hpx_option(HPX_WITH_APEX BOOL
-  "Enable APEX instrumentation support." OFF CATEGORY "Profiling")
-if(HPX_WITH_APEX)
-  hpx_add_config_define(HPX_HAVE_APEX)
-endif()
-hpx_option(HPX_WITH_PAPI BOOL
-  "Enable the PAPI based performance counter." OFF CATEGORY "Profiling")
-if(HPX_WITH_PAPI)
-  hpx_add_config_define(HPX_HAVE_PAPI)
-endif()
-hpx_option(HPX_WITH_TAU BOOL
-  "Enable TAU profiling support." OFF CATEGORY "Profiling")
-if(HPX_WITH_TAU)
-  hpx_add_config_define(HPX_HAVE_TAU)
-endif()
-hpx_option(HPX_WITH_GOOGLE_PERFTOOLS BOOL
-  "Enable Google Perftools instrumentation support." OFF CATEGORY "Profiling")
-if(HPX_WITH_GOOGLE_PERFTOOLS)
-  hpx_add_config_define(HPX_HAVE_GOOGLE_PERFTOOLS)
-endif()
-hpx_option(HPX_WITH_ITTNOTIFY BOOL
-  "Enable Amplifier (ITT) instrumentation support." OFF CATEGORY "Profiling")
-#if(HPX_WITH_ITTNOTIFY)
-  #hpx_add_config_define(HPX_HAVE_ITTNOTIFY)
-#endif()
 
 ## External libraries/frameworks used by sme of the examples and benchmarks
 hpx_option(HPX_WITH_EXAMPLES_OPENMP BOOL
@@ -618,7 +643,8 @@ if(NOT "${HPX_PLATFORM_UC}" STREQUAL "BLUEGENEQ")
 endif()
 
 ## Debugging related build options
-hpx_option(HPX_WITH_VALGRIND BOOL "Enable Valgrind instrumentation support." OFF CATEGORY "Debugging")
+hpx_option(HPX_WITH_VALGRIND BOOL "Enable Valgrind instrumentation support."
+  OFF CATEGORY "Debugging")
 
 hpx_option(HPX_WITH_VERIFY_LOCKS BOOL
   "Enable lock verification code (default: OFF, implicitly enabled in debug builds)"
@@ -847,14 +873,30 @@ if(NOT MSVC)
     set(CXX_FLAG -std=c++11)
   else()
     # Try -std=c++14 first
-    check_cxx_compiler_flag(-std=c++14 HPX_WITH_CXX14)
+
+    # The Intel compiler has the C++14 flag, but doesn't have sufficient C++14
+    # support to compile Boost. If the user has explicitly asked for it, use it,
+    # otherwise don't run the check.
+    # FIXME: This should be replaced with a version-based check in the future
+    # when the Intel compiler is able to build Boost with -std=c++14.
+    if(HPX_WITH_CXX14 OR NOT ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel"))
+      check_cxx_compiler_flag(-std=c++14 HPX_WITH_CXX14)
+    endif()
     if(HPX_WITH_CXX14)
+
       set(CXX_FLAG -std=c++14)
     else()
-      # ... otherwise try -std=c++0y
-      check_cxx_compiler_flag(-std=c++0y HPX_WITH_CXX0Y)
-      if(HPX_WITH_CXX0Y)
-        set(CXX_FLAG -std=c++0y)
+      # ... otherwise try -std=c++1y
+
+      # See comment above.
+      # FIXME: This should be replaced with a version-based check in the future
+      # when the Intel compiler is able to build Boost with -std=c++14.
+      if(HPX_WITH_CXX1Y OR NOT ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel"))
+        check_cxx_compiler_flag(-std=c++1y HPX_WITH_CXX1Y)
+      endif()
+
+      if(HPX_WITH_CXX1Y)
+        set(CXX_FLAG -std=c++1y)
       else()
         # ... otherwise try -std=c++11
         check_cxx_compiler_flag(-std=c++11 HPX_WITH_CXX11)
@@ -953,7 +995,7 @@ hpx_check_for_cxx11_std_chrono(
   REQUIRED "HPX needs support for C++11 std::chrono")
 
 hpx_check_for_cxx11_std_cstdint(
-  DEFINITIONS HPX_HAVE_CXX11_STD_CSTDINT)
+  REQUIRED "HPX needs support for C++11 std::[u]intX_t")
 
 hpx_check_for_cxx11_std_initializer_list(
   REQUIRED "HPX needs support for C++11 std::initializer_list")
@@ -1034,10 +1076,10 @@ if(HPX_WITH_CUDA AND NOT HPX_WITH_CUDA_CLANG)
     set(CUDA_PROPAGATE_HOST_FLAGS OFF)
     hpx_library_dir(${CUDA_TOOLKIT_ROOT_DIR}/lib/x64)
     link_directories(${CUDA_TOOLKIT_ROOT_DIR}/lib/x64)
-    set(CUDA_NVCC_FLAGS_DEBUG ${CUDA_NVCC_FLAGS_DEBUG};-D_DEBUG;-O0;-g;-G;-Xcompiler=-MDd;-Xcompiler=-Od;-Xcompiler=-Zi)
-    set(CUDA_NVCC_FLAGS_RELWITHDEBINFO ${CUDA_NVCC_FLAGS_RELWITHDEBINFO};-DNDEBUG;-O2;-g;-Xcompiler=-MD,-O2,-Zi)
-    set(CUDA_NVCC_FLAGS_MINSIZEREL ${CUDA_NVCC_FLAGS_MINSIZEREL};-DNDEBUG;-O1;-Xcompiler=-MD,-O1)
-    set(CUDA_NVCC_FLAGS_RELEASE ${CUDA_NVCC_FLAGS_RELEASE};-DNDEBUG;-O2;-Xcompiler=-MD,-Ox)
+    set(CUDA_NVCC_FLAGS_DEBUG ${CUDA_NVCC_FLAGS_DEBUG};-D_DEBUG;-O0;-g;-G;-Xcompiler=-MDd;-Xcompiler=-Od;-Xcompiler=-Zi;-Xcompiler=-bigobj)
+    set(CUDA_NVCC_FLAGS_RELWITHDEBINFO ${CUDA_NVCC_FLAGS_RELWITHDEBINFO};-DNDEBUG;-O2;-g;-Xcompiler=-MD,-O2,-Zi;-Xcompiler=-bigobj)
+    set(CUDA_NVCC_FLAGS_MINSIZEREL ${CUDA_NVCC_FLAGS_MINSIZEREL};-DNDEBUG;-O1;-Xcompiler=-MD,-O1;-Xcompiler=-bigobj)
+    set(CUDA_NVCC_FLAGS_RELEASE ${CUDA_NVCC_FLAGS_RELEASE};-DNDEBUG;-O2;-Xcompiler=-MD,-Ox;-Xcompiler=-bigobj)
   endif()
   set(CUDA_SEPARABLE_COMPILATION ON)
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode=arch=compute_30,code=sm_30)
@@ -1046,6 +1088,7 @@ if(HPX_WITH_CUDA AND NOT HPX_WITH_CUDA_CLANG)
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode=arch=compute_35,code=compute_35)
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};--expt-relaxed-constexpr)
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};--expt-extended-lambda)
+  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};--default-stream per-thread)
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-lcudadevrt)
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-rdc=true)
 endif()
@@ -1168,6 +1211,11 @@ if(WIN32)
       # Update 2 requires to set _ENABLE_ATOMIC_ALIGNMENT_FIX for it to compile
       # atomics
       hpx_add_config_define(_ENABLE_ATOMIC_ALIGNMENT_FIX)
+
+      # Update 3 allows to flag rvalue misuses and enforces strict string const-
+      # qualification conformance
+      hpx_add_target_compile_option(-Zc:rvalueCast)
+      hpx_add_target_compile_option(-Zc:strictStrings)
     endif()
 
     # Runtime type information
@@ -1225,11 +1273,8 @@ if(HPX_WITH_COMPILER_WARNINGS)
     # max symbol length exceeded
     hpx_add_compile_flag(-wd4503)
 
-    # OpenMPI triggers a lot of forcing value to bool 'true' or 'false'
-    # (performance warning)
-    if(MPI_FOUND OR HPX_WITH_APEX)
-      hpx_add_compile_flag(-wd4800)
-    endif()
+    # 'int': forcing value to bool 'true' or 'false' (performance warning)
+    hpx_add_compile_flag(-wd4800)
   else() # Trial and error approach for any other compiler ...
     hpx_add_compile_flag_if_available(-Wall LANGUAGES CXX C Fortran)
     hpx_add_compile_flag_if_available(-Wextra LANGUAGES CXX C Fortran)
@@ -1409,24 +1454,20 @@ if(WITH_AMPLIFIER)
   hpx_add_config_define(HPX_HAVE_ITTNOTIFY)
 endif()
 
-if(HPX_WITH_TAU)
-  find_package(TAU)
-  if(NOT TAU_FOUND)
-    hpx_error("TAU could not be found and HPX_WITH_TAU=On, please specify TAU_ROOT to point to the root of your TAU installation")
-  endif()
-  hpx_libraries(${TAU_LIBRARIES})
-  include_directories(${TAU_INCLUDE_DIR})
-endif()
-
 ################################################################################
 # Enable integration with Apex event counters
 ################################################################################
+set(_hpx_apex_no_update)
+if(HPX_WITH_APEX_NO_UPDATE)
+  set(_hpx_apex_no_update NO_UPDATE)
+endif()
 if(HPX_WITH_APEX)
   # handle APEX library
   include(GitExternal)
   git_external(apex
     https://github.com/khuck/xpress-apex.git
-    v0.5
+    v1.0
+    ${_hpx_apex_no_update}
     VERBOSE)
 
   LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/apex/cmake/Modules")
@@ -1439,19 +1480,19 @@ if(HPX_WITH_APEX)
   endif()
 
   include_directories(${APEX_SOURCE_DIR})
-  set(HPX_ADDITIONAL_RUNTIME_DEPENDENCIES
-      ${HPX_ADDITIONAL_RUNTIME_DEPENDENCIES} apex_lib)
+  set(HPX_ADDITIONAL_PRIVATE_RUNTIME_DEPENDENCIES
+      ${HPX_ADDITIONAL_PRIVATE_RUNTIME_DEPENDENCIES} apex_lib)
   if(APEX_WITH_MSR)
-    set(HPX_ADDITIONAL_RUNTIME_DEPENDENCIES
-        ${HPX_ADDITIONAL_RUNTIME_DEPENDENCIES} -L${MSR_ROOT}/lib -lmsr)
+    set(HPX_ADDITIONAL_PRIVATE_RUNTIME_DEPENDENCIES
+        ${HPX_ADDITIONAL_PRIVATE_RUNTIME_DEPENDENCIES} -L${MSR_ROOT}/lib -lmsr)
   endif()
   if(APEX_WITH_ACTIVEHARMONY)
-    set(HPX_ADDITIONAL_RUNTIME_DEPENDENCIES
-        ${HPX_ADDITIONAL_RUNTIME_DEPENDENCIES} -L${ACTIVEHARMONY_ROOT}/lib -lharmony)
+    set(HPX_ADDITIONAL_PRIVATE_RUNTIME_DEPENDENCIES
+        ${HPX_ADDITIONAL_PRIVATE_RUNTIME_DEPENDENCIES} -L${ACTIVEHARMONY_ROOT}/lib -lharmony)
   endif()
-  if(APEX_WITH_TAU OR HPX_WITH_TAU)
-    set(HPX_ADDITIONAL_RUNTIME_DEPENDENCIES
-        ${HPX_ADDITIONAL_RUNTIME_DEPENDENCIES} -L${TAU_ROOT}/lib -lTAU)
+  if(APEX_WITH_OTF2)
+    set(HPX_ADDITIONAL_PRIVATE_RUNTIME_DEPENDENCIES
+        ${HPX_ADDITIONAL_PRIVATE_RUNTIME_DEPENDENCIES} -L${OTF2_ROOT}/lib -lotf2)
   endif()
 
   # handle optional ITTNotify library
@@ -1462,8 +1503,8 @@ if(HPX_WITH_APEX)
     endif()
     include_directories(${ITTNOTIFY_SOURCE_DIR})
     hpx_add_config_define(HPX_HAVE_ITTNOTIFY 1)
-    set(HPX_ADDITIONAL_RUNTIME_DEPENDENCIES
-        ${HPX_ADDITIONAL_RUNTIME_DEPENDENCIES} ittnotify_lib)
+    set(HPX_ADDITIONAL_PRIVATE_RUNTIME_DEPENDENCIES
+        ${HPX_ADDITIONAL_PRIVATE_RUNTIME_DEPENDENCIES} ittnotify_lib)
   endif()
 endif()
 

@@ -14,13 +14,15 @@
 #include <hpx/exception.hpp>
 #include <hpx/runtime/actions/action_support.hpp>
 #include <hpx/runtime/actions/transfer_action.hpp>
+#include <hpx/runtime/actions/transfer_continuation_action.hpp>
 #include <hpx/runtime/actions/basic_action_fwd.hpp>
 #include <hpx/runtime/actions/continuation.hpp>
-#include <hpx/runtime/actions/invocation_count_registry.hpp>
+#include <hpx/runtime/actions/detail/action_factory.hpp>
+#include <hpx/runtime/actions/detail/invocation_count_registry.hpp>
+#include <hpx/runtime/parcelset/detail/per_action_data_counter_registry.hpp>
 #include <hpx/runtime/launch_policy.hpp>
 #include <hpx/runtime/naming/address.hpp>
 #include <hpx/runtime/naming/id_type.hpp>
-#include <hpx/runtime/serialization/detail/polymorphic_id_factory.hpp>
 #include <hpx/runtime/threads/thread_data_fwd.hpp>
 #include <hpx/runtime/threads/thread_enums.hpp>
 #include <hpx/runtime_fwd.hpp>
@@ -36,6 +38,7 @@
 #include <hpx/util/detail/count_num_args.hpp>
 #include <hpx/util/detail/pack.hpp>
 #include <hpx/util/get_and_reset_value.hpp>
+#include <hpx/util/logging.hpp>
 #include <hpx/util/tuple.hpp>
 #include <hpx/util/void_guard.hpp>
 
@@ -45,6 +48,7 @@
 #include <boost/preprocessor/stringize.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <exception>
 #include <memory>
 #include <sstream>
@@ -65,10 +69,23 @@ namespace hpx { namespace actions
             HPX_MOVABLE_ONLY(continuation_thread_function);
 
         public:
+            typedef typename Action::continuation_type
+                continuation_type;
+
             explicit continuation_thread_function(
-                std::unique_ptr<continuation> cont,
+                continuation_type&& cont,
                 naming::address::address_type lva, F&& f, Ts&&... vs)
               : cont_(std::move(cont))
+              , lva_(lva)
+              , f_(std::forward<F>(f), std::forward<Ts>(vs)...)
+            {}
+
+            explicit continuation_thread_function(
+                naming::id_type target,
+                continuation_type&& cont,
+                naming::address::address_type lva, F&& f, Ts&&... vs)
+              : target_(std::move(target))
+              , cont_(std::move(cont))
               , lva_(lva)
               , f_(std::forward<F>(f), std::forward<Ts>(vs)...)
             {}
@@ -78,20 +95,22 @@ namespace hpx { namespace actions
               , f_(std::move(other.f_))
             {}
 
-            HPX_FORCEINLINE threads::thread_state_enum
+            HPX_FORCEINLINE threads::thread_result_type
             operator()(threads::thread_state_ex_enum)
             {
                 LTM_(debug) << "Executing " << Action::get_action_name(lva_)
-                    << " with continuation(" << cont_->get_id() << ")";
+                    << " with continuation(" << cont_.get_id() << ")";
 
                 typedef typename Action::local_result_type local_result_type;
 
-                actions::trigger<local_result_type>(std::move(cont_), f_);
-                return threads::terminated;
+                actions::trigger(std::move(cont_), f_);
+                return threads::thread_result_type(threads::terminated, nullptr);
             }
 
         private:
-            std::unique_ptr<continuation> cont_;
+            // This holds the target alive, if necessary.
+            naming::id_type target_;
+            continuation_type cont_;
             naming::address::address_type lva_;
             util::detail::deferred<F(Ts&&...)> f_;
         };
@@ -142,6 +161,12 @@ namespace hpx { namespace actions
             typename traits::promise_local_result<
                 remote_result_type
             >::type local_result_type;
+
+        typedef
+            hpx::actions::typed_continuation<
+                local_result_type,
+                remote_result_type
+            > continuation_type;
 
         static const std::size_t arity = sizeof...(Args);
         typedef util::tuple<typename std::decay<Args>::type...> arguments_type;
@@ -196,8 +221,15 @@ namespace hpx { namespace actions
         /// original function (given by \a func).
         struct thread_function
         {
+            thread_function()
+            {}
+
+            thread_function(naming::id_type const& target)
+              : target_(target)
+            {}
+
             template <typename ...Ts>
-            HPX_FORCEINLINE threads::thread_state_enum
+            HPX_FORCEINLINE threads::thread_result_type
             operator()(naming::address::address_type lva, Ts&&... vs) const
             {
                 try {
@@ -231,8 +263,11 @@ namespace hpx { namespace actions
                 // OS-thread. This will throw if there are still any locks
                 // held.
                 util::force_error_on_lock();
-                return threads::terminated;
+                return threads::thread_result_type(threads::terminated, nullptr);
             }
+
+            // This holds the target alive, if necessary.
+            naming::id_type target_;
         };
 
     public:
@@ -242,12 +277,22 @@ namespace hpx { namespace actions
         // case no continuation has been supplied.
         template <typename ...Ts>
         static threads::thread_function_type
-        construct_thread_function(naming::address::address_type lva,
+        construct_thread_function(naming::id_type const& target,
+            naming::address::address_type lva,
             Ts&&... vs)
         {
-            return traits::action_decorate_function<Derived>::call(lva,
-                util::bind(util::one_shot(typename Derived::thread_function()),
-                    lva, std::forward<Ts>(vs)...));
+            if (target && target.get_management_type() == naming::id_type::unmanaged)
+            {
+                return traits::action_decorate_function<Derived>::call(lva,
+                    util::bind(util::one_shot(typename Derived::thread_function()),
+                        lva, std::forward<Ts>(vs)...));
+            }
+            else
+            {
+                return traits::action_decorate_function<Derived>::call(lva,
+                    util::bind(util::one_shot(typename Derived::thread_function(target)),
+                        lva, std::forward<Ts>(vs)...));
+            }
         }
 
         // This static construct_thread_function allows to construct
@@ -256,16 +301,26 @@ namespace hpx { namespace actions
         // case a continuation has been supplied
         template <typename ...Ts>
         static threads::thread_function_type
-        construct_thread_function(std::unique_ptr<continuation> cont,
+        construct_thread_function(naming::id_type const& target,
+            continuation_type&& cont,
             naming::address::address_type lva, Ts&&... vs)
         {
             typedef detail::continuation_thread_function<
                 Derived, invoker, naming::address::address_type&, Ts&&...
             > thread_function;
 
-            return traits::action_decorate_function<Derived>::call(lva,
-                thread_function(std::move(cont), lva, invoker(),
-                    lva, std::forward<Ts>(vs)...));
+            if (target && target.get_management_type() == naming::id_type::unmanaged)
+            {
+                return traits::action_decorate_function<Derived>::call(lva,
+                    thread_function(std::move(cont), lva, invoker(),
+                        lva, std::forward<Ts>(vs)...));
+            }
+            else
+            {
+                return traits::action_decorate_function<Derived>::call(lva,
+                    thread_function(target, std::move(cont), lva, invoker(),
+                        lva, std::forward<Ts>(vs)...));
+            }
         }
 
         // direct execution
@@ -557,12 +612,18 @@ namespace hpx { namespace actions
         base_set_exception_action_id,
         broadcast_call_shutdown_functions_action_id,
         broadcast_call_startup_functions_action_id,
-        broadcast_symbol_namespace_service_action_id,
+        broadcast_symbol_namespace_on_event_action_id,
         bulk_create_components_action_id,
         call_shutdown_functions_action_id,
         call_startup_functions_action_id,
-        component_namespace_bulk_service_action_id,
-        component_namespace_service_action_id,
+        component_namespace_bind_prefix_action_id,
+        component_namespace_bind_name_action_id,
+        component_namespace_resolve_id_action_id,
+        component_namespace_unbind_action_id,
+        component_namespace_iterate_types_action_id,
+        component_namespace_get_component_type_action_id,
+        component_namespace_get_num_localities_action_id,
+        component_namespace_statistics_counter_action_id,
         console_error_sink_action_id,
         console_logging_action_id,
         console_print_action_id,
@@ -585,8 +646,14 @@ namespace hpx { namespace actions
         load64_action_id,
         load8_action_id,
         load_components_action_id,
-        locality_namespace_bulk_service_action_id,
-        locality_namespace_service_action_id,
+        locality_namespace_allocate_action_id,
+        locality_namespace_free_action_id,
+        locality_namespace_localities_action_id,
+        locality_namespace_resolve_locality_action_id,
+        locality_namespace_get_num_localities_action_id,
+        locality_namespace_get_num_threads_action_id,
+        locality_namespace_get_num_overall_threads_action_id,
+        locality_namespace_statistics_counter_action_id,
         memory_block_checkin_action_id,
         memory_block_checkout_action_id,
         memory_block_clone_action_id,
@@ -601,9 +668,17 @@ namespace hpx { namespace actions
         performance_counter_reset_counter_value_action_id,
         performance_counter_start_action_id,
         performance_counter_stop_action_id,
-        primary_namespace_bulk_service_action_id,
-        primary_namespace_service_action_id,
+        primary_namespace_allocate_action_id,
+        primary_namespace_begin_migration_action_id,
+        primary_namespace_bind_gid_action_id,
+        primary_namespace_colocate_action_id,
+        primary_namespace_decrement_credit_action_id,
+        primary_namespace_end_migration_action_id,
+        primary_namespace_increment_credit_action_id,
+        primary_namespace_resolve_gid_action_id,
         primary_namespace_route_action_id,
+        primary_namespace_unbind_gid_action_id,
+        primary_namespace_statistics_counter_action_id,
         remove_from_connection_cache_action_id,
         set_value_action_agas_bool_response_type_id,
         set_value_action_agas_id_type_response_type_id,
@@ -614,8 +689,12 @@ namespace hpx { namespace actions
         store32_action_id,
         store64_action_id,
         store8_action_id,
-        symbol_namespace_bulk_service_action_id,
-        symbol_namespace_service_action_id,
+        symbol_namespace_bind_action_id,
+        symbol_namespace_resolve_action_id,
+        symbol_namespace_unbind_action_id,
+        symbol_namespace_iterate_action_id,
+        symbol_namespace_on_event_action_id,
+        symbol_namespace_statistics_counter_action_id,
         terminate_action_id,
         terminate_all_action_id,
         update_agas_cache_entry_action_id,
@@ -662,16 +741,64 @@ namespace hpx { namespace actions
         base_lco_with_value_hpx_counter_info_set,
         base_lco_with_value_hpx_counter_value_get,
         base_lco_with_value_hpx_counter_value_set,
-        base_lco_with_value_hpx_agas_response_get,
-        base_lco_with_value_hpx_agas_response_set,
-        base_lco_with_value_hpx_agas_response_vector_get,
-        base_lco_with_value_hpx_agas_response_vector_set,
         base_lco_with_value_hpx_memory_data_get,
         base_lco_with_value_hpx_memory_data_set,
         base_lco_with_value_std_string_get,
         base_lco_with_value_std_string_set,
         base_lco_with_value_std_bool_ptrdiff_get,
         base_lco_with_value_std_bool_ptrdiff_set,
+
+        base_set_event_action_id_non_direct,
+        base_set_exception_action_id_non_direct,
+        base_lco_with_value_gid_get_non_direct,
+        base_lco_with_value_gid_set_non_direct,
+        base_lco_with_value_vector_gid_get_non_direct,
+        base_lco_with_value_vector_gid_set_non_direct,
+        base_lco_with_value_id_get_non_direct,
+        base_lco_with_value_id_set_non_direct,
+        base_lco_with_value_vector_id_get_non_direct,
+        base_lco_with_value_vector_id_set_non_direct,
+        base_lco_with_value_unused_get_non_direct,
+        base_lco_with_value_unused_set_non_direct,
+        base_lco_with_value_float_get_non_direct,
+        base_lco_with_value_float_set_non_direct,
+        base_lco_with_value_double_get_non_direct,
+        base_lco_with_value_double_set_non_direct,
+        base_lco_with_value_int8_get_non_direct,
+        base_lco_with_value_int8_set_non_direct,
+        base_lco_with_value_uint8_get_non_direct,
+        base_lco_with_value_uint8_set_non_direct,
+        base_lco_with_value_int16_get_non_direct,
+        base_lco_with_value_int16_set_non_direct,
+        base_lco_with_value_uint16_get_non_direct,
+        base_lco_with_value_uint16_set_non_direct,
+        base_lco_with_value_int32_get_non_direct,
+        base_lco_with_value_int32_set_non_direct,
+        base_lco_with_value_uint32_get_non_direct,
+        base_lco_with_value_uint32_set_non_direct,
+        base_lco_with_value_int64_get_non_direct,
+        base_lco_with_value_int64_set_non_direct,
+        base_lco_with_value_uint64_get_non_direct,
+        base_lco_with_value_uint64_set_non_direct,
+        base_lco_with_value_uint128_get_non_direct,
+        base_lco_with_value_uint128_set_non_direct,
+        base_lco_with_value_bool_get_non_direct,
+        base_lco_with_value_bool_set_non_direct,
+        base_lco_with_value_hpx_section_get_non_direct,
+        base_lco_with_value_hpx_section_set_non_direct,
+        base_lco_with_value_hpx_counter_info_get_non_direct,
+        base_lco_with_value_hpx_counter_info_set_non_direct,
+        base_lco_with_value_hpx_counter_value_get_non_direct,
+        base_lco_with_value_hpx_counter_value_set_non_direct,
+        base_lco_with_value_hpx_memory_data_get_non_direct,
+        base_lco_with_value_hpx_memory_data_set_non_direct,
+        base_lco_with_value_std_string_get_non_direct,
+        base_lco_with_value_std_string_set_non_direct,
+        base_lco_with_value_std_bool_ptrdiff_get_non_direct,
+        base_lco_with_value_std_bool_ptrdiff_set_non_direct,
+
+        // typed continuations...
+        typed_continuation_hpx_agas_response,
 
         last_action_id
     };
@@ -750,10 +877,24 @@ namespace hpx { namespace serialization
 #define HPX_REGISTER_ACTION_2(action, actionname)                             \
     HPX_DEFINE_GET_ACTION_NAME_(action, actionname)                           \
     HPX_REGISTER_ACTION_INVOCATION_COUNT(action)                              \
+    HPX_REGISTER_PER_ACTION_DATA_COUNTER_TYPES(action)                        \
     namespace hpx { namespace actions {                                       \
         template struct transfer_action<action>;                              \
+        template struct transfer_continuation_action<action>;                 \
     }}                                                                        \
 /**/
+
+#if defined(HPX_MSVC)
+#define HPX_REGISTER_ACTION_EXTERN_DECLARATION(action)                        \
+/**/
+#else
+#define HPX_REGISTER_ACTION_EXTERN_DECLARATION(action)                        \
+    namespace hpx { namespace actions {                                       \
+        extern template struct HPX_EXPORT transfer_action<action>;            \
+        extern template struct HPX_EXPORT transfer_continuation_action<action>;\
+    }}                                                                        \
+/**/
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 #define HPX_REGISTER_ACTION_DECLARATION_NO_DEFAULT_GUID(action)               \
@@ -761,6 +902,7 @@ namespace hpx { namespace serialization
         template <> HPX_ALWAYS_EXPORT                                         \
         char const* get_action_name<action>();                                \
     }}}                                                                       \
+    HPX_REGISTER_ACTION_EXTERN_DECLARATION(action)                            \
                                                                               \
     namespace hpx { namespace traits {                                        \
         template <>                                                           \
@@ -962,7 +1104,7 @@ namespace hpx { namespace serialization
 ///
 #define HPX_REGISTER_ACTION_ID(action, actionname, actionid)                  \
     HPX_REGISTER_ACTION_2(action, actionname)                                 \
-    HPX_SERIALIZATION_ADD_CONSTANT_ENTRY(actionname, actionid)                \
+    HPX_REGISTER_ACTION_FACTORY_ID(actionname, actionid)                      \
 /**/
 
 #endif /*HPX_RUNTIME_ACTIONS_BASIC_ACTION_HPP*/

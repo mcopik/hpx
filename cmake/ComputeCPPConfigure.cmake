@@ -6,13 +6,13 @@
 macro(computecpp_configure_cxx)
 
   #ComputeCPP requires loading its own modules
-  
+
 
 endmacro()
 
 macro(computecpp_configure)
   set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${HPX_WITH_COMPUTECPP}/cmake/Modules/")
-  include(${HPX_WITH_COMPUTECPP}/cmake/common.cmake)
+  #include(${HPX_WITH_COMPUTECPP}/cmake/common.cmake)
   hpx_add_config_define(HPX_WITH_SYCL)
   hpx_add_config_define(HPX_WITH_GPU_EXECUTOR)
 

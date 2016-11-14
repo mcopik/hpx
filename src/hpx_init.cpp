@@ -14,8 +14,8 @@
 #include <hpx/runtime/agas/addressing_service.hpp>
 #include <hpx/runtime/actions/plain_action.hpp>
 #include <hpx/runtime/components/runtime_support.hpp>
+#include <hpx/runtime/config_entry.hpp>
 #include <hpx/runtime/find_localities.hpp>
-#include <hpx/runtime/get_config_entry.hpp>
 #include <hpx/runtime/shutdown_function.hpp>
 #include <hpx/runtime/startup_function.hpp>
 #include <hpx/runtime/threads/policies/schedulers.hpp>
@@ -36,7 +36,6 @@
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
-#include <boost/ref.hpp>
 
 #if defined(HPX_NATIVE_MIC) || defined(__bgq__)
 #  include <cstdlib>
@@ -44,6 +43,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <new>
@@ -316,7 +316,7 @@ namespace hpx
         ///////////////////////////////////////////////////////////////////////
         struct dump_config
         {
-            dump_config(hpx::runtime const& rt) : rt_(boost::cref(rt)) {}
+            dump_config(hpx::runtime const& rt) : rt_(std::cref(rt)) {}
 
             void operator()() const
             {
@@ -326,7 +326,7 @@ namespace hpx
                 std::cout << "----------------------------------\n";
             }
 
-            boost::reference_wrapper<hpx::runtime const> rt_;
+            std::reference_wrapper<hpx::runtime const> rt_;
         };
 
         ///////////////////////////////////////////////////////////////////////
@@ -411,7 +411,7 @@ namespace hpx
                 // itself to run after the given interval
                 std::shared_ptr<util::query_counters> qc =
                     std::make_shared<util::query_counters>(
-                        boost::ref(counters), interval, destination, counter_format,
+                        std::ref(counters), interval, destination, counter_format,
                         counter_shortnames, csv_header);
 
                 // schedule to print counters at shutdown, if requested
@@ -599,7 +599,7 @@ namespace hpx
             if (cfg.affinity_bind_.empty())
                 return cfg.numa_sensitive_;
 
-            if (cfg.pu_offset_ != 0 || cfg.pu_step_ != 1 ||
+            if (cfg.pu_offset_ != std::size_t(-1) || cfg.pu_step_ != 1 ||
                 cfg.affinity_domain_ != "pu")
             {
                 throw detail::command_line_error(
@@ -615,11 +615,13 @@ namespace hpx
 
         std::size_t get_pu_offset(util::command_line_handling const& cfg)
         {
-            std::size_t pu_offset = static_cast<std::size_t>(-1);
+            std::size_t pu_offset = std::size_t(-1);
 #if defined(HPX_HAVE_HWLOC)
-            if (cfg.pu_offset_ != 0) {
+            if (cfg.pu_offset_ != std::size_t(-1))
+            {
                 pu_offset = cfg.pu_offset_;
-                if (pu_offset >= hpx::threads::hardware_concurrency()) {
+                if (pu_offset >= hpx::threads::hardware_concurrency())
+                {
                     throw detail::command_line_error(
                         "Invalid command line option "
                         "--hpx:pu-offset, value must be smaller than number of "
@@ -1083,8 +1085,6 @@ namespace hpx
                 util::command_line_handling cfg(
                     mode, f, std::move(ini_config), argv[0]);
 
-                util::apex_wrapper_init apex(argc, argv);
-
                 result = cfg.call(desc_cmdline, argc, argv);
 
                 if (result != 0) {
@@ -1092,6 +1092,8 @@ namespace hpx
                         result = 0;     // --hpx:help
                     return result;
                 }
+
+                util::apex_wrapper_init apex(argc, argv);
 
                 // Initialize and start the HPX runtime.
                 if (0 == std::string("local").find(cfg.queuing_))
@@ -1154,14 +1156,15 @@ namespace hpx
                         "Bad value for command line option --hpx:queuing");
                 }
             }
+//             catch (hpx::exception const& e) {
+//                 std::cerr << "{env}: " << hpx::detail::get_execution_environment();
+//                 std::cerr << "hpx::init: hpx::exception caught: " << e.what() << "\n";
+//                 return -1;
+//             }
             catch (detail::command_line_error const& e) {
                 std::cerr << "{env}: " << hpx::detail::get_execution_environment();
                 std::cerr << "hpx::init: std::exception caught: " << e.what() << "\n";
                 return -1;
-            //} catch (...) {
-            //     std::cerr << "{env}: " << hpx::detail::get_execution_environment();
-            //     std::cerr << "hpx::init: unexpected exception caught\n";
-            //     return -1;
             }
             return result;
         }

@@ -14,6 +14,7 @@
 #include <hpx/runtime/launch_policy.hpp>
 #include <hpx/runtime/threads/thread_executor.hpp>
 #include <hpx/runtime/threads/thread_helpers.hpp>
+#include <hpx/runtime/threads/coroutines/detail/get_stack_pointer.hpp>
 #include <hpx/throw_exception.hpp>
 #include <hpx/traits/get_remote_result.hpp>
 #include <hpx/util/atomic_count.hpp>
@@ -28,6 +29,7 @@
 #include <boost/intrusive_ptr.hpp>
 
 #include <chrono>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -349,23 +351,15 @@ namespace detail
         // allowed
         void handle_on_completed(completed_callback_type && on_completed)
         {
-            // We need to run the completion asynchronously if we aren't on a
-            // HPX thread
-            if (HPX_UNLIKELY(nullptr == threads::get_self_ptr()))
-            {
-                HPX_THROW_EXCEPTION(null_thread_id,
-                        "future_data::handle_on_completed",
-                        "null thread id encountered");
-            }
-
-#if defined(HPX_WINDOWS)
-            bool recurse_asynchronously = false;
-#elif defined(HPX_HAVE_THREADS_GET_STACK_POINTER)
-            bool recurse_asynchronously =
+            // We need to run the completion on a new thread if we are on a
+            // non HPX thread.
+            bool recurse_asynchronously = hpx::threads::get_self_ptr() == nullptr;
+#if defined(HPX_HAVE_THREADS_GET_STACK_POINTER)
+            recurse_asynchronously =
                 !this_thread::has_sufficient_stack_space();
 #else
             handle_continuation_recursion_count cnt;
-            bool recurse_asynchronously =
+            recurse_asynchronously = recurse_asynchronously ||
                 cnt.count_ > HPX_CONTINUATION_MAX_RECURSION_DEPTH;
 #endif
             if (!recurse_asynchronously)
@@ -570,7 +564,7 @@ namespace detail
 
             // block if this entry is empty
             if (state_ == empty) {
-                cond_.wait(std::move(l), "future_data::wait", ec);
+                cond_.wait(l, "future_data::wait", ec);
                 if (ec) return;
             }
 
@@ -587,7 +581,7 @@ namespace detail
             // block if this entry is empty
             if (state_ == empty) {
                 threads::thread_state_ex_enum const reason =
-                    cond_.wait_until(std::move(l), abs_time,
+                    cond_.wait_until(l, abs_time,
                         "future_data::wait_until", ec);
                 if (ec) return future_status::uninitialized;
 
@@ -774,18 +768,19 @@ namespace detail
         }
 
         // run in a separate thread
-        virtual void apply(launch policy,
+        virtual threads::thread_id_type apply(launch policy,
             threads::thread_priority priority,
             threads::thread_stacksize stacksize, error_code& ec)
         {
             HPX_ASSERT(false);      // shouldn't ever be called
+            return threads::invalid_thread_id;
         }
 
     protected:
-        static threads::thread_state_enum run_impl(future_base_type this_)
+        static threads::thread_result_type run_impl(future_base_type this_)
         {
             this_->do_run();
-            return threads::terminated;
+            return threads::thread_result_type(threads::terminated, nullptr);
         }
 
     public:
@@ -857,11 +852,11 @@ namespace detail
         };
 
     protected:
-        static threads::thread_state_enum run_impl(future_base_type this_)
+        static threads::thread_result_type run_impl(future_base_type this_)
         {
             reset_id r(*this_);
             this_->do_run();
-            return threads::terminated;
+            return threads::thread_result_type(threads::terminated, nullptr);
         }
 
     public:

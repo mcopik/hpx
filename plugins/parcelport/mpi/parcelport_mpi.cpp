@@ -35,6 +35,7 @@
 #include <boost/archive/basic_archive.hpp>
 #include <boost/exception_ptr.hpp>
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -58,7 +59,8 @@ namespace hpx { namespace parcelset
     {
         typedef policies::mpi::sender_connection connection_type;
         typedef std::true_type  send_early_parcel;
-        typedef std::true_type do_background_work;
+        typedef std::true_type  do_background_work;
+        typedef std::false_type send_immediate_parcels;
 
         static const char * type()
         {
@@ -161,8 +163,7 @@ namespace hpx { namespace parcelset
                 parcelset::locality const& l, error_code& ec)
             {
                 int dest_rank = l.get<locality>().rank();
-                return sender_.create_connection(
-                    dest_rank, parcels_sent_);
+                return sender_.create_connection(dest_rank, this);
             }
 
             parcelset::locality agas_locality(

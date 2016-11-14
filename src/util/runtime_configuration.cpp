@@ -188,6 +188,11 @@ namespace hpx { namespace util
             "numa_sensitive = 0",
             "max_background_threads = ${MAX_BACKGROUND_THREADS:$[hpx.os_threads]}",
 
+            // arity for collective operations implemented in a tree fashion
+            "[hpx.lcos.collectives]",
+            "arity = ${HPX_LCOS_COLLECTIVES_ARITY:32}",
+            "cut_off = ${HPX_LCOS_COLLECTIVES_CUT_OFF:256}",
+
             // connect back to the given latch if specified
             "[hpx.on_startup]",
             "wait_on_latch = ${HPX_ON_STARTUP_WAIT_ON_LATCH}",
@@ -217,7 +222,7 @@ namespace hpx { namespace util
             // enable aliasing
             "aliasing = ${HPX_COMMANDLINE_ALIASING:1}",
 
-            // allow for unknown options to passed through
+            // allow for unknown options to be passed through
             "allow_unknown = ${HPX_COMMANDLINE_ALLOW_UNKNOWN:0}",
 
             // predefine command line aliases

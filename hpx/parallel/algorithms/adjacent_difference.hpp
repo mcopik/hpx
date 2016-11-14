@@ -20,6 +20,7 @@
 #include <hpx/parallel/util/partitioner.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <iterator>
 #include <numeric>
 #include <type_traits>
@@ -71,24 +72,32 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
                 FwdIter prev = first;
                 *dest++ = *first++;
 
-                if (count == 0) {
+                if (count == 0)
+                {
                     return result::get(std::move(dest));
                 }
+
+                auto f1 =
+                    [op, policy](
+                        zip_iterator part_begin, std::size_t part_size
+                    ) mutable
+                    {
+                        // VS2015RC bails out when op is captured by ref
+                        using hpx::util::get;
+                        util::loop_n(
+                            policy, part_begin, part_size,
+                            [op](zip_iterator it)
+                            {
+                                get<2>(*it) = hpx::util::invoke(
+                                    op, get<0>(*it), get<1>(*it));
+                            });
+                    };
 
                 using hpx::util::make_zip_iterator;
                 return util::partitioner<ExPolicy, Iter, void>::call(
                     std::forward<ExPolicy>(policy),
                     make_zip_iterator(first, prev, dest), count,
-                    [op](zip_iterator part_begin, std::size_t part_size)
-                    {
-                        // VS2015RC bails out when op is captured by ref
-                        using hpx::util::get;
-                        util::loop_n(part_begin, part_size,
-                            [op](zip_iterator it)
-                            {
-                                get<2>(*it) = op(get<0>(*it), get<1>(*it));
-                            });
-                    },
+                    std::move(f1),
                     [dest, count](std::vector<hpx::future<void> > &&)
                         mutable -> Iter
                     {
@@ -183,7 +192,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v1)
 
     ////////////////////////////////////////////////////////////////////////////
     /// Assigns each value in the range given by result its corresponding
-    /// element in the range [first, last] and the one preceeding it except
+    /// element in the range [first, last] and the one preceding it except
     /// *result, which is assigned *first
     ///
     /// \note   Complexity: Exactly (last - first) - 1 application of the

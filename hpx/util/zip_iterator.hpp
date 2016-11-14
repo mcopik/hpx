@@ -313,11 +313,7 @@ namespace hpx { namespace util
 
             typedef IteratorTuple iterator_tuple_type;
 
-            HPX_HOST_DEVICE iterator_tuple_type get_iterator_tuple()
-            {
-                return iterators_;
-            }
-            HPX_HOST_DEVICE iterator_tuple_type const& get_iterator_tuple() const
+            HPX_HOST_DEVICE iterator_tuple_type get_iterator_tuple() const
             {
                 return iterators_;
             }
@@ -399,6 +395,9 @@ namespace hpx { namespace util
             tuple<Ts...>, zip_iterator<Ts...>
         >
     {
+        static_assert(sizeof...(Ts) != 0,
+            "zip_iterator must wrap at least one iterator");
+
         typedef detail::zip_iterator_base<
                 tuple<Ts...>, zip_iterator<Ts...>
             > base_type;
@@ -469,6 +468,9 @@ namespace hpx { namespace util
             tuple<Ts...>, zip_iterator<tuple<Ts...> >
         >
     {
+        static_assert(sizeof...(Ts) != 0,
+            "zip_iterator must wrap at least one iterator");
+
         typedef detail::zip_iterator_base<
                 tuple<Ts...>, zip_iterator<tuple<Ts...> >
             > base_type;

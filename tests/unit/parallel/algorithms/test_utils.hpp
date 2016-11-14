@@ -11,6 +11,7 @@
 
 #include <boost/atomic.hpp>
 
+#include <cstddef>
 #include <numeric>
 #include <random>
 #include <vector>
@@ -92,8 +93,18 @@ namespace test
         {
             ++instance_count;
         }
+        count_instances(count_instances && rhs)
+          : value_(rhs.value_)
+        {
+            ++instance_count;
+        }
 
         count_instances& operator=(count_instances const& rhs)
+        {
+            value_ = rhs.value_;
+            return *this;
+        }
+        count_instances& operator=(count_instances && rhs)
         {
             value_ = rhs.value_;
             return *this;
@@ -196,6 +207,15 @@ namespace test
     inline std::vector<std::size_t> random_iota(std::size_t size)
     {
         std::vector<std::size_t> c(size);
+        std::iota(boost::begin(c), boost::end(c), 0);
+        std::random_shuffle(boost::begin(c), boost::end(c));
+        return c;
+    }
+
+    template <typename T>
+    inline std::vector<T> random_iota(std::size_t size)
+    {
+        std::vector<T> c(size);
         std::iota(boost::begin(c), boost::end(c), 0);
         std::random_shuffle(boost::begin(c), boost::end(c));
         return c;

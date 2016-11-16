@@ -129,6 +129,13 @@ macro(add_hpx_executable name)
   if(HPX_WITH_CUDA AND NOT HPX_WITH_CUDA_CLANG)
     cuda_add_executable(${name}_exe
       ${${name}_SOURCES} ${${name}_HEADERS})
+  elseif(HPX_WITH_COMPUTECPP)
+    add_executable(${name}_exe
+              ${${name}_SOURCES} ${${name}_HEADERS})
+    #TODO: make it work for multiple files
+    foreach(source ${${name}_SOURCES})
+        add_sycl_to_target(${name}_exe ${source} ${CMAKE_CURRENT_BINARY_DIR})
+    endforeach()
   else()
     add_executable(${name}_exe
       ${${name}_SOURCES} ${${name}_HEADERS})

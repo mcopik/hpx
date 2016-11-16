@@ -465,15 +465,15 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     //tuple type
                     typedef typename std::iterator_traits<tuple_iterator_type>::value_type tuple_type;
                     //iterator stored in tuple
-                    typedef typename std::decay<decltype(hpx::util::get<1>(elem))>::type iterator_type;
+                    typedef typename std::decay<decltype(hpx::util::get<0>(elem))>::type iterator_type;
                     typedef typename std::iterator_traits<iterator_type>::value_type value_type;
 
 
-                    int offset = hpx::util::get<0>(elem);
-                    int data_count = hpx::util::get<2>(elem);
+                    int offset = hpx::util::get<1>(elem);
+                    int data_count = hpx::util::get<1>(elem);
                     int local_size = std::min(LOCAL_SIZE, data_count);
                     int chunk_size = 1;
-                    auto begin = hpx::util::get<1>(elem);
+                    auto begin = hpx::util::get<0>(elem);
                     //auto end = begin;
                     //std::advance(end, data_count);
                     //std::cout << data_count << std::endl;
@@ -506,7 +506,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                                 //typedef typename std::iterator_traits<decltype(it)>::difference_type difference_type;
                                 //typedef typename std::iterator_traits<decltype(it)>::iterator_category cat;
 
-                                auto t = hpx::util::make_tuple(offset, it, chunk_size);
+                                auto t = hpx::util::make_tuple(it, chunk_size, offset);
                                 hpx::util::invoke(_f, t);
                             };
 

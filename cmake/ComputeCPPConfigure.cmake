@@ -12,13 +12,14 @@ endmacro()
 
 macro(computecpp_configure)
   set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${HPX_WITH_COMPUTECPP}/cmake/Modules/")
+  include(FindComputeCpp)
   #include(${HPX_WITH_COMPUTECPP}/cmake/common.cmake)
   hpx_add_config_define(HPX_WITH_SYCL)
   hpx_add_config_define(HPX_WITH_GPU_EXECUTOR)
 
   #temporary workaround to enable compilation
-  hpx_add_compile_flag(-I${HPX_WITH_COMPUTECPP}/include)
-
+  #hpx_add_compile_flag(-I${HPX_WITH_COMPUTECPP}/include)
+  hpx_add_compile_flag(-I${COMPUTECPP_INCLUDE_DIRECTORY})
   #using hpx_add_link_flag will modify also static linking flags
   #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${KALMAR_LD_FLAGS}")
   #set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${KALMAR_LD_FLAGS}")

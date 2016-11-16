@@ -133,9 +133,9 @@ macro(add_hpx_executable name)
     add_executable(${name}_exe
               ${${name}_SOURCES} ${${name}_HEADERS})
     #TODO: make it work for multiple files
-    foreach(source ${${name}_SOURCES})
-        add_sycl_to_target(${name}_exe ${source} ${CMAKE_CURRENT_BINARY_DIR})
-    endforeach()
+    #foreach(source ${${name}_SOURCES})
+    #    add_sycl_to_target(${name}_exe ${source} ${CMAKE_CURRENT_BINARY_DIR})
+    #endforeach()
   else()
     add_executable(${name}_exe
       ${${name}_SOURCES} ${${name}_HEADERS})

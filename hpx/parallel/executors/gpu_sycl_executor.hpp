@@ -444,17 +444,17 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
 		}
 
-		template <typename F, typename Shape, typename ... Ts>
+		template <typename Parameters, typename F, typename Shape, typename ... Ts>
         std::vector<hpx::future<
             typename detail::bulk_async_execute_result<F, Shape, Ts...>::type
         > >
-        bulk_async_execute(F && f, Shape const& shape, Ts const &... ts)
+        bulk_async_execute(const Parameters & params, F && f, Shape const& shape, Ts const &... ts)
 		{
             typedef typename
                     detail::bulk_async_execute_result<F, Shape, Ts...>::type
                 result_type;
 			//typedef typename GPUBuffer::buffer_view_type buffer_view_type;
-			//using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
+			using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
             static const int LOCAL_SIZE = 128;
 			std::vector<hpx::future<result_type> > results;
 
@@ -510,7 +510,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                                 hpx::util::invoke(_f, t);
                             };
 
-                            cgh.parallel_for<class kernel_name>(
+                            cgh.parallel_for<kernel_name>(
                                 cl::sycl::nd_range<1>(cl::sycl::range<1>(data_count), cl::sycl::range<1>(local_size)),
                                 kernel
                             );

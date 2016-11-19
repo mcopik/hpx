@@ -35,6 +35,19 @@
 
 //#include <SYCL/sycl.hpp>
 
+namespace std
+{
+    template<typename T>
+    struct iterator_traits< cl::sycl::global_ptr<T> >
+    {
+        typedef T value_type;
+        typedef typename cl::sycl::global_ptr<T>::pointer_t pointer;
+        typedef typename cl::sycl::global_ptr<T>::reference_t reference;
+        typedef ptrdiff_t difference_type;
+        typedef std::random_access_iterator_tag iterator_category;
+    };
+}
+
 namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 {
     namespace detail
@@ -460,6 +473,49 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                             cl::sycl::global_ptr<unsigned long> it = buffer_acc.first.get_pointer() + buffer_acc.second + idx.get_global_linear_id();
 
                             auto t = hpx::util::make_tuple(it, chunk_size, offset);
+                            hpx::util::invoke(_f, t);
+                        };
+
+                        cgh.parallel_for<Name>(
+                            cl::sycl::nd_range<1>(cl::sycl::range<1>(global_size), cl::sycl::range<1>(local_size)),
+                            kernel
+                        );
+                    });
+                };
+                command_group();
+            }
+        };
+
+        template<typename T, typename Name>
+        struct executor_helper<
+                hpx::util::zip_iterator<detail::host_iterator<T>, detail::host_iterator<T>>,
+                Name
+                >
+        {
+            typedef hpx::util::zip_iterator<detail::host_iterator<T>, detail::host_iterator<T>> Iter;
+            template<typename F>
+            static void execute(F && f, const Iter & begin, int data_count, int offset, int chunk_size, int global_size, int local_size, cl::sycl::queue & queue)
+            {
+                F _f = std::move(f);
+                auto iter_tuple = begin.get_iterator_tuple();
+                auto it1 = hpx::util::get<0>(iter_tuple);
+                auto it2 = hpx::util::get<1>(iter_tuple);
+                auto buffer_first = detail::get_buffer( it1, data_count);
+                auto buffer_second = detail::get_buffer( it2, data_count);
+                std::cout << "Run: " << it1.pos() << " " << it2.pos() << " " << global_size << std::endl;
+                auto command_group = [=]() mutable {
+                    queue.submit( [=](cl::sycl::handler & cgh) mutable {
+                        auto buffer_acc_first = detail::get_device_acc(cgh, buffer_first, it1);
+                        auto buffer_acc_second = detail::get_device_acc(cgh, buffer_second, it2);
+                        auto kernel = [=] (cl::sycl::nd_item<1> idx) mutable {
+
+                            if(idx.get_global_linear_id() >= data_count)
+                                return;
+                            //detail::device_iterator<value_type> it = detail::get_device_it<value_type>(buffer_acc, idx.get_global_linear_id());
+                            cl::sycl::global_ptr<unsigned long> dev_it1 = buffer_acc_first.first.get_pointer() + buffer_acc_first.second + idx.get_global_linear_id();
+                            cl::sycl::global_ptr<unsigned long> dev_it2 = buffer_acc_second.first.get_pointer() + buffer_acc_second.second + idx.get_global_linear_id();
+
+                            auto t = hpx::util::make_tuple(hpx::util::make_zip_iterator(dev_it1, dev_it2), chunk_size, offset);
                             hpx::util::invoke(_f, t);
                         };
 

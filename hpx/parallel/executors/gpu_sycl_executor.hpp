@@ -22,6 +22,8 @@
 #include <hpx/util/result_of.hpp>
 #include <hpx/util/unwrapped.hpp>
 
+#include <hpx/compute/sycl/target.hpp>
+
 #include <type_traits>
 #include <utility>
 #include <iterator>
@@ -322,7 +324,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     {
 		/// Returns always 1 if user doesn't provide a chunk size
 		typedef hpx::parallel::dynamic_chunk_size executor_parameters_type;
-
+        hpx::compute::sycl::target target_;
 		cl::sycl::default_selector selector;
         std::shared_ptr<cl::sycl::queue> queue;
 
@@ -444,21 +446,17 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
 		}
 
-		template <typename Parameters, typename F, typename Shape, typename ... Ts>
-        std::vector<hpx::future<
-            typename detail::bulk_async_execute_result<F, Shape, Ts...>::type
-        > >
-        bulk_async_execute(const Parameters & params, F && f, Shape const& shape, Ts const &... ts)
-		{
+        template <typename Parameters, typename F, typename Shape, typename ... Ts>
+        void bulk_launch(const Parameters & params, F && f, const Shape & shape, Ts &&... ts) const
+        {
             typedef typename
                     detail::bulk_async_execute_result<F, Shape, Ts...>::type
                 result_type;
 			//typedef typename GPUBuffer::buffer_view_type buffer_view_type;
 			using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
             static const int LOCAL_SIZE = 128;
-			std::vector<hpx::future<result_type> > results;
 
-			try {
+            try {
 				for (auto const& elem: shape) {
 
                     typedef typename boost::range_const_iterator<Shape>::type tuple_iterator_type;
@@ -468,109 +466,46 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     typedef typename std::decay<decltype(hpx::util::get<0>(elem))>::type iterator_type;
                     typedef typename std::iterator_traits<iterator_type>::value_type value_type;
 
-
-                    int offset = hpx::util::get<1>(elem);
+                    int offset = hpx::util::get<2>(elem);
                     int data_count = hpx::util::get<1>(elem);
                     int local_size = std::min(LOCAL_SIZE, data_count);
-                    int chunk_size = 1;
                     auto begin = hpx::util::get<0>(elem);
-                    //auto end = begin;
-                    //std::advance(end, data_count);
-                    //std::cout << data_count << std::endl;
-                    //iterator_type begin = hpx::util::get<1>(elem);
-                    //sycl_buffer<value_type> buffer(begin, end);
                     auto buffer = detail::get_buffer(begin, data_count);
-                    auto & queue_ = queue;
+                    auto * queue_ = &target_.get_queue();
+                    int chunk_size = 1;
                     F _f = std::move(f);
+                    std::cout << *begin << " " << data_count << " " << offset << std::endl;
 
-                    //auto data_ = buffer.get_access();
-                    //std::cout << data_[0] << " " << *data_.get_pointer() << " " << data_count << " " << offset << " " << chunk_size << std::endl;
-                    //auto buffer_acc = buffer.get_access();
-                    //auto t = hpx::util::make_tuple(offset, buffer_acc.get_pointer(), chunk_size);
-                    //hpx::util::invoke(_f, t);
-
+                    // FIXME: remove this to use normal execution
+                    int global_size = data_count;
+                    if (data_count > LOCAL_SIZE && data_count % LOCAL_SIZE != 0)
+                    {
+                        global_size += LOCAL_SIZE - (data_count % LOCAL_SIZE);
+                    }
+                    std::cout << data_count << " " << global_size << " " << local_size << std::endl;
                     // Mutable is necessary to invoke the functor on a tuple of arguments
                     // Otherwise we get a failed substitution
-                    auto command_group = [_f, buffer, begin, data_count, queue_, offset, chunk_size, local_size]() mutable {
-                        queue_->submit( [_f, buffer, begin, data_count, offset, chunk_size, local_size](cl::sycl::handler & cgh) mutable {
-
-                            //auto buffer_acc = buffer.get_access(cgh);
+                    auto command_group = [_f, buffer, begin, data_count, queue_, offset, chunk_size, local_size, global_size]() mutable {
+                        queue_->submit( [_f, buffer, begin, data_count, offset, local_size, chunk_size, global_size](cl::sycl::handler & cgh) mutable {
                             auto buffer_acc = detail::get_device_acc(cgh, buffer, begin);
-                            //std::cout << buffer_acc.first.get_size() << " " << buffer_acc.second << std::endl;
                             auto kernel = [=] (cl::sycl::nd_item<1> idx) mutable {
+
+                                if(idx.get_global_linear_id() >= data_count)
+                                    return;
                                 //detail::device_iterator<value_type> it = detail::get_device_it<value_type>(buffer_acc, idx.get_global_linear_id());
                                 cl::sycl::global_ptr<unsigned long> it = buffer_acc.first.get_pointer() + buffer_acc.second + idx.get_global_linear_id();
-                                //typedef typename std::iterator_traits<decltype(it)>::value_type value_type;
-                                //typedef typename std::iterator_traits<decltype(it)>::pointer pointer;
-                                //typedef typename std::iterator_traits<decltype(it)>::reference reference;
-                                //typedef typename std::iterator_traits<decltype(it)>::difference_type difference_type;
-                                //typedef typename std::iterator_traits<decltype(it)>::iterator_category cat;
 
                                 auto t = hpx::util::make_tuple(it, chunk_size, offset);
                                 hpx::util::invoke(_f, t);
                             };
 
                             cgh.parallel_for<kernel_name>(
-                                cl::sycl::nd_range<1>(cl::sycl::range<1>(data_count), cl::sycl::range<1>(local_size)),
+                                cl::sycl::nd_range<1>(cl::sycl::range<1>(global_size), cl::sycl::range<1>(local_size)),
                                 kernel
                             );
                         });
-                        queue_->wait();
-                        copy_back(buffer, begin);
-                        //std::cout << *buffer->host_accessor->get_pointer() << *buffer->get_access().get_pointer() << std::endl;
-                        //auto data = buffer->get_access();
-                        //std::copy(data.get_pointer(), data.get_pointer() + data_count, begin);
                     };
-                    //command_group();
-
-                    //std::cout << *buffer->host_accessor->get_pointer() << *buffer->get_access().get_pointer() << std::endl;
-                    //auto data = buffer->get_access();
-                    //std::cout << *data.get_pointer() << " " << data_count << std::endl;
-                    //std::copy(data.get_pointer(), data.get_pointer() + data_count, begin);
-					results.push_back(hpx::async(launch::async, command_group, ts...));
-/*
-                    std::size_t data_count = std::get<1>(elem);
-					std::size_t chunk_size = std::get<2>(elem);
-					std::size_t threads_to_run = data_count / chunk_size;
-					std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
-
-					F _f( std::move(f) );
-
-					auto kernelSubmit = [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk]() {
-						sycl_buffer.queue.submit( [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk](cl::sycl::handler & cgh) {
-
-							buffer_view_type buffer_view =
-								(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-							auto syclKernel = [=] (cl::sycl::id<1> index) {
-								if (true) {
-									// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
-									// Test 3 shows that hardcoded '1' is passed correctly.
-									auto _x = std::make_tuple(&buffer_view, index[0], 1);
-
-									// This doesn't. Obviously, x = 0 means that no work is done.
-									// Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
-									// auto _x = std::make_tuple(&buffer_view, index[0], x);
-
-									// This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
-									// auto _x = std::make_tuple(&buffer_view, index[0] + x, 1);
-									//auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
-
-									_f(_x);
-									//for(int i = 0; i < 10; ++i)
-									//buffer_view[ 0 ] = 1;//index[0];
-								} else {
-
-									// This would show that x has a inproper value here! 1 is written correctly
-									//buffer_view[ index[0] ] = 1;
-									//buffer_view[ index[0] ] = x;
-								}
-							};
-							cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count), syclKernel);
-
-						});
-					};
-
-					results.push_back(hpx::async(launch::async, kernelSubmit));*/
+                    command_group();
 				}
 			}
 			catch (std::bad_alloc const& ba) {
@@ -581,243 +516,266 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 				    exception_list(boost::current_exception())
 				);
 			}
+        }
 
-			return std::move(results);
-		}
+        template <typename Parameters, typename F, typename Shape, typename ... Ts>
+        void bulk_execute(const Parameters & params, F && f, const Shape & shape, Ts &&... ts) const
+        {
+            bulk_launch(params, std::forward<F>(f), shape, std::forward<Ts>(ts)...);
+            target_.synchronize();
+        }
 
-
-		template <typename F, typename Parameters,typename Shape, typename GPUBuffer>
-		static std::vector<hpx::future<
-			typename detail::bulk_async_execute_result<F, Shape>::type
-		> >
-		bulk_async_execute(Parameters & params, F && f, Shape const& shape, GPUBuffer & sycl_buffer)
+		template <typename Parameters, typename F, typename Shape, typename ... Ts>
+        std::vector<hpx::future<
+            typename detail::bulk_async_execute_result<F, Shape, Ts...>::type
+        > >
+        bulk_async_execute(const Parameters & params, F && f, Shape const& shape, Ts const &... ts)
 		{
-			typedef typename detail::bulk_async_execute_result<F, Shape>::type result_type;
-			typedef typename GPUBuffer::buffer_view_type buffer_view_type;
-			using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
-
+            typedef typename
+                    detail::bulk_async_execute_result<F, Shape, Ts...>::type
+                result_type;
 			std::vector<hpx::future<result_type> > results;
-			try {
-				for (auto const& elem: shape) {
-					std::size_t data_count = std::get<1>(elem);
-					std::size_t chunk_size = std::get<2>(elem);
-					std::size_t threads_to_run = data_count / chunk_size;
-					std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
 
-					F _f( std::move(f) );
-
-					auto kernelSubmit = [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk]() {
-						sycl_buffer.queue.submit( [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk](cl::sycl::handler & cgh) {
-
-							buffer_view_type buffer_view =
-								(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-							auto syclKernel = [=] (cl::sycl::id<1> index) {
-								if (true) {
-									// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
-									// Test 3 shows that hardcoded '1' is passed correctly.
-									auto _x = std::make_tuple(&buffer_view, index[0], 1);
-
-									// This doesn't. Obviously, x = 0 means that no work is done.
-									// Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
-									// auto _x = std::make_tuple(&buffer_view, index[0], x);
-
-									// This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
-									// auto _x = std::make_tuple(&buffer_view, index[0] + x, 1);
-									//auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
-
-									_f(_x);
-									//for(int i = 0; i < 10; ++i)
-									//buffer_view[ 0 ] = 1;//index[0];
-								} else {
-
-									// This would show that x has a inproper value here! 1 is written correctly
-									//buffer_view[ index[0] ] = 1;
-									//buffer_view[ index[0] ] = x;
-								}
-							};
-							cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count), syclKernel);
-
-						});
-					};
-
-					results.push_back(hpx::async(launch::async, kernelSubmit));
-				}
-			}
-			catch (std::bad_alloc const& ba) {
-				boost::throw_exception(ba);
-			}
-			catch (...) {
-				boost::throw_exception(
-				    exception_list(boost::current_exception())
-				);
-			}
+            bulk_launch(params, std::forward<F>(f), shape, std::forward<Ts>(ts)...);
+			//results.push_back(hpx::async(launch::async, command_group, ts...));
+            results.push_back(target_.get_future());
 
 			return std::move(results);
 		}
 
-		template <typename F, typename Parameters, typename Shape, typename GPUBuffer>
-		static typename detail::bulk_execute_result<F, Shape>::type
-		bulk_execute(Parameters & params, F && f, Shape const& shape, GPUBuffer & sycl_buffer)
-		{
-			typedef typename GPUBuffer::buffer_view_type buffer_view_type;
-			using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
 
-			/**
-			 * The elements of pair are:
-			 * begin at array, # of elements to process
-			 */
-			for(auto const & elem : shape) {
-				F _f( std::move(f) );
+		//template <typename F, typename Parameters,typename Shape, typename GPUBuffer>
+		//static std::vector<hpx::future<
+		//	typename detail::bulk_async_execute_result<F, Shape>::type
+		//> >
+		//bulk_async_execute(Parameters & params, F && f, Shape const& shape, GPUBuffer & sycl_buffer)
+		//{
+		//	typedef typename detail::bulk_async_execute_result<F, Shape>::type result_type;
+		//	typedef typename GPUBuffer::buffer_view_type buffer_view_type;
+		//	using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
 
-				std::size_t data_count = std::get<1>(elem);
-				std::size_t chunk_size = std::get<2>(elem);
+		//	std::vector<hpx::future<result_type> > results;
+		//	try {
+		//		for (auto const& elem: shape) {
+		//			std::size_t data_count = std::get<1>(elem);
+		//			std::size_t chunk_size = std::get<2>(elem);
+		//			std::size_t threads_to_run = data_count / chunk_size;
+		//			std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
 
-				std::size_t threads_to_run = data_count / chunk_size;
-				std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
+		//			F _f( std::move(f) );
 
-				sycl_buffer.queue.submit( [_f, &sycl_buffer, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
+		//			auto kernelSubmit = [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk]() {
+		//				sycl_buffer.queue.submit( [_f, &sycl_buffer, data_count, chunk_size, threads_to_run, last_thread_chunk](cl::sycl::handler & cgh) {
 
-					buffer_view_type buffer_view =
-						(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
+		//					buffer_view_type buffer_view =
+		//						(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
+		//					auto syclKernel = [=] (cl::sycl::id<1> index) {
+		//						if (true) {
+		//							// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
+		//							// Test 3 shows that hardcoded '1' is passed correctly.
+		//							auto _x = std::make_tuple(&buffer_view, index[0], 1);
 
-					cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count),
-						[=] (cl::sycl::id<1> index)
-						{
-							if (true) {
-								// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
-								// Test 3 shows that hardcoded '1' is passed correctly.
-								auto _x = std::make_tuple(&buffer_view, index[0], 1);
+		//							// This doesn't. Obviously, x = 0 means that no work is done.
+		//							// Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
+		//							// auto _x = std::make_tuple(&buffer_view, index[0], x);
 
-								// This doesn't. Obviously, x = 0 means that no work is done.
-								// Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
-								// auto _x = std::make_tuple(&buffer_view, index[0], x);
+		//							// This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
+		//							// auto _x = std::make_tuple(&buffer_view, index[0] + x, 1);
+		//							//auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
 
-								// This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
-								//auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
+		//							_f(_x);
+		//							//for(int i = 0; i < 10; ++i)
+		//							//buffer_view[ 0 ] = 1;//index[0];
+		//						} else {
 
-								_f(_x);
+		//							// This would show that x has a inproper value here! 1 is written correctly
+		//							//buffer_view[ index[0] ] = 1;
+		//							//buffer_view[ index[0] ] = x;
+		//						}
+		//					};
+		//					cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count), syclKernel);
 
-							} else {
+		//				});
+		//			};
 
-								// This would show that x has a inproper value here! 1 is written correctly
-								//buffer_view[ index[0] ] = 1;
-								//buffer_view[ index[0] ] = data_count;
-							}
+		//			results.push_back(hpx::async(launch::async, kernelSubmit));
+		//		}
+		//	}
+		//	catch (std::bad_alloc const& ba) {
+		//		boost::throw_exception(ba);
+		//	}
+		//	catch (...) {
+		//		boost::throw_exception(
+		//		    exception_list(boost::current_exception())
+		//		);
+		//	}
 
-						});
-				});
-                sycl_buffer.queue.wait();
-             }
-           }
+		//	return std::move(results);
+		//}
 
-            template <typename F, typename Parameters, typename GPUBuffer, typename GPUBuffer2, typename GPUBuffer3>
-	        static void bulk_execute(Parameters & params, F && f, std::size_t data_count, std::size_t chunk_size, GPUBuffer & sycl_buffer,GPUBuffer2 & sycl_buffer2,GPUBuffer3 & sycl_buffer3)
-	        {
-		        typedef typename GPUBuffer::buffer_view_type buffer_view_type;
-		        using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
-
-		        /**
-		         * The elements of pair are:
-		         * begin at array, # of elements to process
-		         */
-		        //for(auto const & elem : shape) {
-			        F _f( std::move(f) );
-
-
-			        std::size_t threads_to_run = data_count / chunk_size;
-			        std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
-                    //std::cout << "Runs: " << data_count << std::endl;
-
-			        sycl_buffer.queue.submit( [_f, &sycl_buffer,&sycl_buffer2,&sycl_buffer3, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
-
-				        buffer_view_type buffer_view =
-					        (*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-				        buffer_view_type buffer_view2 =
-					        (*sycl_buffer2.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-				        buffer_view_type buffer_view3 =
-					        (*sycl_buffer3.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-
-				        cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count),
-					        [=] (cl::sycl::id<1> index)
-					        {
-						        if (true) {
-							        // This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
-							        // Test 3 shows that hardcoded '1' is passed correctly.
-							        //auto _x = std::make_tuple();
-
-							        // This doesn't. Obviously, x = 0 means that no work is done.
-							        // Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
-							        // auto _x = std::make_tuple(&buffer_view, index[0], x);
-
-							        // This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
-							        //auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
-
-							        _f(index[0], 1,&buffer_view,&buffer_view2,&buffer_view3);
-
-						        } else {
-
-							        // This would show that x has a inproper value here! 1 is written correctly
-							        //buffer_view[ index[0] ] = 1;
-							        //buffer_view[ index[0] ] = data_count;
-						        }
-
-					        });
-			        });
-                    sycl_buffer.queue.wait();
-		        }
-
-            template <typename F, typename Parameters, typename GPUBuffer, typename GPUBuffer2>
-	        static void bulk_execute(Parameters & params, F && f, std::size_t data_count, std::size_t chunk_size, GPUBuffer & sycl_buffer,GPUBuffer2 & sycl_buffer2)
-	        {
-		        typedef typename GPUBuffer::buffer_view_type buffer_view_type;
-		        using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
-
-		        /**
-		         * The elements of pair are:
-		         * begin at array, # of elements to process
-		         */
-		        //for(auto const & elem : shape) {
-			        F _f( std::move(f) );
-
-
-			        std::size_t threads_to_run = data_count / chunk_size;
-			        std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
-                    //std::cout << "Runs: " << data_count << std::endl;
-			        sycl_buffer.queue.submit( [_f, &sycl_buffer,&sycl_buffer2, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
-
-				        buffer_view_type buffer_view =
-					        (*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-				        buffer_view_type buffer_view2 =
-					        (*sycl_buffer2.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
-
-				        cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count),
-					        [=] (cl::sycl::id<1> index)
-					        {
-						        if (true) {
-							        // This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
-							        // Test 3 shows that hardcoded '1' is passed correctly.
-							        //auto _x = std::make_tuple();
-
-							        // This doesn't. Obviously, x = 0 means that no work is done.
-							        // Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
-							        // auto _x = std::make_tuple(&buffer_view, index[0], x);
-
-							        // This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
-							        //auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
-
-							        _f(index[0], 1,&buffer_view,&buffer_view2);
-
-						        } else {
-
-							        // This would show that x has a inproper value here! 1 is written correctly
-							        //buffer_view[ index[0] ] = 1;
-							        //buffer_view[ index[0] ] = data_count;
-						        }
-
-					        });
-			        });
-                    sycl_buffer.queue.wait();
-		        }
+//		template <typename F, typename Parameters, typename Shape, typename GPUBuffer>
+//		static typename detail::bulk_execute_result<F, Shape>::type
+//		bulk_execute(Parameters & params, F && f, Shape const& shape, GPUBuffer & sycl_buffer)
+//		{
+//			typedef typename GPUBuffer::buffer_view_type buffer_view_type;
+//			using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
+//
+//			/**
+//			 * The elements of pair are:
+//			 * begin at array, # of elements to process
+//			 */
+//			for(auto const & elem : shape) {
+//				F _f( std::move(f) );
+//
+//				std::size_t data_count = std::get<1>(elem);
+//				std::size_t chunk_size = std::get<2>(elem);
+//
+//				std::size_t threads_to_run = data_count / chunk_size;
+//				std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
+//
+//				sycl_buffer.queue.submit( [_f, &sycl_buffer, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
+//
+//					buffer_view_type buffer_view =
+//						(*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
+//
+//					cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count),
+//						[=] (cl::sycl::id<1> index)
+//						{
+//							if (true) {
+//								// This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
+//								// Test 3 shows that hardcoded '1' is passed correctly.
+//								auto _x = std::make_tuple(&buffer_view, index[0], 1);
+//
+//								// This doesn't. Obviously, x = 0 means that no work is done.
+//								// Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
+//								// auto _x = std::make_tuple(&buffer_view, index[0], x);
+//
+//								// This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
+//								//auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
+//
+//								_f(_x);
+//
+//							} else {
+//
+//								// This would show that x has a inproper value here! 1 is written correctly
+//								//buffer_view[ index[0] ] = 1;
+//								//buffer_view[ index[0] ] = data_count;
+//							}
+//
+//						});
+//				});
+//                sycl_buffer.queue.wait();
+//             }
+//           }
+//
+//            template <typename F, typename Parameters, typename GPUBuffer, typename GPUBuffer2, typename GPUBuffer3>
+//	        static void bulk_execute(Parameters & params, F && f, std::size_t data_count, std::size_t chunk_size, GPUBuffer & sycl_buffer,GPUBuffer2 & sycl_buffer2,GPUBuffer3 & sycl_buffer3)
+//	        {
+//		        typedef typename GPUBuffer::buffer_view_type buffer_view_type;
+//		        using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
+//
+//		        /**
+//		         * The elements of pair are:
+//		         * begin at array, # of elements to process
+//		         */
+//		        //for(auto const & elem : shape) {
+//			        F _f( std::move(f) );
+//
+//
+//			        std::size_t threads_to_run = data_count / chunk_size;
+//			        std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
+//                    //std::cout << "Runs: " << data_count << std::endl;
+//
+//			        sycl_buffer.queue.submit( [_f, &sycl_buffer,&sycl_buffer2,&sycl_buffer3, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
+//
+//				        buffer_view_type buffer_view =
+//					        (*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
+//				        buffer_view_type buffer_view2 =
+//					        (*sycl_buffer2.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
+//				        buffer_view_type buffer_view3 =
+//					        (*sycl_buffer3.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
+//
+//				        cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count),
+//					        [=] (cl::sycl::id<1> index)
+//					        {
+//						        if (true) {
+//							        // This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
+//							        // Test 3 shows that hardcoded '1' is passed correctly.
+//							        //auto _x = std::make_tuple();
+//
+//							        // This doesn't. Obviously, x = 0 means that no work is done.
+//							        // Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
+//							        // auto _x = std::make_tuple(&buffer_view, index[0], x);
+//
+//							        // This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
+//							        //auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
+//
+//							        _f(index[0], 1,&buffer_view,&buffer_view2,&buffer_view3);
+//
+//						        } else {
+//
+//							        // This would show that x has a inproper value here! 1 is written correctly
+//							        //buffer_view[ index[0] ] = 1;
+//							        //buffer_view[ index[0] ] = data_count;
+//						        }
+//
+//					        });
+//			        });
+//                    sycl_buffer.queue.wait();
+//		        }
+//
+//            template <typename F, typename Parameters, typename GPUBuffer, typename GPUBuffer2>
+//	        static void bulk_execute(Parameters & params, F && f, std::size_t data_count, std::size_t chunk_size, GPUBuffer & sycl_buffer,GPUBuffer2 & sycl_buffer2)
+//	        {
+//		        typedef typename GPUBuffer::buffer_view_type buffer_view_type;
+//		        using kernel_name = typename hpx::parallel::get_kernel_name<F, Parameters>::kernel_name;
+//
+//		        /**
+//		         * The elements of pair are:
+//		         * begin at array, # of elements to process
+//		         */
+//		        //for(auto const & elem : shape) {
+//			        F _f( std::move(f) );
+//
+//
+//			        std::size_t threads_to_run = data_count / chunk_size;
+//			        std::size_t last_thread_chunk = data_count - (threads_to_run - 1)*chunk_size;
+//                    //std::cout << "Runs: " << data_count << std::endl;
+//			        sycl_buffer.queue.submit( [_f, &sycl_buffer,&sycl_buffer2, threads_to_run, last_thread_chunk, data_count, chunk_size](cl::sycl::handler & cgh) {
+//
+//				        buffer_view_type buffer_view =
+//					        (*sycl_buffer.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
+//				        buffer_view_type buffer_view2 =
+//					        (*sycl_buffer2.buffer.get()).template get_access<cl::sycl::access::mode::read_write>(cgh);
+//
+//				        cgh.parallel_for<kernel_name>(cl::sycl::range<1>(data_count),
+//					        [=] (cl::sycl::id<1> index)
+//					        {
+//						        if (true) {
+//							        // This works with all tests. Type of tuple: <const buffer_view_type *, std::size_t, std::size_t>
+//							        // Test 3 shows that hardcoded '1' is passed correctly.
+//							        //auto _x = std::make_tuple();
+//
+//							        // This doesn't. Obviously, x = 0 means that no work is done.
+//							        // Together with test 3 it proves that the value of last element in tuple is passed incorrectly (same random value on each thread).
+//							        // auto _x = std::make_tuple(&buffer_view, index[0], x);
+//
+//							        // This is what I want to obtain. Test 1 ends with a segfault, because the address is very incorrect - test 2 proves that
+//							        //auto _x = std::make_tuple(&buffer_view, index[0] * chunk_size, index[0] != static_cast<int>(threads_to_run - 1) ? chunk_size : last_thread_chunk);
+//
+//							        _f(index[0], 1,&buffer_view,&buffer_view2);
+//
+//						        } else {
+//
+//							        // This would show that x has a inproper value here! 1 is written correctly
+//							        //buffer_view[ index[0] ] = 1;
+//							        //buffer_view[ index[0] ] = data_count;
+//						        }
+//
+//					        });
+//			        });
+//                    sycl_buffer.queue.wait();
+//		        }
 
         std::size_t os_thread_count()
         {

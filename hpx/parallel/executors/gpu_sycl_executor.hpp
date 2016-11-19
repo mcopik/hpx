@@ -47,6 +47,7 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
     struct sycl_buffer
 	{
         typedef cl::sycl::buffer<T> buffer_t;
+        typedef detail::host_iterator<T> iterator;
         typedef decltype(std::declval<buffer_t>().template get_access<cl::sycl::access::mode::read_write>(std::declval<cl::sycl::handler &>())) device_acc_t;
         typedef decltype(std::declval<buffer_t>().template get_access<cl::sycl::access::mode::read, cl::sycl::access::target::host_buffer>()) host_acc_t;
 
@@ -437,6 +438,41 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
 			throw std::runtime_error("Feature not supported in GPU AMP executor! Please, use bulk execute.");
 		}
 
+        template<typename Iter, typename Name>
+        struct executor_helper;
+
+        template<typename T, typename Name>
+        struct executor_helper<detail::host_iterator<T>, Name>
+        {
+            template<typename F>
+            static void execute(F && f, const detail::host_iterator<T> & begin, int data_count, int offset, int chunk_size, int global_size, int local_size, cl::sycl::queue & queue)
+            {
+                F _f = std::move(f);
+                auto buffer = detail::get_buffer(begin, data_count);
+                auto command_group = [=]() mutable {
+                    queue.submit( [=](cl::sycl::handler & cgh) mutable {
+                        auto buffer_acc = detail::get_device_acc(cgh, buffer, begin);
+                        auto kernel = [=] (cl::sycl::nd_item<1> idx) mutable {
+
+                            if(idx.get_global_linear_id() >= data_count)
+                                return;
+                            //detail::device_iterator<value_type> it = detail::get_device_it<value_type>(buffer_acc, idx.get_global_linear_id());
+                            cl::sycl::global_ptr<unsigned long> it = buffer_acc.first.get_pointer() + buffer_acc.second + idx.get_global_linear_id();
+
+                            auto t = hpx::util::make_tuple(it, chunk_size, offset);
+                            hpx::util::invoke(_f, t);
+                        };
+
+                        cgh.parallel_for<Name>(
+                            cl::sycl::nd_range<1>(cl::sycl::range<1>(global_size), cl::sycl::range<1>(local_size)),
+                            kernel
+                        );
+                    });
+                };
+                command_group();
+            }
+        };
+
 		template <typename F>
 		static hpx::future<typename hpx::util::result_of<
 			typename hpx::util::decay<F>::type()
@@ -470,11 +506,11 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                     int data_count = hpx::util::get<1>(elem);
                     int local_size = std::min(LOCAL_SIZE, data_count);
                     auto begin = hpx::util::get<0>(elem);
-                    auto buffer = detail::get_buffer(begin, data_count);
-                    auto * queue_ = &target_.get_queue();
+                    //auto buffer = detail::get_buffer(begin, data_count);
+                    auto queue_ = target_.get_queue();
                     int chunk_size = 1;
-                    F _f = std::move(f);
-                    std::cout << *begin << " " << data_count << " " << offset << std::endl;
+                    //F _f = std::move(f);
+                    //std::cout << *begin << " " << data_count << " " << offset << std::endl;
 
                     // FIXME: remove this to use normal execution
                     int global_size = data_count;
@@ -483,29 +519,31 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                         global_size += LOCAL_SIZE - (data_count % LOCAL_SIZE);
                     }
                     std::cout << data_count << " " << global_size << " " << local_size << std::endl;
+                    executor_helper<iterator_type, kernel_name>::execute(std::forward<F>(f), begin, data_count, offset, chunk_size,
+                            global_size, local_size, queue_);
                     // Mutable is necessary to invoke the functor on a tuple of arguments
                     // Otherwise we get a failed substitution
-                    auto command_group = [_f, buffer, begin, data_count, queue_, offset, chunk_size, local_size, global_size]() mutable {
-                        queue_->submit( [_f, buffer, begin, data_count, offset, local_size, chunk_size, global_size](cl::sycl::handler & cgh) mutable {
-                            auto buffer_acc = detail::get_device_acc(cgh, buffer, begin);
-                            auto kernel = [=] (cl::sycl::nd_item<1> idx) mutable {
+                    //auto command_group = [_f, buffer, begin, data_count, queue_, offset, chunk_size, local_size, global_size]() mutable {
+                    //    queue_->submit( [_f, buffer, begin, data_count, offset, local_size, chunk_size, global_size](cl::sycl::handler & cgh) mutable {
+                    //        auto buffer_acc = detail::get_device_acc(cgh, buffer, begin);
+                    //        auto kernel = [=] (cl::sycl::nd_item<1> idx) mutable {
 
-                                if(idx.get_global_linear_id() >= data_count)
-                                    return;
-                                //detail::device_iterator<value_type> it = detail::get_device_it<value_type>(buffer_acc, idx.get_global_linear_id());
-                                cl::sycl::global_ptr<unsigned long> it = buffer_acc.first.get_pointer() + buffer_acc.second + idx.get_global_linear_id();
+                    //            if(idx.get_global_linear_id() >= data_count)
+                    //                return;
+                    //            //detail::device_iterator<value_type> it = detail::get_device_it<value_type>(buffer_acc, idx.get_global_linear_id());
+                    //            cl::sycl::global_ptr<unsigned long> it = buffer_acc.first.get_pointer() + buffer_acc.second + idx.get_global_linear_id();
 
-                                auto t = hpx::util::make_tuple(it, chunk_size, offset);
-                                hpx::util::invoke(_f, t);
-                            };
+                    //            auto t = hpx::util::make_tuple(it, chunk_size, offset);
+                    //            hpx::util::invoke(_f, t);
+                    //        };
 
-                            cgh.parallel_for<kernel_name>(
-                                cl::sycl::nd_range<1>(cl::sycl::range<1>(global_size), cl::sycl::range<1>(local_size)),
-                                kernel
-                            );
-                        });
-                    };
-                    command_group();
+                    //        cgh.parallel_for<kernel_name>(
+                    //            cl::sycl::nd_range<1>(cl::sycl::range<1>(global_size), cl::sycl::range<1>(local_size)),
+                    //            kernel
+                    //        );
+                    //    });
+                    //};
+                    //command_group();
 				}
 			}
 			catch (std::bad_alloc const& ba) {

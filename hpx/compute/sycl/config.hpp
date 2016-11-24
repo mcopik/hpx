@@ -12,6 +12,8 @@
 
 
 namespace hpx { namespace compute { namespace sycl {
+    template<typename T>
+    using buffer_t = ::cl::sycl::buffer<T, 1>;
     typedef ::cl::sycl::device device_t;
     typedef ::cl::sycl::queue queue_t;
     typedef ::cl::sycl::exception exception_t;

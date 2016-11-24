@@ -8,6 +8,7 @@
 
 #include <hpx/compute/host.hpp>
 #include <hpx/compute/cuda.hpp>
+#include <hpx/compute/sycl.hpp>
 #include <hpx/compute/vector.hpp>
 #include <hpx/compute/serialization/vector.hpp>
 

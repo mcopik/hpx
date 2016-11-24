@@ -243,6 +243,12 @@ hpx_option(HPX_WITH_HCC BOOL
   "Enable hcc support (default: OFF)" OFF ADVANCED)
 hpx_option(HPX_WITH_SYCL BOOL
   "Enable sycl support (default: OFF)" OFF ADVANCED)
+if(HPX_WITH_SYCL)
+  find_package(ComputeCpp REQUIRED)
+  set(HPX_WITH_COMPUTE On)
+  hpx_add_config_define(HPX_HAVE_SYCL)
+  hpx_add_config_define(HPX_HAVE_COMPUTE)
+endif()
 
 ################################################################################
 # HPX datapar configuration
@@ -1081,6 +1087,17 @@ if(HPX_WITH_CUDA AND HPX_WITH_CUDA_CLANG)
   hpx_libraries(cudart)
   hpx_library_dir(${CUDA_TOOLKIT_ROOT_DIR}/lib64)
   link_directories(${CUDA_TOOLKIT_ROOT_DIR}/lib64)
+endif()
+
+################################################################################
+# SYCL features - ComputeCpp
+################################################################################
+
+if(HPX_WITH_SYCL)
+  hpx_add_compile_flag(-I${COMPUTECPP_INCLUDE_DIRECTORY})
+  #Link directly to OpenCL because of dependency on OpenCL callbacks in future
+  #FIXME: should be OpenCL_LIBRARIES, but HPX's FindOpenCL overrides it
+  hpx_libraries(${COMPUTECPP_RUNTIME_LIBRARY} ${OPENCL_LIBRARIES})
 endif()
 
 ################################################################################

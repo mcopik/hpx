@@ -12,6 +12,12 @@ if(HPX_WITH_CUDA)
      )
 endif()
 
+if(HPX_WITH_SYCL)
+  set(subdirs ${subdirs}
+      sycl
+     )
+endif()
+
 foreach(subdir ${subdirs})
   add_hpx_pseudo_target(examples.compute.${subdir})
   add_subdirectory(${subdir})

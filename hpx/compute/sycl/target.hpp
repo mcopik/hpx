@@ -1,3 +1,10 @@
+///////////////////////////////////////////////////////////////////////////////
+//  Copyright (c) 2016 Marcin Copik
+//
+//  Distributed under the Boost Software License, Version 1.0. (See accompanying
+//  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+///////////////////////////////////////////////////////////////////////////////
+
 #ifndef HPX_COMPUTE_SYCL_TARGET_HPP
 #define HPX_COMPUTE_SYCL_TARGET_HPP
 
@@ -5,20 +12,11 @@
 
 #if defined(HPX_HAVE_SYCL)
 
-#include <hpx/compute/sycl/config.hpp>
-
 #include <hpx/runtime/runtime_fwd.hpp>
 #include <hpx/lcos/future.hpp>
 #include <hpx/lcos/local/spinlock.hpp>
 #include <hpx/config/warnings_prefix.hpp>
-
-//#if !defined(__COMPUTE__ACCELERATOR__)
-#include <hpx/runtime/serialization/serialization_fwd.hpp>
-//#endif
-
-//#include <hpx/compute/hc/config.hpp>
-
-//#include <hc.hpp>
+#include <hpx/compute/sycl/config.hpp>
 
 #include <mutex>
 #include <string>
@@ -123,13 +121,7 @@ namespace hpx { namespace compute { namespace sycl
         void synchronize() const;
 
         hpx::future<void> get_future() const;
-        //TODO: remove this
-        queue_t & get_queue() const
-        {
-            return handle_.get_queue();
-        }
     private:
-//#if !defined(__COMPUTE__ACCELERATOR__)
         friend class hpx::serialization::access;
 
         template <typename Archive>
@@ -137,7 +129,7 @@ namespace hpx { namespace compute { namespace sycl
         {
             ar & handle_.device_idx_ & handle_.locality_;
         }
-//#endif
+
         native_handle_type handle_;
     };
 

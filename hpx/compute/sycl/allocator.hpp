@@ -16,11 +16,50 @@
 #include <hpx/compute/sycl/target.hpp>
 #include <hpx/compute/sycl/target_ptr.hpp>
 #include <hpx/compute/sycl/value_proxy.hpp>
+#include <hpx/compute/sycl/detail/launch.hpp>
 
 #include <string>
 
+#if defined(__SYCL_DEVICE_ONLY__)
+namespace cl {
+namespace sycl {
+namespace detail {
+// typedef for __global void*
+typedef cl::sycl::detail::address_space_trait<
+    void, cl::sycl::access::address_space::global_space>::address_space_type *
+    global_void_ptr;
+// typedef for __local void*
+typedef cl::sycl::detail::address_space_trait<
+    void, cl::sycl::access::address_space::local_space>::address_space_type *
+    local_void_ptr;
+} // namespace detail
+} // namespace sycl
+} // namespace cl
+
+// device-side overloads for placement taking pointers to global and local data
+cl::sycl::detail::global_void_ptr
+operator new(std::size_t, cl::sycl::detail::global_void_ptr p) {
+  return p;
+}
+cl::sycl::detail::local_void_ptr
+operator new(std::size_t, cl::sycl::detail::local_void_ptr p) {
+  return p;
+}
+#endif
+
 namespace hpx { namespace compute { namespace sycl
 {
+
+    namespace detail
+    {
+        // name can't be nested
+        template<typename U>
+        struct AllocatorConstruct;
+        // name can't be nested
+        template<typename U>
+        struct AllocatorDestruct;
+    }
+
     template <typename T>
     class allocator
     {
@@ -28,13 +67,8 @@ namespace hpx { namespace compute { namespace sycl
         typedef T value_type;
         typedef target_ptr<T> pointer;
         typedef target_ptr<T const> const_pointer;
-//#if defined(__CUDA_ARCH__)
-//        typedef T& reference;
-//        typedef T const& const_reference;
-//#else
         typedef value_proxy<T> reference;
         typedef value_proxy<T const> const_reference;
-//#endif
         typedef std::size_t size_type;
         typedef std::ptrdiff_t difference_type;
 
@@ -47,7 +81,7 @@ namespace hpx { namespace compute { namespace sycl
         typedef std::true_type is_always_equal;
         typedef std::true_type propagate_on_container_move_assignment;
 
-        typedef sycl::target target_type;
+        typedef sycl::target    target_type;
 
         allocator()
           : target_(sycl::get_default_target())
@@ -81,7 +115,7 @@ namespace hpx { namespace compute { namespace sycl
         // Allocates n * sizeof(T) bytes of uninitialized storage by creating
         // a new sycl::buffer. Exact location of the memory is unspecified
         // but it is logically tied in HPX to a specific target.
-        // The responsilibity for efficient memory transfer and allocation relies
+        // The responsibility for efficient memory transfer and allocation relies
         // on SYCL runtime because its API does not give us any possibility to control
         // it or provide hints.
         pointer allocate(size_type n)
@@ -140,11 +174,18 @@ namespace hpx { namespace compute { namespace sycl
         }
 
     public:
+
         // Constructs count objects of type T in allocated uninitialized
         // storage pointed to by p, using placement-new
         template <typename ... Args>
         void bulk_construct(pointer p, std::size_t count, Args &&... args)
         {
+            //FIXME: add varargs after getting tuple
+            detail::launch<class detail::AllocatorConstruct<T>>(target_, count,
+                [=](size_t idx, cl::sycl::global_ptr<int> ptr) mutable {
+                    new (ptr + idx) T();
+                }, p);
+            target_.synchronize();
         }
 
         // Constructs an object of type T in allocated uninitialized storage
@@ -152,11 +193,17 @@ namespace hpx { namespace compute { namespace sycl
         template <typename ... Args>
         void construct(pointer p, Args &&... args)
         {
+            bulk_construct(p, 1, std::forward<Args>(args)...);
         }
 
         // Calls the destructor of count objects pointed to by p
         void bulk_destroy(pointer p, std::size_t count)
         {
+            detail::launch<class detail::AllocatorDestruct<T>>(target_, count,
+                [=](size_t idx, cl::sycl::global_ptr<int> ptr) mutable {
+                    (ptr + idx)->~T();
+                }, p);
+            target_.synchronize();
         }
 
         // Calls the destructor of the object pointed to by p

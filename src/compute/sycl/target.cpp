@@ -33,19 +33,24 @@ namespace hpx { namespace compute { namespace sycl
         {
             HPX_ASSERT(rt);
 
-            // Register this thread with HPX, this should be done once for
-            // each external OS-thread intended to invoke HPX functionality.
-            // Calling this function more than once on the same thread will
-            // report an error.
-            hpx::error_code ec(hpx::lightweight);       // ignore errors
-            hpx::register_thread(rt_, "hc", ec);
+            // ID is nullptr iff the thread is foreign
+            if(!hpx::threads::get_self_id()) {
+                // Register this thread with HPX, this should be done once for
+                // each external OS-thread intended to invoke HPX functionality.
+                // Calling this function more than once on the same thread will
+                // report an error.
+                hpx::error_code ec(hpx::lightweight);       // ignore errors
+                hpx::register_thread(rt_, "hc", ec);
+            }
         }
 
         runtime_registration_wrapper::~runtime_registration_wrapper()
         {
-            // Unregister the thread from HPX, this should be done once in
-            // the end before the external thread exists.
-            hpx::unregister_thread(rt_);
+            if(!hpx::threads::get_self_id()) {
+                // Unregister the thread from HPX, this should be done once in
+                // the end before the external thread exists.
+                hpx::unregister_thread(rt_);
+            }
         }
 
         ///////////////////////////////////////////////////////////////////////
@@ -158,8 +163,7 @@ namespace hpx { namespace compute { namespace sycl
     }
 
     target::native_handle_type::native_handle_type(int device) :
-        device_idx_(device),
-        locality_(hpx::find_here())
+        device_idx_(device)
     {
         HPX_ASSERT(device_idx_ >= -1);
         // TODO: recheck if this implementation is what we want
@@ -168,31 +172,29 @@ namespace hpx { namespace compute { namespace sycl
         device_idx_ = device_idx_ >= 0 ? device_idx_ : 0;
         HPX_ASSERT(devices.size() > static_cast<std::size_t>(device_idx_));
         device_ = devices[device_idx_];
-        queue_ = queue_t(device_);
+        queue_ = queue_t(device_, &async_handler);
     }
 
     target::native_handle_type::~native_handle_type()
     {
-        queue_.wait();
+        //FIXME: is it necessary? Queue has its own destructor
+        //queue_.wait();
     }
 
     target::native_handle_type::native_handle_type(
             target::native_handle_type && rhs) HPX_NOEXCEPT
       : device_idx_(rhs.device_idx_),
         device_(std::move(rhs.device_)),
-        queue_(std::move(rhs.queue_)),
-        locality_(rhs.locality_)
+        queue_(std::move(rhs.queue_))
     {
         //rhs.device_view_ = nullptr;
-        rhs.locality_ = hpx::invalid_id;
     }
 
     target::native_handle_type::native_handle_type(
             const target::native_handle_type & rhs) HPX_NOEXCEPT
       : device_idx_(rhs.device_idx_),
         device_(rhs.device_),
-        queue_(rhs.queue_),
-        locality_(rhs.locality_)
+        queue_(rhs.queue_)
     {
         //rhs.device_view_ = nullptr;
         //rhs.locality_ = hpx::invalid_id;
@@ -206,9 +208,7 @@ namespace hpx { namespace compute { namespace sycl
 
         device_idx_ = rhs.device_idx_;
         device_= std::move(rhs.device_);
-        locality_ = rhs.locality_;
         queue_ = std::move(rhs.queue_);
-        rhs.locality_ = hpx::invalid_id;
         return *this;
     }
 
@@ -220,20 +220,13 @@ namespace hpx { namespace compute { namespace sycl
 
         device_idx_ = rhs.device_idx_;
         device_= rhs.device_;
-        locality_ = rhs.locality_;
         queue_ = rhs.queue_;
         return *this;
     }
+
     ///////////////////////////////////////////////////////////////////////////
     void target::synchronize() const
     {
-        //if (handle_.device_view_)
-        //{
-        //    HPX_THROW_EXCEPTION(invalid_status,
-        //        "hc::target::synchronize",
-        //        "no view of accelerator available");
-        //}
-
         try {
             handle_.get_queue().wait_and_throw();
         } catch (exception_t & exc) {
@@ -251,6 +244,22 @@ namespace hpx { namespace compute { namespace sycl
         boost::intrusive_ptr<shared_state_type> p(new shared_state_type());
         p.get()->initialize(handle_.get_queue());
         return hpx::traits::future_access<hpx::future<void>>::create(p);
+    }
+
+    void target::async_handler(cl::sycl::exception_list el)
+    {
+        for(auto & exc : el) {
+            try {
+                std::rethrow_exception(exc);
+            } catch (cl::sycl::exception &e) {
+                /* We set to true since we have caught a SYCL exception.
+                 * More complex checking of error classes can be done here,
+                 * like checking for specific SYCL sub-classes or
+                 * recovering a potential underlying OpenCL error. */
+                std::cout << " I have caught an exception! " << std::endl;
+                std::cout << e.what() << std::endl;
+            }
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////

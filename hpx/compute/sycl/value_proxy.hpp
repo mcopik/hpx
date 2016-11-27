@@ -27,6 +27,7 @@ namespace hpx { namespace compute { namespace sycl
             traits::access_target<sycl::target> access_target;
 
     public:
+        typedef T proxy_type;
 
         value_proxy(buffer_t<T> * buffer, uint64_t pos) HPX_NOEXCEPT
           : buffer_(buffer)
@@ -59,6 +60,50 @@ namespace hpx { namespace compute { namespace sycl
         buffer_t<T> * device_data() const
         {
             return buffer_;
+        }
+
+        uint64_t pos() const
+        {
+            return pos_;
+        }
+
+    private:
+        buffer_t<T> * buffer_;
+        uint64_t pos_;
+    };
+
+    template <typename T>
+    class value_proxy<T const>
+    {
+        typedef
+            traits::access_target<sycl::target> access_target;
+
+    public:
+        typedef T const proxy_type;
+
+        value_proxy(buffer_t<T> * buffer, uint64_t pos) HPX_NOEXCEPT
+          : buffer_(buffer)
+          , pos_(pos)
+        {}
+
+        value_proxy(value_proxy<T> const& other)
+          : buffer_(other.device_data())
+          , pos_(other.pos())
+        {}
+
+        operator T() const
+        {
+            return access_target::read(buffer_, pos_);
+        }
+
+        buffer_t<T> * device_data() const
+        {
+            return buffer_;
+        }
+
+        uint64_t pos() const
+        {
+            return pos_;
         }
 
     private:

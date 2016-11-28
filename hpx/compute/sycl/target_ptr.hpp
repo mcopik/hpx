@@ -29,7 +29,7 @@ namespace hpx { namespace compute { namespace sycl
     class target_ptr :
         public hpx::util::iterator_facade<
                 target_ptr<T>,
-                T,
+                value_proxy<T>,
                 std::random_access_iterator_tag,
                 value_proxy<T>,
                 std::ptrdiff_t,
@@ -38,13 +38,16 @@ namespace hpx { namespace compute { namespace sycl
     {
         typedef hpx::util::iterator_facade<
                 target_ptr<T>,
-                T,
+                value_proxy<T>,
                 std::random_access_iterator_tag,
                 value_proxy<T>,
                 std::ptrdiff_t,
                 T*
             > base_type;
     public:
+
+        // Necessary for concepts in algorithms - verification of callable
+        typename compute::detail::get_proxy_type<T>::type * proxy_type;
 
         typedef target_ptr<T> pointer;
         typedef value_proxy<T> reference;
@@ -74,6 +77,13 @@ namespace hpx { namespace compute { namespace sycl
         {
             pos_ = rhs.pos_;
             buffer_ = rhs.buffer_;
+            return *this;
+        }
+
+        target_ptr& operator=(std::nullptr_t)
+        {
+            pos_ = 0;
+            buffer_ = nullptr;
             return *this;
         }
 
@@ -107,6 +117,11 @@ namespace hpx { namespace compute { namespace sycl
             return buffer_;
         }
 
+        uint64_t pos() const
+        {
+            return pos_;
+        }
+
         reference dereference() const
         {
             return value_proxy<T>(buffer_, pos_);
@@ -132,10 +147,16 @@ namespace hpx { namespace compute { namespace sycl
             pos_ += n;
         }
 
-        std::ptrdiff_t distance(const target_ptr<T> & oth) const
+        std::ptrdiff_t distance_to(const target_ptr<T> & oth) const
         {
             return oth.pos_ - pos_;
         }
+
+        explicit operator T*() const
+        {
+            return nullptr;
+        }
+
     private:
 
         uint64_t pos_;

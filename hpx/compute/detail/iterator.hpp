@@ -48,6 +48,9 @@ namespace hpx { namespace compute { namespace detail
         typedef
             typename traits::allocator_traits<Allocator>::target_type
             target_type;
+        typedef
+            typename traits::allocator_traits<Allocator>::pointer
+            pointer_type;
 
         HPX_HOST_DEVICE iterator()
           : base_type(nullptr)
@@ -78,6 +81,11 @@ namespace hpx { namespace compute { namespace detail
         HPX_HOST_DEVICE target_type const& target() const
         {
             return *target_;
+        }
+
+        HPX_HOST_DEVICE pointer_type device_ptr() const
+        {
+            return this->base();
         }
 
     private:

@@ -14,6 +14,7 @@
 #include <hpx/util/decay.hpp>
 #include <hpx/util/invoke.hpp>
 #include <hpx/util/tuple.hpp>
+#include <hpx/util/zip_iterator.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -42,7 +43,33 @@ namespace hpx { namespace compute { namespace sycl
                                 auto t = hpx::util::make_tuple(ptr + idx, 1, offset);
                                 hpx::util::invoke(_f, t);
                             };
-                detail::launch<Name>(t, chunk_size, local_size, f1, begin.device_ptr(), std::forward<Args>(args)...);
+                launch<Name>(t, chunk_size, local_size, f1, begin.device_ptr(), std::forward<Args>(args)...);
+            }
+        };
+
+        template<typename Iter, typename Iter2, typename Name>
+        struct launcher_helper< hpx::util::zip_iterator<Iter, Iter2>, Name >
+        {
+            template<typename F, typename ... Args>
+            static void execute(target const& t, int local_size, F && f, hpx::util::zip_iterator<Iter, Iter2> begin,
+                                int chunk_size, int offset, Args &&... args)
+            {
+                typedef typename std::iterator_traits<Iter>::value_type value_type;
+                typedef typename std::iterator_traits<Iter2>::value_type value_type2;
+                typedef hpx::util::zip_iterator<
+                    cl::sycl::global_ptr<value_type>,
+                    cl::sycl::global_ptr<value_type2>
+                > it_type;
+
+                F _f = std::move(f);
+                auto f1 = [=](size_t idx, it_type ptr) mutable {
+                    //ptr += pos + idx.get_global_linear_id();
+                    auto t = hpx::util::make_tuple(ptr + idx, 1, offset);
+                    hpx::util::invoke(_f, t);
+                };
+                auto it_tuple = begin.get_iterator_tuple();
+                launch<Name>(t, chunk_size, local_size, f1, hpx::util::get<0>(it_tuple).device_ptr(),
+                                     hpx::util::get<1>(it_tuple).device_ptr(), std::forward<Args>(args)...);
             }
         };
     }

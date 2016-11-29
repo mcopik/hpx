@@ -40,7 +40,8 @@ namespace hpx { namespace serialization
             vs.resize(size);
             for(size_type i = 0; i != size; ++i)
             {
-                ar >> vs[i];
+                //FIXME: disabled for SYCL
+                //ar >> vs[i];
             }
         }
 
@@ -65,7 +66,8 @@ namespace hpx { namespace serialization
                 if(size == 0) return;
 
                 v.resize(size);
-                load_binary(ar, &v[0], v.size() * sizeof(value_type));
+                //FIXME: disabled for SYCL
+                //load_binary(ar, &v[0], v.size() * sizeof(value_type));
             }
         }
     }
@@ -112,7 +114,8 @@ namespace hpx { namespace serialization
                 // bitwise save ...
                 typedef typename compute::vector<T, Allocator>::value_type
                     value_type;
-                save_binary(ar, &v[0], v.size() * sizeof(value_type));
+                //FIXME: disabled for SYCL
+                //save_binary(ar, &v[0], v.size() * sizeof(value_type));
             }
         }
     }

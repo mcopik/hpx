@@ -9,12 +9,14 @@
 #define HPX_COMPUTE_SYCL_HPP
 
 #include <hpx/compute/sycl/allocator.hpp>
+#include <hpx/compute/sycl/default_executor.hpp>
 #include <hpx/compute/sycl/get_targets.hpp>
-#include <hpx/compute/cuda/serialization/value_proxy.hpp>
+#include <hpx/compute/sycl/serialization/value_proxy.hpp>
 #include <hpx/compute/sycl/target.hpp>
-#include <hpx/compute/cuda/target_ptr.hpp>
-#include <hpx/compute/cuda/traits/access_target.hpp>
-#include <hpx/compute/cuda/transfer.hpp>
-#include <hpx/compute/cuda/value_proxy.hpp>
+#include <hpx/compute/sycl/target_ptr.hpp>
+#include <hpx/compute/sycl/transfer.hpp>
+#include <hpx/compute/sycl/target_distribution_policy.hpp>
+#include <hpx/compute/sycl/value_proxy.hpp>
+#include <hpx/compute/sycl/detail/launch.hpp>
 
 #endif

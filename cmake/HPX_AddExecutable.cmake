@@ -134,6 +134,14 @@ macro(add_hpx_executable name)
       ${${name}_SOURCES} ${${name}_HEADERS})
   endif()
 
+  if(HPX_WITH_SYCL)
+    if(${name}_SYCL)
+      foreach(source ${${name}_SOURCES})
+        add_sycl_to_target(${example_program}_exe ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/${sources})
+      endforeach()
+    endif()
+  endif()
+
   if(${name}_OUTPUT_SUFFIX)
     if(MSVC)
       set_target_properties("${name}_exe" PROPERTIES

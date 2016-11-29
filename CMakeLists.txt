@@ -248,6 +248,15 @@ if(HPX_WITH_SYCL)
   set(HPX_WITH_COMPUTE On)
   hpx_add_config_define(HPX_HAVE_SYCL)
   hpx_add_config_define(HPX_HAVE_COMPUTE)
+
+  set(HPX_WITH_CXX14_IS_FINAL Off)
+  set(HPX_WITH_CXX1Y_EXPERIMENTAL_OPTIONAL Off)
+  #Enable older API on GCC >= 5.1
+  if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 5.1)
+        #hpx_add_config_define(_GLIBCXX_USE_CXX11_ABI 0)
+    endif()
+  endif()
 endif()
 
 ################################################################################
@@ -1097,7 +1106,7 @@ if(HPX_WITH_SYCL)
   hpx_add_compile_flag(-I${COMPUTECPP_INCLUDE_DIRECTORY})
   #Link directly to OpenCL because of dependency on OpenCL callbacks in future
   #FIXME: should be OpenCL_LIBRARIES, but HPX's FindOpenCL overrides it
-  hpx_libraries(${COMPUTECPP_RUNTIME_LIBRARY} ${OPENCL_LIBRARIES})
+  hpx_libraries(${COMPUTECPP_RUNTIME_LIBRARY} ${OpenCL_LIBRARY})
 endif()
 
 ################################################################################

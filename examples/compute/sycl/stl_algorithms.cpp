@@ -7,6 +7,9 @@
 
 #include <hpx/include/compute.hpp>
 #include <hpx/include/parallel_copy.hpp>
+#include <hpx/include/parallel_for_each.hpp>
+#include <hpx/include/parallel_transform.hpp>
+#include <hpx/include/parallel_executor_parameters.hpp>
 
 #include <hpx/hpx_init.hpp>
 
@@ -15,7 +18,47 @@
 #include <string>
 #include <vector>
 
+struct pfo
+{
+    void operator()(int & x) const
+    {
+        ++x;
+        //int v = x;
+        //x = ++v;
+    }
+    // otherwise result_of fails to match pfo against value_proxy &&
+    void operator()(int && x) const
+    {
+        ++x;
+        //int v = x;
+        //x = ++v;
+    }
+};
 
+struct pfo2
+{
+    int operator()(int & x) const
+    {
+        return x + 1;
+        //int v = x;
+        //x = ++v;
+    }
+    // otherwise result_of fails to match pfo against value_proxy &&
+    int operator()(int && x) const
+    {
+        return x + 1;
+        //int v = x;
+        //x = ++v;
+    }
+};
+
+struct pfo3
+{
+    int operator()(int x, double y) const
+    {
+        return x + y;
+    }
+};
 int hpx_main(boost::program_options::variables_map& vm)
 {
     unsigned int seed = (unsigned int)std::time(nullptr);
@@ -35,41 +78,27 @@ int hpx_main(boost::program_options::variables_map& vm)
     {
         hpx::compute::sycl::target target;
         target_allocator alloc(target);
+
         hpx::compute::vector<int, target_allocator> device(N, alloc);
         hpx::compute::vector<int, target_allocator> device2(N, alloc);
         hpx::compute::vector<int, target_allocator> device3(N, alloc);
-        std::cout << host[0] << " " << host[1] << std::endl;
-        std::cout << "Write at 0 val " << host[0] << "\n";
-        device[0] = host[0];
-        std::cout << "Read at 0 val " << device[0] << "\n";
 
         hpx::parallel::copy(hpx::parallel::seq, host.begin(), host.end(), device.begin());
-        hpx::parallel::copy(hpx::parallel::seq, device.begin(), device.end(), new_host.begin());
-        if (!std::equal(host.begin(), host.end(), new_host.begin())) {
-            std::cout << "Wrong copy - not equal!" << std::endl;
-        }
-
-        hpx::compute::sycl::detail::launch<class NewKernel>(target, N, 32,
-                                                         [=](size_t idx, cl::sycl::global_ptr<int> ptr) mutable {
-                                                             if (idx >= N)
-                                                                 return;
-                                                             ptr[idx] += 1;
-                                                         }, device.data());
-        hpx::future<void> f = target.get_future();
-        f.get();
         hpx::compute::sycl::default_executor exec(target);
-        hpx::parallel::for_each(hpx::parallel::par.on(exec).with(hpx::parallel::kernel_name<class ForEach>()), device.begin(), device.end(), pfo());
-        hpx::parallel::transform(hpx::parallel::par.on(exec).with(hpx::parallel::kernel_name<class Transform>()), device.begin(), device.end(), device2.begin(), pfo2());//[](int & val) { return val + 2;});
-        hpx::parallel::transform(hpx::parallel::par.on(exec).with(hpx::parallel::kernel_name<class Transform2>()), device.begin(), device.end(),
-                                 device2.begin(), device3.begin(), pfo3());//[](int & val) { return val + 2;});
-        hpx::parallel::for_each(hpx::parallel::par, host.begin(), host.end(), [](int & val) { val = 2*val + 5;} );
-        target.synchronize();
+        hpx::parallel::for_each(hpx::parallel::par.on(exec).with(hpx::parallel::kernel_name<class ForEach>()),
+                                device.begin(), device.end(), pfo());
+        hpx::parallel::transform(hpx::parallel::par.on(exec).with(hpx::parallel::kernel_name<class Transform>()),
+                                 device.begin(), device.end(), device2.begin(), pfo2());
+        hpx::parallel::transform(hpx::parallel::par(hpx::parallel::task).on(exec).with(hpx::parallel::kernel_name<class Transform2>()),
+                                 device.begin(), device.end(), device2.begin(), device3.begin(), pfo3());
+        hpx::parallel::for_each(hpx::parallel::par, host.begin(), host.end(), [](int & val) { val = 2*val + 3;} );
+
         hpx::parallel::copy(hpx::parallel::seq, device3.begin(), device3.end(), new_host.begin());
-        //target.synchronize();
         if (!std::equal(host.begin(), host.end(), new_host.begin())) {
             std::cout << "Wrong copy - not equal!" << std::endl;
         }
     }
+
     return hpx::finalize();
 }
 

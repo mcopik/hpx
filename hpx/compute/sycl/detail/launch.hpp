@@ -116,7 +116,45 @@ namespace hpx { namespace compute { namespace sycl { namespace detail
                             kernel
                     );
                 };
-                //std::cout << "Launch: " << global_size << " " << local_size << " " << pos << std::endl;
+                t.native_handle().get_queue().submit(cmd_group_launcher);
+            }
+        };
+
+        template<typename T, typename U, typename V, typename... Args>
+        struct launch<target_ptr<T>, target_ptr<U>, target_ptr<V>, Args...>
+        {
+            // FIXME: change it to allow variadic args - parse buffers to a tuple
+            template<typename Name, typename F>
+            static void call(target const& t, std::size_t global_size, std::size_t local_size, F && f,
+                const target_ptr<T> & ptr1, const target_ptr<U> & ptr2, const target_ptr<V> & ptr3, Args &&...)
+            {
+                //f can't be caught as an rvalue
+                auto _f = std::move(f);
+                uint64_t pos1 = ptr1.pos(), pos2 = ptr2.pos(), pos3 = ptr3.pos();
+                // Iter has to be a SYCL device iterator
+                std::size_t original_global_size = global_size;
+                if (global_size % local_size)
+                {
+                    global_size += local_size - (global_size % local_size);
+                }
+                auto cmd_group_launcher = [=](cl::sycl::handler & cgh) mutable {
+                    auto buffer_acc = ptr1.device_data()->template get_access<cl::sycl::access::mode::read_write>(cgh);
+                    auto buffer_acc2 = ptr2.device_data()->template get_access<cl::sycl::access::mode::read_write>(cgh);
+                    auto buffer_acc3 = ptr3.device_data()->template get_access<cl::sycl::access::mode::read_write>(cgh);
+                    auto kernel = [=] (cl::sycl::nd_item<1> idx) mutable {
+                        size_t id = idx.get_global_linear_id();
+                        if(id >= original_global_size)
+                            return;
+                        cl::sycl::global_ptr<T> dev_ptr1 = buffer_acc.get_pointer() + pos1;
+                        cl::sycl::global_ptr<U> dev_ptr2 = buffer_acc2.get_pointer() + pos2;
+                        cl::sycl::global_ptr<V> dev_ptr3 = buffer_acc3.get_pointer() + pos3;
+                        hpx::util::invoke(_f, id, hpx::util::make_zip_iterator(dev_ptr1, dev_ptr2, dev_ptr3));
+                    };
+                    cgh.parallel_for<Name>(
+                            cl::sycl::nd_range<1>(cl::sycl::range<1>(global_size), cl::sycl::range<1>(local_size)),
+                            kernel
+                    );
+                };
                 t.native_handle().get_queue().submit(cmd_group_launcher);
             }
         };

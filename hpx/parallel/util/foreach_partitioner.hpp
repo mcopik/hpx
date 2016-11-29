@@ -80,7 +80,7 @@ namespace hpx { namespace parallel { namespace util
                             has_variable_chunk_size());
 
                     workitems = executor_traits::bulk_async_execute(
-                        policy.executor(),
+                        policy.executor(), policy.parameters(),
                         partitioner_iteration<Result, F1>{std::forward<F1>(f1)},
                         std::move(shapes));
                 }
@@ -152,7 +152,7 @@ namespace hpx { namespace parallel { namespace util
                             has_variable_chunk_size());
 
                     workitems = executor_traits::bulk_async_execute(
-                        policy.executor(),
+                        policy.executor(), policy.parameters(),
                         partitioner_iteration<Result, F1>{std::forward<F1>(f1)},
                         std::move(shapes));
                 }

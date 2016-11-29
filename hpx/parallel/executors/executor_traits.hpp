@@ -279,9 +279,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         ///////////////////////////////////////////////////////////////////////
         struct bulk_async_execute_helper
         {
-            template <typename Executor, typename F, typename S, typename ... Ts>
+            template <typename Executor, typename Parameters, typename F, typename S, typename ... Ts>
             static auto
-            call(hpx::traits::detail::wrap_int, Executor&& exec, F && f,
+            call(hpx::traits::detail::wrap_int, Executor&& exec, Parameters &&, F && f,
                     S const& shape, Ts &&... ts)
             ->  std::vector<typename future_type<
                         typename hpx::util::decay<Executor>::type,
@@ -310,9 +310,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 return results;
             }
 
-            template <typename Executor, typename F, typename S, typename ... Ts>
+            template <typename Executor, typename Parameters, typename F, typename S, typename ... Ts>
             static auto
-            call(int, Executor&& exec, F && f, S const& shape, Ts &&... ts)
+            call(int, Executor&& exec, Parameters &&, F && f, S const& shape, Ts &&... ts)
             ->  decltype(
                     exec.bulk_async_execute(std::forward<F>(f), shape,
                         std::forward<Ts>(ts)...)
@@ -321,18 +321,30 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
                 return exec.bulk_async_execute(std::forward<F>(f), shape,
                     std::forward<Ts>(ts)...);
             }
+
+            template <typename Executor, typename Parameters, typename F, typename S, typename ... Ts>
+            static auto
+            call(int, Executor&& exec, Parameters && parameters, F && f, S const& shape, Ts &&... ts)
+            ->  decltype(
+                    exec.bulk_async_execute(std::forward<Parameters>(parameters), std::forward<F>(f),
+                                            shape, std::forward<Ts>(ts)...)
+                )
+            {
+                return exec.bulk_async_execute(std::forward<Parameters>(parameters), std::forward<F>(f),
+                                               shape, std::forward<Ts>(ts)...);
+            }
         };
 
-        template <typename Executor, typename F, typename S, typename ... Ts>
-        auto call_bulk_async_execute(Executor&& exec, F && f, S const& shape,
+        template <typename Executor, typename Parameters, typename F, typename S, typename ... Ts>
+        auto call_bulk_async_execute(Executor&& exec, Parameters && parameters, F && f, S const& shape,
                 Ts &&... ts)
         ->  decltype(
                 bulk_async_execute_helper::call(0, std::forward<Executor>(exec),
-                    std::forward<F>(f), shape, std::forward<Ts>(ts)...)
+                    std::forward<Parameters>(parameters), std::forward<F>(f), shape, std::forward<Ts>(ts)...)
             )
         {
             return bulk_async_execute_helper::call(
-                0, std::forward<Executor>(exec), std::forward<F>(f), shape,
+                0, std::forward<Executor>(exec), std::forward<Parameters>(parameters), std::forward<F>(f), shape,
                 std::forward<Ts>(ts)...);
         }
 
@@ -595,19 +607,19 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         /// \note This calls exec.async_execute(f, shape) if it exists;
         ///       otherwise it executes hpx::async(f, i) as often as needed.
         ///
-        template <typename Executor_, typename F, typename Shape,
+        template <typename Executor_, typename Parameters, typename F, typename Shape,
             typename ... Ts>
         static auto
-        bulk_async_execute(Executor_ && exec, F && f, Shape const& shape,
+        bulk_async_execute(Executor_ && exec, Parameters && parameters, F && f, Shape const& shape,
             Ts &&... ts)
         ->  decltype(
-                detail::call_bulk_async_execute(std::forward<Executor_>(exec),
-                    std::forward<F>(f), shape, std::forward<Ts>(ts)...)
+                detail::call_bulk_async_execute(std::forward<Executor_>(exec), std::forward<Parameters>(parameters),
+                                                std::forward<F>(f), shape, std::forward<Ts>(ts)...)
             )
         {
             return detail::call_bulk_async_execute(
-                std::forward<Executor_>(exec), std::forward<F>(f), shape,
-                std::forward<Ts>(ts)...);
+                std::forward<Executor_>(exec), std::forward<Parameters>(parameters),
+                std::forward<F>(f), shape, std::forward<Ts>(ts)...);
         }
 
         /// \brief Bulk form of synchronous execution agent creation

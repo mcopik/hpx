@@ -344,6 +344,29 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         }
 
         HPX_HAS_MEMBER_XXX_TRAIT_DEF(mark_end_execution);
+
+        // If there is a kernel wrapper - take that name
+        // If not, take the parameter type
+        // If none - take default
+
+        // Look for parameter type
+        template<typename Kernel, typename Params, typename Enable = void>
+        struct get_kernel_name_params
+        {
+            typedef Kernel kernel_name;
+        };
+
+        template<typename> struct void_ { typedef void type; };
+
+        template<typename Kernel, typename Params>
+        struct get_kernel_name_params<Kernel, Params, typename void_<typename Params::name>::type>
+        {
+            typedef typename Params::name kernel_name;
+        };
+
+        template<typename Kernel, typename Params>
+        struct get_kernel_name : get_kernel_name_params<Kernel, typename hpx::util::decay<Params>::type > {};
+
     }
     /// \endcond
 
@@ -366,6 +389,9 @@ namespace hpx { namespace parallel { HPX_INLINE_NAMESPACE(v3)
         typedef typename detail::extract_has_variable_chunk_size<
                 executor_parameters_type
             >::type has_variable_chunk_size;
+
+        template<typename Kernel>
+        using kernel_name = typename detail::get_kernel_name<Kernel, Parameters>::kernel_name;
 
         /// Return the number of invocations of the given function \a f which
         /// should be combined into a single task

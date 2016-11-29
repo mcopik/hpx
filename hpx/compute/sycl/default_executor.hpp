@@ -77,6 +77,8 @@ namespace hpx { namespace compute { namespace sycl
 
     struct default_executor : hpx::parallel::executor_tag
     {
+        typedef std::true_type requires_executor_parameters ;
+
         // By default, this executor relies on a special executor parameters
         // implementation which knows about the specifics of creating the
         // bulk-shape ranges for the accelerator.
@@ -85,10 +87,13 @@ namespace hpx { namespace compute { namespace sycl
           : target_(target)
         {}
 
-        template <typename F, typename ... Args>
-        void apply_execute(F && f, Args &&... args) const
+        template <typename Parameters, typename F, typename ... Args>
+        void apply_execute(Parameters &&, F && f, Args &&... args) const
         {
-            detail::launch(target_, 1, std::forward<F>(f), std::forward<Args>(args)...);
+            typedef hpx::parallel::executor_parameter_traits<Parameters> parameters_traits;
+            typedef typename parameters_traits::template kernel_name<F> kernel_name;
+
+            detail::launch<kernel_name>(target_, 1, std::forward<F>(f), std::forward<Args>(args)...);
         }
 
         template <typename F, typename ... Args>
@@ -105,35 +110,38 @@ namespace hpx { namespace compute { namespace sycl
             target_.synchronize();
         }
 
-        template <typename F, typename Shape, typename ... Args>
-        void bulk_launch(F && f, Shape const& shape, Args &&... args) const
+        template <typename Parameters, typename F, typename Shape, typename ... Args>
+        void bulk_launch(Parameters &&, F && f, Shape const& shape, Args &&... args) const
         {
+            typedef hpx::parallel::executor_parameter_traits<Parameters> parameters_traits;
+            typedef typename parameters_traits::template kernel_name<F> kernel_name;
+
             for (auto const& elem: shape)
             {
                 auto begin = hpx::util::get<0>(elem);
                 std::size_t chunk_size = hpx::util::get<1>(elem);
                 std::size_t offset = hpx::util::get<2>(elem);
-                detail::launcher_helper<decltype(begin), class Name>::execute(target_, 32,
+                detail::launcher_helper<decltype(begin), kernel_name>::execute(target_, 32,
                                                                               std::forward<F>(f), begin, chunk_size, offset, std::forward<Args>(args)...);
             }
         }
 
-        template <typename F, typename Shape, typename ... Args>
+        template <typename Parameters, typename F, typename Shape, typename ... Args>
         std::vector<hpx::future<void> >
-        bulk_async_execute(F && f, Shape const& shape, Args &&... args) const
+        bulk_async_execute(Parameters && params, F && f, Shape const& shape, Args &&... args) const
         {
             std::cout << "Launch!" << std::endl;
-            bulk_launch(std::forward<F>(f), shape, std::forward<Args>(args)...);
+            bulk_launch(std::forward<Parameters>(params), std::forward<F>(f), shape, std::forward<Args>(args)...);
             std::vector<hpx::future<void> > result;
             result.push_back(target_.get_future());
             return result;
         }
 
-        template <typename F, typename Shape, typename ... Args>
-        void bulk_execute(F && f, Shape const& shape, Args &&... args) const
+        template <typename Parameters, typename F, typename Shape, typename ... Args>
+        void bulk_execute(Parameters && params, F && f, Shape const& shape, Args &&... args) const
         {
             std::cout << "Launch!" << std::endl;
-            bulk_launch(std::forward<F>(f), shape, std::forward<Args>(args)...);
+            bulk_launch(std::forward<Parameters>(params), std::forward<F>(f), shape, std::forward<Args>(args)...);
             target_.synchronize();
         }
 
